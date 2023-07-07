@@ -22,7 +22,7 @@ Your app or use case may only require a single dialog or sidebar, or you may wan
 
 To edit the entrypoints, you will need to:
 
-1. Create or remove the entrypoint directories in the client source code. For instance, you can remove `./src/client/sidebar-about-page` altogether, or copy it and modify the source code. See above [requirements](#requirements).
+1. Create or remove the entrypoint directories in the client source code. For instance, you can remove `./src/client/sidebar` altogether, or copy it and modify the source code. See above [requirements](#requirements).
 
 2. Modify the server-side code to load the correct menu items and expose the correct public functions:
     - [ui file](../server/ui.js)

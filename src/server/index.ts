@@ -1,11 +1,8 @@
 import {
     onInstall,
     onOpen,
-    openDialog,
-    openDialogBootstrap,
-    openDialogMUI,
-    openDialogTailwindCSS,
-    openAboutSidebar,
+    showGenTemplate,
+    openSidebar,
 } from './ui';
 
 import { getSheetsData, addSheet, deleteSheet, setActiveSheet } from './sheets';
@@ -14,11 +11,8 @@ import { getSheetsData, addSheet, deleteSheet, setActiveSheet } from './sheets';
 export {
     onInstall,
     onOpen,
-    openDialog,
-    openDialogBootstrap,
-    openDialogMUI,
-    openDialogTailwindCSS,
-    openAboutSidebar,
+    showGenTemplate,
+    openSidebar,
     getSheetsData,
     addSheet,
     deleteSheet,
