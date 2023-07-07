@@ -5,7 +5,13 @@ import {
     openSidebar,
 } from './ui';
 
-import { getSheetsData, addSheet, deleteSheet, setActiveSheet } from './sheets';
+import {
+    getSheetsData,
+    addSheet,
+    deleteSheet,
+    setActiveSheet,
+    generateTemplateScript,
+} from './sheets';
 
 // Public functions must be exported as named exports
 export {
@@ -17,4 +23,5 @@ export {
     addSheet,
     deleteSheet,
     setActiveSheet,
+    generateTemplateScript,
 };

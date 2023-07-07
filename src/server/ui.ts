@@ -16,8 +16,8 @@ export const showGenTemplate = () => {
     let html = HtmlService.createHtmlOutputFromFile("generateTemplate")
         .setWidth(640)
         .setHeight(300)
-        .setTitle("Generate Vocab Lists");
-    ui.showModalDialog(html, "Generate Vocab Lists")
+        .setTitle("Generate a template to start");
+    ui.showModalDialog(html, "Generate a template to start")
 }
 
 export const openSidebar = () => {
