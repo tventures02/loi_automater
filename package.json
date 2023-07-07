@@ -1,10 +1,9 @@
 {
-  "name": "react-google-apps-script",
-  "version": "2.1.1",
-  "description": "Starter project for using React with Google Apps Script",
+  "name": "z-real-estate-calc",
+  "version": "1.0.0",
+  "description": "Z Real Estate Calculator",
   "repository": {
-    "type": "git",
-    "url": "https://github.com/enuchi/React-Google-Apps-Script.git"
+    "type": "git"
   },
   "scripts": {
     "test:integration": "jest --forceExit test/local-development.test",
@@ -27,8 +26,7 @@
     "script",
     "sheets"
   ],
-  "author": "Elisha Nuchi",
-  "license": "MIT",
+  "author": "Tidis Ventures LLC",
   "engines": {
     "node": ">=10.0.0",
     "npm": ">=6.0.0"

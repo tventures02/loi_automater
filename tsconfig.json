@@ -1,7 +1,21 @@
 {
-  "compilerOptions": {
-    "types": ["gas-types-detailed"],
-    "jsx": "react",
-    "esModuleInterop": true
+    "compilerOptions": {
+      "types": [ "node",  "gas-types-detailed"],
+      "jsx": "react",
+      "esModuleInterop": true,
+      "lib": [ "dom","es2019" ],
+      "baseUrl": ".",
+      "paths": {
+      "*": [
+            "*"
+        ]
+      }
+    },
+    "include": [
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.ts",
+      "**/*.tsx"
+    ]
   }
-}
+  
