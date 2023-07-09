@@ -42,9 +42,13 @@ export const generateTemplateScript = () => {
         activeSpreadsheet.setActiveSheet(tempSheet);
         activeSpreadsheet.moveActiveSheet(0);
         let sheets = activeSpreadsheet.getSheets();
+        let settingsSheetExists = false;
         if (sheets.length > 1) {
             for (let i = sheets.length - 1; i > 0; i--) {
-                activeSpreadsheet.deleteSheet(sheets[i]);
+                if (sheets[i].getName() == CONSTANTS.SETTINGS_SHEETNAME) {
+                    settingsSheetExists = true;
+                }
+                else activeSpreadsheet.deleteSheet(sheets[i]);
             }
         }
         sheets[0].setName("Sheet1");
@@ -55,10 +59,27 @@ export const generateTemplateScript = () => {
         tempSheet.getRange(CONSTANTS.HEADERS_RANGE).setValues([CONSTANTS.DEFAULT_LABELS]).setFontWeight('bold');
         tempSheet.setFrozenRows(1);
 
-        // Construct backdoor sheet
-        tempSheet = activeSpreadsheet.insertSheet();
-        
-        tempSheet.setName(CONSTANTS.CONFIG_SHEETNAME);
+        // Construct settings sheet
+        if (!settingsSheetExists) {
+            tempSheet = activeSpreadsheet.insertSheet();
+            tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
+        }
+        activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
+        tempSheet = SpreadsheetApp.getActiveSheet();
+        if (tempSheet) {
+            console.log('here')
+            tempSheet.setColumnWidth(1, 300);
+            const settingsKeys = Object.keys(CONSTANTS.SETTINGS.RANGES);
+            const numSettingsCategories = settingsKeys.length;
+            for (let i = 0; i < numSettingsCategories; i++) {
+                const key = settingsKeys[i];
+                const label = CONSTANTS.SETTINGS.LABELS[key];
+                tempSheet.getRange(CONSTANTS.SETTINGS.RANGES[key].LABEL).setValue(label).setFontWeight('bold');
+                const values = CONSTANTS.SETTINGS[key];
+                tempSheet.getRange(CONSTANTS.SETTINGS.RANGES[key].VALUES).setValues(values);
+            }
+            tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
+        }
 
         activeSpreadsheet.setActiveSheet(sheets[0]);
         return {
@@ -67,6 +88,7 @@ export const generateTemplateScript = () => {
         }
 
     } catch (error) {
+        console.log(error)
         return {
             success: false,
             message: error.message,

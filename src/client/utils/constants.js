@@ -9,8 +9,83 @@ module.exports = {
     LIGHT_RED_BERRY: "#FFCBCB",
     LIGHT_GREEN: "#93c47d",
     DARK_RED_BERRY: "#5f2120",
-    CONFIG_SHEETNAME: `Configuration Sheet`,
-    ANA_SHEETNAME: 'Properties to analyze',
+    SETTINGS_SHEETNAME: `Settings`,
+    SETTINGS: {
+        PURCHASE: [
+            ['Downpayment (%)'],
+            ['Downpayment ($)'],
+            ['Closing costs ($)'],
+        ],
+        LOAN: [
+            ['Loan interest rate (%)'],
+            ['Points charged'],
+            ['Loan term (years)'],
+        ],
+        EXPENSES: [
+            ['Property taxes (% of home value)'],
+            ['Property taxes ($)'],
+            ['Insurance (% of home value)'],
+            ['Insurance ($)'],
+            ['Repairs & maintenance (% of gross monthly rent)'],
+            ['Repairs & maintenance ($)'],
+            ['Capital expenditures (% of gross monthly rent)'],
+            ['Capital expenditures ($)'],
+            ['Management fees (% of gross monthly rent)'],
+            ['Utilities ($)'],
+            ['HOA Fees ($)'],
+            ['Other expenses ($)'],
+        ],
+        LTR: [
+            ['Rental income ($)'],
+            ['Other income ($)'],
+            ['Vacancy (%)'],
+        ],
+        STR: [
+            ['Platform fee (% of gross rent charged)'],
+            ['Cleaning cost ($)'],
+            ['Average occupancy rate (%)'],
+        ],
+        TIME: [
+            ['Annual income growth (%)'],
+            ['Annual expense growth (%)'],
+        ],
+        LABELS: {
+            PURCHASE: 'Purchase values',
+            LOAN: 'Loan values',
+            EXPENSES: 'Expenses',
+            LTR: 'Long term rental values',
+            STR: 'Short term rental values',
+            TIME: 'Time dependent values',
+        },
+        RANGES: {
+            PURCHASE: {
+                LABEL: 'A2',
+                VALUES: 'A3:A5',
+            },
+            LOAN: {
+                LABEL: 'A7',
+                VALUES: 'A8:A10',
+            },
+            EXPENSES: {
+                LABEL: 'A12',
+                VALUES: 'A13:A24',
+            },
+            LTR: {
+                LABEL: 'A26',
+                VALUES: 'A27:A29',
+            },
+            STR: {
+                LABEL: 'A31',
+                VALUES: 'A32:A34',
+            },
+            TIME: {
+                LABEL: 'A36',
+                VALUES: 'A37:A38',
+            },
+        }
+    },
+    SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations. All $ amounts take precendence over percentages.',
+    ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',
     FREE_FEATURES: ["600 free GRE vocabulary words",
         "Review up to 10 flashcards per set",
         "Make up to 18 printable flashcards to Google Docs",
