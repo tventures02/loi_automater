@@ -63,12 +63,12 @@ export const generateTemplateScript = () => {
         if (!settingsSheetExists) {
             tempSheet = activeSpreadsheet.insertSheet();
             tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
+            tempSheet.getRange('B3:B38').setValues(CONSTANTS.SETTINGS.DEFAULT_VALUES);
         }
         activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
         tempSheet = SpreadsheetApp.getActiveSheet();
         if (tempSheet) {
-            console.log('here')
-            tempSheet.setColumnWidth(1, 300);
+            tempSheet.setColumnWidth(1, 370);
             const settingsKeys = Object.keys(CONSTANTS.SETTINGS.RANGES);
             const numSettingsCategories = settingsKeys.length;
             for (let i = 0; i < numSettingsCategories; i++) {
