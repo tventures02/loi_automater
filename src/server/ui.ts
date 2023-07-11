@@ -7,8 +7,7 @@ export const onOpen = (e) => {
   menu.createMenu('Z Real Estate Calculator')
       .addSubMenu(menu.createMenu('Start Here')
           .addItem('Generate Template', 'showGenTemplate'))
-      .addItem('Open Calculator', 'openSidebar')
-      .addItem('Sheet Editor (MUI)', 'openDialogMUI').addToUi();
+      .addItem('Open Calculator', 'openSidebar').addToUi();
 };
 
 export const showGenTemplate = () => {
@@ -21,6 +20,6 @@ export const showGenTemplate = () => {
 }
 
 export const openSidebar = () => {
-  const html = HtmlService.createHtmlOutputFromFile('sidebar');
+  const html = HtmlService.createHtmlOutputFromFile('sidebar').setTitle("Z Real Estate Calculator");
   SpreadsheetApp.getUi().showSidebar(html);
 };

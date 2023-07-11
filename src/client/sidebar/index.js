@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import About from './components/About';
+import SidebarContainer from './components/Sidebar';
+import '../base.css';
 
 const container = document.getElementById('index');
 const root = createRoot(container);
-root.render(<About />);
+root.render(<SidebarContainer />);

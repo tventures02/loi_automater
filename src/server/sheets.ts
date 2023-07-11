@@ -32,6 +32,9 @@ export const setActiveSheet = (sheetName) => {
   return getSheetsData();
 };
 
+export const getUserEmail = () => {
+    return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
+}
 
 export const generateTemplateScript = () => {
     try {

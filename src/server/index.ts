@@ -11,6 +11,7 @@ import {
     deleteSheet,
     setActiveSheet,
     generateTemplateScript,
+    getUserEmail,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -24,4 +25,5 @@ export {
     deleteSheet,
     setActiveSheet,
     generateTemplateScript,
+    getUserEmail,
 };
