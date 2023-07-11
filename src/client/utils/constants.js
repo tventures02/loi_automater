@@ -10,6 +10,12 @@ module.exports = {
     LIGHT_GREEN: "#93c47d",
     DARK_RED_BERRY: "#5f2120",
     SETTINGS_SHEETNAME: `Settings`,
+    ANALYSIS_MODES: [
+        'Long term rental property',
+        'Short term rental property',
+        'Fix and flip',
+        'BRRRR'
+    ],
     SETTINGS: {
         DEFAULT_VALUES: [
             ['20'],

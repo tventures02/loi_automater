@@ -2,14 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 // import { backendCall } from '../../utils/server-calls';
-import { Grid, Button, Divider } from '@mui/material';
+import { Grid, Button, MenuItem, TextField } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
-const blueFont = { color: "#1456FF" };
+const textFieldStyle = {
+    marginTop: "1em",
+    height: '32px',
+    width: '100%',
+    backgroundColor: "white",
+};
 const controlButtonStyle = { width: "100%", marginBottom: "1em" };
 const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);
@@ -21,6 +26,7 @@ const SidebarContainer = () => {
         statusMessage: null,
         errorMessage: null,
     });
+    const [anaMode, setAnaMode] = useState('');
     const [user, setUser] = useState({
         subscriptionId: '',
     });
@@ -79,6 +85,17 @@ const SidebarContainer = () => {
         </>
     );
 
+    const renderAnalysisOptions = () => {
+        let outputTypesDropdown = [];
+        for (let i = 0; i < CONSTANTS.ANALYSIS_MODES.length; i++) {
+            outputTypesDropdown.push(
+                <MenuItem value={CONSTANTS.ANALYSIS_MODES[i]}
+                >{CONSTANTS.ANALYSIS_MODES[i]}</MenuItem>
+            )
+        }
+        return outputTypesDropdown;
+    }
+
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
@@ -102,12 +119,29 @@ const SidebarContainer = () => {
                             null
                     }
                 </Grid>
+                <Grid xs={12} container style={{ marginBottom: "0.5rem", }}>
+                    <TextField
+                        className="textfield-day-32px"
+                        select
+                        id="select-question"
+                        size="small"
+                        variant="outlined"
+                        label="Analysis type"
+                        value={anaMode}
+                        style={textFieldStyle}
+                        onChange={(e) => setAnaMode(e.target.value)}
+                    >
+                        {renderAnalysisOptions()}
+                    </TextField>
+                </Grid>
+
 
             </div>
-            <div className='bottomDiv'></div>
+            <div className='bottomDiv'>
             <Grid item xs={12}>
                 {controls}
             </Grid>
+            </div>
         </div>
     )
 }
