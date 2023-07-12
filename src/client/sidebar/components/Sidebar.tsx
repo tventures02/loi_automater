@@ -96,9 +96,11 @@ const SidebarContainer = () => {
     const controls = (
         <>
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
-                onClick={() => {
+                onClick={async () => {
                     console.log('askdfh')
                     // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
+                    let priceAndAddressesObj = await serverFunctions.readPricesAndAddresses();
+                    console.log(priceAndAddressesObj)
                 }}
             >Calculate</Button>
         </>

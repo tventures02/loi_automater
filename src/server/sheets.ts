@@ -36,6 +36,25 @@ export const getUserEmail = () => {
     return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
 }
 
+export const readPricesAndAddresses = () => {
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
+    const values = settingsSheet
+        .getRange('A2:B101').getValues();
+    let pricesAndAddressesObj = {};
+    for (let i = 0; i < values.length; i++) {
+        const priceFloat = parseFloat(values[i][0]);
+        const address = values[i][1];
+        if (address && priceFloat) {
+            pricesAndAddressesObj[address] = {
+                price: priceFloat,
+                address,
+            };
+        }
+    }
+    return pricesAndAddressesObj;
+}
+
 export const readAndParseSettingsValues = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);

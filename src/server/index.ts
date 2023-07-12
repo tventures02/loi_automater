@@ -13,6 +13,7 @@ import {
     generateTemplateScript,
     getUserEmail,
     readAndParseSettingsValues,
+    readPricesAndAddresses,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -28,4 +29,5 @@ export {
     generateTemplateScript,
     getUserEmail,
     readAndParseSettingsValues,
+    readPricesAndAddresses,
 };
