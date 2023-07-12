@@ -19,7 +19,21 @@ const controlButtonStyle = { width: "100%", marginBottom: "1em" };
 const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [subscriptionStatusActive, setSubscriptionStatusActive] = useState(false);
+    const [anaSettings, setAnaSettings] = useState({
+        downPaymentP: 20, downPaymentD: null, closingCostsD: 3000,
+        loanInterestRateP: 5, points: 0, loanTermYears: 30,
+        propTaxesP: 1, propTaxesD: null,
+        homeInsuranceP: 1, homeInsuranceD: 2000,
+        repairsAndMaintP: 5, repairsAndMaintD: null,
+        capExP: 5, capExD: null,
+        managementFeesP: 10,
+        utilitiesD: null,
+        hoaFeesD: null,
+        otherExpensesD: null,
+        rentalIncomeD: 2000, otherIncomeD: 0, vacancyP: 3,
+        nightlyRateD: 100, availableDaysPerYearForBooking: 300, platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
+        annualIncomeGrowthP: 3, annualExpGrowthP: 2
+    });
     const [addOnPurchaseTier, setPurchaseTier] = useState('tier0');
     const [messages, setMessages] = useState({
         trialMessage: null,
@@ -29,6 +43,8 @@ const SidebarContainer = () => {
     const [anaMode, setAnaMode] = useState('');
     const [user, setUser] = useState({
         subscriptionId: '',
+        subscriptionStatusActive: false,
+        addOnPurchaseTier: 'tier0'
     });
 
     //@ts-ignore
@@ -55,7 +71,7 @@ const SidebarContainer = () => {
                     setIsLoading(false);
 
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();
-                    console.log(defaultValues)
+                    setAnaSettings(defaultValues);
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
@@ -102,6 +118,8 @@ const SidebarContainer = () => {
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
+    console.log('render side bar')
+    console.log(anaSettings)
 
     return (
         <div className='container'>
@@ -116,7 +134,7 @@ const SidebarContainer = () => {
                 }
                 <Grid xs={12} container>
                     {
-                        !subscriptionStatusActive ?
+                        !user.subscriptionStatusActive ?
                             <CTA message={{ msg: messages.trialMessage }} singleLineCTA={true} />
                             :
                             null
@@ -129,7 +147,7 @@ const SidebarContainer = () => {
                         id="select-question"
                         size="small"
                         variant="outlined"
-                        label="Analysis type"
+                        label="Choose analysis type"
                         value={anaMode}
                         style={textFieldStyle}
                         onChange={(e) => setAnaMode(e.target.value)}

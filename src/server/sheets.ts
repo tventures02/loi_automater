@@ -37,11 +37,30 @@ export const getUserEmail = () => {
 }
 
 export const readAndParseSettingsValues = () => {
-    let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    let settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
-    let defaultValues = settingsSheet
-        .getRange(CONSTANTS.SETTINGS.VALUES_RANGE).getDisplayValues();
-    return defaultValues;
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
+    const values = settingsSheet
+        .getRange(CONSTANTS.SETTINGS.VALUES_RANGE).getValues();
+    const settingsValues = {
+        downPaymentP: values[0][0], downPaymentD: values[1][0], closingCostsD: values[2][0],
+        loanInterestRateP: values[5][0], points: values[6][0], loanTermYears: values[7][0],
+        propTaxesP: values[10][0], propTaxesD: values[11][0],
+        homeInsuranceP: values[12][0], homeInsuranceD: values[13][0],
+        repairsAndMaintP: values[14][0], repairsAndMaintD: values[15][0],
+        capExP: values[16][0], capExD: values[17][0],
+        managementFeesP: values[18][0],
+        utilitiesD: values[19][0],
+        hoaFeesD: values[20][0],
+        otherExpensesD: values[21][0],
+        rentalIncomeD: values[24][0], otherIncomeD: values[25][0], vacancyP: values[26][0],
+        nightlyRateD: values[29][0], availableDaysPerYearForBooking: values[30][0], platformFeeP: values[31][0], cleaningCostD: values[32][0], cleaningChargeD: values[33][0], occupanyRateP: values[34][0],
+        annualIncomeGrowthP: values[37][0], annualExpGrowthP: values[38][0]
+    };
+    const keys = Object.keys(settingsValues);
+    for (let i = 0; i < keys.length; i++) {
+        if (settingsValues[keys[i]] === '') settingsValues[keys[i]] = null;              
+    }
+    return settingsValues;
 }
 
 export const generateTemplateScript = () => {
@@ -64,37 +83,12 @@ export const generateTemplateScript = () => {
         }
         sheets[0].setName("Sheet1");
 
+        makeSettingsSheet(settingsSheetExists, tempSheet, activeSpreadsheet);
 
         tempSheet = sheets[0];
         tempSheet.setName(CONSTANTS.ANA_SHEETNAME);
         tempSheet.getRange(CONSTANTS.HEADERS_RANGE).setValues([CONSTANTS.DEFAULT_LABELS]).setFontWeight('bold');
         tempSheet.setFrozenRows(1);
-
-        // Construct settings sheet
-        if (!settingsSheetExists) {
-            tempSheet = activeSpreadsheet.insertSheet();
-            tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
-            tempSheet.getRange(CONSTANTS.SETTINGS.VALUES_RANGE).setValues(CONSTANTS.SETTINGS.DEFAULT_VALUES);
-        }
-        activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
-        tempSheet = SpreadsheetApp.getActiveSheet();
-        if (tempSheet) {
-            tempSheet.setColumnWidth(1, 370);
-            const settingsKeys = Object.keys(CONSTANTS.SETTINGS.LABELS);
-            const numSettingsCategories = settingsKeys.length;
-            let row = 2;
-            for (let i = 0; i < numSettingsCategories; i++) {
-                const key = settingsKeys[i];
-                tempSheet.getRange(`A${row}`).setValue(CONSTANTS.SETTINGS.LABELS[key]).setFontWeight('bold');
-                row++
-                const values = CONSTANTS.SETTINGS[key];
-                const endRow = values.length + row - 1;
-                const valuesRange = `A${row}:A${endRow}`;
-                tempSheet.getRange(valuesRange).setValues(values);
-                row = endRow + 2;
-            }
-            tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
-        }
 
         activeSpreadsheet.setActiveSheet(sheets[0]);
         return {
@@ -109,4 +103,35 @@ export const generateTemplateScript = () => {
             message: error.message,
         }
     }
+}
+
+export const makeSettingsSheet = (settingsSheetExists, tempSheet, activeSpreadsheet) => {
+            // Construct settings sheet
+            if (!settingsSheetExists) {
+                tempSheet = activeSpreadsheet.insertSheet();
+                tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
+            }
+            activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
+            tempSheet = SpreadsheetApp.getActiveSheet();
+            if (tempSheet) {
+                tempSheet.setColumnWidth(1, 370);
+                const settingsKeys = Object.keys(CONSTANTS.SETTINGS.LABELS);
+                const numSettingsCategories = settingsKeys.length;
+                let row = 2;
+                for (let i = 0; i < numSettingsCategories; i++) {
+                    const key = settingsKeys[i];
+                    tempSheet.getRange(`A${row}`).setValue(CONSTANTS.SETTINGS.LABELS[key]).setFontWeight('bold');
+                    row++
+                    const labels = CONSTANTS.SETTINGS[key];
+                    const endRow = labels.length + row - 1;
+                    const labelsRange = `A${row}:A${endRow}`;
+                    tempSheet.getRange(labelsRange).setValues(labels);
+
+                    const values = CONSTANTS.SETTINGS.VALUES[key];
+                    const valuesRange = `B${row}:B${endRow}`;
+                    tempSheet.getRange(valuesRange).setValues(values);
+                    row = endRow + 2;
+                }
+                tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
+            }
 }
