@@ -12,6 +12,7 @@ import {
     setActiveSheet,
     generateTemplateScript,
     getUserEmail,
+    readAndParseSettingsValues,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -26,4 +27,5 @@ export {
     setActiveSheet,
     generateTemplateScript,
     getUserEmail,
+    readAndParseSettingsValues,
 };

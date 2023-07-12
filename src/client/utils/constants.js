@@ -55,6 +55,7 @@ module.exports = {
             ['3'],
             ['2'],
         ],
+        VALUES_RANGE: 'B3:B38',
         PURCHASE: [
             ['Downpayment (%)'],
             ['Downpayment ($)'],
@@ -101,32 +102,6 @@ module.exports = {
             STR: 'Short term rental values',
             TIME: 'Time dependent values',
         },
-        RANGES: {
-            PURCHASE: {
-                LABEL: 'A2',
-                VALUES: 'A3:A5',
-            },
-            LOAN: {
-                LABEL: 'A7',
-                VALUES: 'A8:A10',
-            },
-            EXPENSES: {
-                LABEL: 'A12',
-                VALUES: 'A13:A24',
-            },
-            LTR: {
-                LABEL: 'A26',
-                VALUES: 'A27:A29',
-            },
-            STR: {
-                LABEL: 'A31',
-                VALUES: 'A32:A34',
-            },
-            TIME: {
-                LABEL: 'A36',
-                VALUES: 'A37:A38',
-            },
-        }
     },
     SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations. All $ amounts take precendence over percentages.',
     ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',

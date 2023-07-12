@@ -1,6 +1,6 @@
 import { Grid, Button, Paper } from "@mui/material";
 import { serverFunctions } from './serverFunctions';
-let alertStyle = { 'marginBottom': '.1em', 'borderRadius': '4px', 'padding': '0.3em 0 0.3em 0', 'border': `0px`, 'backgroundColor': CONSTANTS.LIGHT_RED_BERRY, 'color': `${CONSTANTS.DARK_RED_BERRY}`, 'fontSize': '.75em', 'alignItems': 'center', 'justifyContent': 'center', 'display': 'flex', 'width': '100%' };
+let alertStyle = {'borderRadius': '4px', 'padding': '0.3em', 'border': `0px`, 'backgroundColor': CONSTANTS.LIGHT_RED_BERRY, 'color': `${CONSTANTS.DARK_RED_BERRY}`, 'fontSize': '.75em', 'alignItems': 'center', 'justifyContent': 'center', 'display': 'flex', 'width': '100%' };
 import CONSTANTS from './constants';
 
 const linkStyle = { "cursor": "pointer", "textDecoration": "underline", "color": "blue", fontWeight: "bold" }

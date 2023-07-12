@@ -36,6 +36,14 @@ export const getUserEmail = () => {
     return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
 }
 
+export const readAndParseSettingsValues = () => {
+    let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
+    let defaultValues = settingsSheet
+        .getRange(CONSTANTS.SETTINGS.VALUES_RANGE).getDisplayValues();
+    return defaultValues;
+}
+
 export const generateTemplateScript = () => {
     try {
         const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -66,20 +74,24 @@ export const generateTemplateScript = () => {
         if (!settingsSheetExists) {
             tempSheet = activeSpreadsheet.insertSheet();
             tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
-            tempSheet.getRange('B3:B38').setValues(CONSTANTS.SETTINGS.DEFAULT_VALUES);
+            tempSheet.getRange(CONSTANTS.SETTINGS.VALUES_RANGE).setValues(CONSTANTS.SETTINGS.DEFAULT_VALUES);
         }
         activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
         tempSheet = SpreadsheetApp.getActiveSheet();
         if (tempSheet) {
             tempSheet.setColumnWidth(1, 370);
-            const settingsKeys = Object.keys(CONSTANTS.SETTINGS.RANGES);
+            const settingsKeys = Object.keys(CONSTANTS.SETTINGS.LABELS);
             const numSettingsCategories = settingsKeys.length;
+            let row = 2;
             for (let i = 0; i < numSettingsCategories; i++) {
                 const key = settingsKeys[i];
-                const label = CONSTANTS.SETTINGS.LABELS[key];
-                tempSheet.getRange(CONSTANTS.SETTINGS.RANGES[key].LABEL).setValue(label).setFontWeight('bold');
+                tempSheet.getRange(`A${row}`).setValue(CONSTANTS.SETTINGS.LABELS[key]).setFontWeight('bold');
+                row++
                 const values = CONSTANTS.SETTINGS[key];
-                tempSheet.getRange(CONSTANTS.SETTINGS.RANGES[key].VALUES).setValues(values);
+                const endRow = values.length + row - 1;
+                const valuesRange = `A${row}:A${endRow}`;
+                tempSheet.getRange(valuesRange).setValues(values);
+                row = endRow + 2;
             }
             tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
         }
@@ -87,7 +99,7 @@ export const generateTemplateScript = () => {
         activeSpreadsheet.setActiveSheet(sheets[0]);
         return {
             success: true,
-            message: "Successful generation of vocab lists."
+            message: "Successfully generated template."
         }
 
     } catch (error) {

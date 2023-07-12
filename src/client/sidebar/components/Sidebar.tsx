@@ -10,7 +10,7 @@ import CTA from '../../utils/CTA';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const textFieldStyle = {
-    marginTop: "1em",
+    marginTop: "8px",
     height: '32px',
     width: '100%',
     backgroundColor: "white",
@@ -53,6 +53,9 @@ const SidebarContainer = () => {
                     //     });
                     // }
                     setIsLoading(false);
+
+                    const defaultValues = await serverFunctions.readAndParseSettingsValues();
+                    console.log(defaultValues)
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
@@ -111,10 +114,10 @@ const SidebarContainer = () => {
                         :
                         null
                 }
-                <Grid xs={12} container style={{ marginBottom: "0.5rem", }}>
+                <Grid xs={12} container>
                     {
                         !subscriptionStatusActive ?
-                            <CTA message={{ msg: messages.trialMessage }} singleLineCTA={true} styleOverride={{ marginBottom: "1em" }} />
+                            <CTA message={{ msg: messages.trialMessage }} singleLineCTA={true} />
                             :
                             null
                     }
