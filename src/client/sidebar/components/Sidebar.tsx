@@ -119,12 +119,12 @@ const SidebarContainer = () => {
         let params = [];
         let inputFields= [];
         switch (anaMode) {
-            case CONSTANTS.ANALYSIS_MODES[0]: // ltr
+            case CONSTANTS.ANALYSIS_MODES[1]: // ltr
                 params = [
-                    ...CONSTANTS.SETTINGS.PURCHASE,
-                    ...CONSTANTS.SETTINGS.LOAN,
-                    ...CONSTANTS.SETTINGS.EXPENSES,
-                    ...CONSTANTS.SETTINGS.LTR,
+                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE,
+                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.LOAN,
+                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES,
+                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR,
                 ];
                 break;
         
@@ -132,30 +132,37 @@ const SidebarContainer = () => {
                 break;
         }
         for (let i = 0; i < params.length; i++) {
+            const anaSettingsKey = params[i];
+            const anaSettingsValue = anaSettings[anaSettingsKey];
             inputFields.push(
                 <TextField
                     // @ts-ignore
-                    type="text"
-                    value={params[i]}
+                    type="number"
+                    value={anaSettingsValue}
                     size="small"
-                    variant="outlined"
+                    variant="standard"
                     label={params[i]}
-                    className="textfield-day-32px"
                     onChange={(e) => {
-                        console.log(e.target.value)
+                        console.log(e.target.value);
+                        setAnaSettings({
+                            ...anaSettings,
+                            [anaSettingsKey]: parseFloat(e.target.value)
+                        })
                     }}
                     // @ts-ignore
-                    style={textFieldStyle}
+                    style={{...textFieldStyle, marginTop: '1em'}}
                 />
             )
-
         }
+
+        return inputFields;
     }
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
     console.log('render side bar')
     console.log(anaSettings)
+    console.log(anaMode)
 
     return (
         <div className='container'>
@@ -194,7 +201,9 @@ const SidebarContainer = () => {
                 <Grid xs={12} container>
                     {
                         anaMode !== '' ?
-                            renderInputFields()
+                            <>
+                                {renderInputFields()}
+                            </>
                             :
                             null
                     }
