@@ -115,6 +115,42 @@ const SidebarContainer = () => {
         return outputTypesDropdown;
     }
 
+    const renderInputFields = () => {
+        let params = [];
+        let inputFields= [];
+        switch (anaMode) {
+            case CONSTANTS.ANALYSIS_MODES[0]: // ltr
+                params = [
+                    ...CONSTANTS.SETTINGS.PURCHASE,
+                    ...CONSTANTS.SETTINGS.LOAN,
+                    ...CONSTANTS.SETTINGS.EXPENSES,
+                    ...CONSTANTS.SETTINGS.LTR,
+                ];
+                break;
+        
+            default:
+                break;
+        }
+        for (let i = 0; i < params.length; i++) {
+            inputFields.push(
+                <TextField
+                    // @ts-ignore
+                    type="text"
+                    value={params[i]}
+                    size="small"
+                    variant="outlined"
+                    label={params[i]}
+                    className="textfield-day-32px"
+                    onChange={(e) => {
+                        console.log(e.target.value)
+                    }}
+                    // @ts-ignore
+                    style={textFieldStyle}
+                />
+            )
+
+        }
+    }
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
@@ -154,6 +190,14 @@ const SidebarContainer = () => {
                     >
                         {renderAnalysisOptions()}
                     </TextField>
+                </Grid>
+                <Grid xs={12} container>
+                    {
+                        anaMode !== '' ?
+                            renderInputFields()
+                            :
+                            null
+                    }
                 </Grid>
 
 
