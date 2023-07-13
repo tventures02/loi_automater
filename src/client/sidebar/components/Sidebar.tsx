@@ -4,6 +4,7 @@ import LoadingAnimation from "../../utils/LoadingAnimation";
 // import { backendCall } from '../../utils/server-calls';
 import { Grid, Button, MenuItem, TextField } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
+import { analyzeLTR } from '../../utils/analysisFunctions';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
@@ -99,8 +100,10 @@ const SidebarContainer = () => {
                 onClick={async () => {
                     console.log('askdfh')
                     // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
-                    let priceAndAddressesObj = await serverFunctions.readPricesAndAddresses();
-                    console.log(priceAndAddressesObj)
+                    let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
+                    console.log(propertiesSheetData)
+                    const anaSheetOutput = analyzeLTR(propertiesSheetData, anaSettings, anaMode);
+                    await serverFunctions.outputAnaResults(anaSheetOutput);
                 }}
             >Calculate</Button>
         </>

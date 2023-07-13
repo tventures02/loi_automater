@@ -38,10 +38,11 @@ export const getUserEmail = () => {
 
 export const readPricesAndAddresses = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
-    const values = settingsSheet
+    const anaSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
+    const values = anaSheet
         .getRange('A2:B101').getValues();
     let pricesAndAddressesObj = {};
+    let orderedAddresses = [];
     for (let i = 0; i < values.length; i++) {
         const priceFloat = parseFloat(values[i][0]);
         const address = values[i][1];
@@ -49,11 +50,42 @@ export const readPricesAndAddresses = () => {
             pricesAndAddressesObj[address] = {
                 price: priceFloat,
                 address,
+                index: i,
             };
+            orderedAddresses.push(address);
         }
     }
-    return pricesAndAddressesObj;
+    return {
+        pricesAndAddressesObj,
+        orderedAddresses
+    }
 }
+
+export const outputAnaResults = (anaSheetOutput) => {
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const anaSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
+    const dataLen = anaSheetOutput.length;
+    console.log(anaSheetOutput)
+    anaSheet.getRange(`E2:S${dataLen + 1}`).setValues(anaSheetOutput);
+    anaSheet.getRange(`E1:S1`).setValues([
+        ['Analysis type',
+        'Down payment ($)',
+        'Down payment (%)',
+        'Principal ($)',
+        'Loan interest rate (%)',
+        'Loan term (years)',
+        'Monthly PI payment ($)',
+        'Total monthly revenue ($)',
+        'Total monthly op. expenses ($)',
+        'Monthly net operating income ($)',
+        'Total monthly expenses ($)',
+        'Monthly cash flow ($)',
+        'Total initial investment ($)',
+        'Annual cash on cash return (%)',
+        'Cap rate (%)']
+    ]).setFontWeight('bold');
+}
+
 
 export const readAndParseSettingsValues = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();

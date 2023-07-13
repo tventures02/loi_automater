@@ -14,6 +14,7 @@ import {
     getUserEmail,
     readAndParseSettingsValues,
     readPricesAndAddresses,
+    outputAnaResults,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -30,4 +31,5 @@ export {
     getUserEmail,
     readAndParseSettingsValues,
     readPricesAndAddresses,
+    outputAnaResults,
 };
