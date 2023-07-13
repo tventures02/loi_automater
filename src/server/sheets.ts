@@ -4,35 +4,14 @@ const getSheets = () => SpreadsheetApp.getActive().getSheets();
 
 const getActiveSheetName = () => SpreadsheetApp.getActive().getSheetName();
 
-export const getSheetsData = () => {
-  const activeSheetName = getActiveSheetName();
-  return getSheets().map((sheet, index) => {
-    const name = sheet.getName();
-    return {
-      name,
-      index,
-      isActive: name === activeSheetName,
-    };
-  });
-};
-
-export const addSheet = (sheetTitle) => {
-  SpreadsheetApp.getActive().insertSheet(sheetTitle);
-  return getSheetsData();
-};
-
-export const deleteSheet = (sheetIndex) => {
-  const sheets = getSheets();
-  SpreadsheetApp.getActive().deleteSheet(sheets[sheetIndex]);
-  return getSheetsData();
-};
-
-export const setActiveSheet = (sheetName) => {
-  SpreadsheetApp.getActive().getSheetByName(sheetName).activate();
-  return getSheetsData();
-};
-
 export const getUserEmail = () => {
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
+    if (!settingsSheet) {
+        makeSettingsSheet(false, null, activeSpreadsheet);
+        let sheets = activeSpreadsheet.getSheets();
+        activeSpreadsheet.setActiveSheet(sheets[0]);
+    }
     return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
 }
 
@@ -123,7 +102,7 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
         closingCostsD = closingCostsD ? closingCostsD : 0;
         managementFeesP = managementFeesP ? managementFeesP : 0;
 
-        anaSheet.getRange(startCol + row + ':' + endCol  + row)
+        anaSheet.getRange(startCol + row + ':' + endCol + row)
             .setFormulas([[
                 `=${down}`, // downpayment in dollars (F)
                 `=F${row}/A${row}`, // downpayment in decimal (G)
@@ -149,36 +128,36 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
                 `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
                 `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
             ]]);
-            row++
+        row++
     }
     anaSheet.getRange(`${startColLessOne}1:${endCol}1`).setValues([
         ['Analysis type',
-        'Down payment ($)',
-        'Down payment (%)',
-        'Principal ($)',
-        'Points',
-        'Loan interest rate (%)',
-        'Loan term (years)',
-        'Monthly PI payment ($)',
-        'Monthly rental revenue ($)',
-        'Other monthly revenue ($)',
-        'Annual property tax ($)',
-        'Home insurance ($)',
-        'Monthly repairs & maint. ($)',
-        'Monthly HOA fees ($)',
-        'Monthly Cap Ex ($)',
-        'Other monthly operating expenses ($)',
-        'Total monthly op. expenses ($)',
-        'Vacancy (%)',
-        'Monthly net operating income ($)',
-        'Total monthly expenses ($)',
-        'Monthly cash flow ($)',
-        'Total initial investment ($)',
-        'Annual cash on cash return (%)',
-        'Cap rate (%)']
+            'Down payment ($)',
+            'Down payment (%)',
+            'Principal ($)',
+            'Points',
+            'Loan interest rate (%)',
+            'Loan term (years)',
+            'Monthly PI payment ($)',
+            'Monthly rental revenue ($)',
+            'Other monthly revenue ($)',
+            'Annual property tax ($)',
+            'Home insurance ($)',
+            'Monthly repairs & maint. ($)',
+            'Monthly HOA fees ($)',
+            'Monthly Cap Ex ($)',
+            'Other monthly operating expenses ($)',
+            'Total monthly op. expenses ($)',
+            'Vacancy (%)',
+            'Monthly net operating income ($)',
+            'Total monthly expenses ($)',
+            'Monthly cash flow ($)',
+            'Total initial investment ($)',
+            'Annual cash on cash return (%)',
+            'Cap rate (%)']
     ]).setFontWeight('bold');
 
-    const percentCols = ['G', 'J' ,'V', 'AA', 'AB'];
+    const percentCols = ['G', 'J', 'V', 'AA', 'AB'];
     for (let i = 0; i < percentCols.length; i++) {
         anaSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.00%");
     }
@@ -212,7 +191,7 @@ export const readAndParseSettingsValues = () => {
     };
     const keys = Object.keys(settingsValues);
     for (let i = 0; i < keys.length; i++) {
-        if (settingsValues[keys[i]] === '') settingsValues[keys[i]] = null;              
+        if (settingsValues[keys[i]] === '') settingsValues[keys[i]] = null;
     }
     return settingsValues;
 }
@@ -260,32 +239,32 @@ export const generateTemplateScript = () => {
 }
 
 export const makeSettingsSheet = (settingsSheetExists, tempSheet, activeSpreadsheet) => {
-            // Construct settings sheet
-            if (!settingsSheetExists) {
-                tempSheet = activeSpreadsheet.insertSheet();
-                tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
-            }
-            activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
-            tempSheet = SpreadsheetApp.getActiveSheet();
-            if (tempSheet) {
-                tempSheet.setColumnWidth(1, 370);
-                const settingsKeys = Object.keys(CONSTANTS.SETTINGS.LABELS);
-                const numSettingsCategories = settingsKeys.length;
-                let row = 2;
-                for (let i = 0; i < numSettingsCategories; i++) {
-                    const key = settingsKeys[i];
-                    tempSheet.getRange(`A${row}`).setValue(CONSTANTS.SETTINGS.LABELS[key]).setFontWeight('bold');
-                    row++
-                    const labels = CONSTANTS.SETTINGS[key];
-                    const endRow = labels.length + row - 1;
-                    const labelsRange = `A${row}:A${endRow}`;
-                    tempSheet.getRange(labelsRange).setValues(labels);
+    // Construct settings sheet
+    if (!settingsSheetExists) {
+        tempSheet = activeSpreadsheet.insertSheet();
+        tempSheet.setName(CONSTANTS.SETTINGS_SHEETNAME);
+    }
+    activeSpreadsheet.setActiveSheet(activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME));
+    tempSheet = SpreadsheetApp.getActiveSheet();
+    if (tempSheet) {
+        tempSheet.setColumnWidth(1, 370);
+        const settingsKeys = Object.keys(CONSTANTS.SETTINGS.LABELS);
+        const numSettingsCategories = settingsKeys.length;
+        let row = 2;
+        for (let i = 0; i < numSettingsCategories; i++) {
+            const key = settingsKeys[i];
+            tempSheet.getRange(`A${row}`).setValue(CONSTANTS.SETTINGS.LABELS[key]).setFontWeight('bold');
+            row++
+            const labels = CONSTANTS.SETTINGS[key];
+            const endRow = labels.length + row - 1;
+            const labelsRange = `A${row}:A${endRow}`;
+            tempSheet.getRange(labelsRange).setValues(labels);
 
-                    const values = CONSTANTS.SETTINGS.VALUES[key];
-                    const valuesRange = `B${row}:B${endRow}`;
-                    tempSheet.getRange(valuesRange).setValues(values);
-                    row = endRow + 2;
-                }
-                tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
-            }
+            const values = CONSTANTS.SETTINGS.VALUES[key];
+            const valuesRange = `B${row}:B${endRow}`;
+            tempSheet.getRange(valuesRange).setValues(values);
+            row = endRow + 2;
+        }
+        tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
+    }
 }

@@ -6,10 +6,6 @@ import {
 } from './ui';
 
 import {
-    getSheetsData,
-    addSheet,
-    deleteSheet,
-    setActiveSheet,
     generateTemplateScript,
     getUserEmail,
     readAndParseSettingsValues,
@@ -23,10 +19,6 @@ export {
     onOpen,
     showGenTemplate,
     openSidebar,
-    getSheetsData,
-    addSheet,
-    deleteSheet,
-    setActiveSheet,
     generateTemplateScript,
     getUserEmail,
     readAndParseSettingsValues,
