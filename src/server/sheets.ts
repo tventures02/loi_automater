@@ -153,9 +153,11 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
             'Total monthly expenses ($)',
             'Monthly cash flow ($)',
             'Total initial investment ($)',
-            'Annual cash on cash return (%)',
+            'Annual cash-on-cash return (%)',
             'Cap rate (%)']
-    ]).setFontWeight('bold');
+    ]).setFontWeight('bold').setFontSize(12);
+
+    anaSheet.getRange(`A1:B1`).setFontSize(12);
 
     const percentCols = ['G', 'J', 'V', 'AA', 'AB'];
     for (let i = 0; i < percentCols.length; i++) {
@@ -168,10 +170,10 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
     }
 
     // Get the number of columns in the sheet
-    var numColumns = anaSheet.getLastColumn();
+    const numColumns = anaSheet.getLastColumn();
 
     // Auto resize all columns
-    for (var i = 1; i <= numColumns; i++) {
+    for (let i = 3; i <= numColumns; i++) {
         anaSheet.autoResizeColumn(i);
     }
 
@@ -256,7 +258,7 @@ export const generateTemplateScript = () => {
 
         tempSheet = sheets[0];
         tempSheet.setName(CONSTANTS.ANA_SHEETNAME);
-        tempSheet.getRange(CONSTANTS.HEADERS_RANGE).setValues([CONSTANTS.DEFAULT_LABELS]).setFontWeight('bold');
+        tempSheet.getRange(CONSTANTS.HEADERS_RANGE).setValues([CONSTANTS.DEFAULT_LABELS]).setFontWeight('bold').setFontSize(12);
         tempSheet.setFrozenRows(1);
 
         activeSpreadsheet.setActiveSheet(sheets[0]);

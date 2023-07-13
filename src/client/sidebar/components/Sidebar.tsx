@@ -6,6 +6,7 @@ import { Grid, Button, MenuItem, TextField } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
+import LTRInput from './LTRInput';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
@@ -40,7 +41,7 @@ const SidebarContainer = () => {
         statusMessage: null,
         errorMessage: null,
     });
-    const [anaMode, setAnaMode] = useState('');
+    const [anaMode, setAnaMode] = useState(CONSTANTS.ANALYSIS_MODES[1]);
     const [user, setUser] = useState({
         subscriptionId: '',
         subscriptionStatusActive: false,
@@ -117,54 +118,22 @@ const SidebarContainer = () => {
         return outputTypesDropdown;
     }
 
-    const renderInputFields = () => {
-        let params = [];
-        let inputFields= [];
-        switch (anaMode) {
-            case CONSTANTS.ANALYSIS_MODES[1]: // ltr
-                params = [
-                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE,
-                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.LOAN,
-                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES,
-                    ...CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR,
-                ];
-                break;
-        
-            default:
-                break;
-        }
-        for (let i = 0; i < params.length; i++) {
-            const anaSettingsKey = params[i];
-            const anaSettingsValue = anaSettings[anaSettingsKey];
-            inputFields.push(
-                <TextField
-                    // @ts-ignore
-                    type="number"
-                    value={anaSettingsValue}
-                    size="small"
-                    variant="standard"
-                    label={params[i]}
-                    onChange={(e) => {
-                        console.log(e.target.value);
-                        setAnaSettings({
-                            ...anaSettings,
-                            [anaSettingsKey]: parseFloat(e.target.value)
-                        })
-                    }}
-                    // @ts-ignore
-                    style={{...textFieldStyle, marginTop: '1em'}}
-                />
-            )
-        }
-
-        return inputFields;
-    }
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
     console.log('render side bar')
     console.log(anaSettings)
     console.log(anaMode)
+
+    let inputFields = null;
+    switch (anaMode) {
+        case CONSTANTS.ANALYSIS_MODES[1]:
+            inputFields = <LTRInput anaSettings={anaSettings} setAnaSettings={setAnaSettings}/>
+            break;
+    
+        default:
+            break;
+    }
 
     return (
         <div className='container'>
@@ -203,9 +172,7 @@ const SidebarContainer = () => {
                 <Grid xs={12} container>
                     {
                         anaMode !== '' ?
-                            <>
-                                {renderInputFields()}
-                            </>
+                            inputFields
                             :
                             null
                     }
