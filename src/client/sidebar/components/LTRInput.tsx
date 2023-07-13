@@ -19,20 +19,21 @@ const textFieldStyle = {
 const LTRInput = (props: {
     anaSettings: any,
     setAnaSettings: any,
+    useAmounts: any,
+    useRentRange: any,
+    setUseAmounts: any,
+    setUseRentRange: any,
 }) => {
     const {
         anaSettings,
         setAnaSettings,
+        useAmounts,
+        useRentRange,
+        setUseAmounts,
+        setUseRentRange,
     } = props;
 
-    const [useAmounts, setUseAmounts] = useState({
-        downpayment: false,
-        propTax: false,
-        insurance: false,
-        rnm: false,
-        capex: false,
-    });
-    const [useRentRange, setUseRentRange] = useState(false);
+
 
     const dpAnaSettingKey = useAmounts.downpayment ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[0];
     const propTaxAnaSettingKey = useAmounts.propTax ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[0];

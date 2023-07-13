@@ -40,7 +40,13 @@ export const readPricesAndAddresses = () => {
     }
 }
 
-export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
+export const doLTRAna = (
+    propertiesSheetData,
+    anaSettings,
+    anaMode,
+    useAmounts,
+    useRentRange,
+) => {
     const {
         pricesAndAddressesObj,
         orderedAddresses,
@@ -67,6 +73,7 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
         otherExpensesD,
         rentalIncomeD,
         otherIncomeD,
+        rentalIncomeRange,
         vacancyP,
     } = anaSettings;
     const ONE_HUND = 100;
@@ -79,22 +86,43 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
         startColLessOne
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
 
+    let minPrice = 999999999999;
+    let maxPrice = 0;
+    let slope = 0;
+    let intercept = 0;
+    if (useRentRange) {
+        const minRent = rentalIncomeRange[0];
+        const maxRent = rentalIncomeRange[1];
+        for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
+            const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
+            if (price > maxPrice) maxPrice = price;
+            if (price < minPrice) minPrice = price;
+        }
+
+        slope = (maxRent - minRent) / (maxPrice - minPrice);
+        intercept = maxRent - slope * maxPrice;
+    }
+
     let row = 2;
     for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
         rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
-        const capex = capExD ? capExD : rentalIncomeD * capExP / ONE_HUND;
+        const capex = useAmounts.capex ? capExD : rentalIncomeD * capExP / ONE_HUND;
         const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
         downPaymentP = downPaymentP ? downPaymentP : 0;
-        let down = downPaymentD ? downPaymentD : price * downPaymentP / ONE_HUND;
+        let down = useAmounts.downpayment ? downPaymentD : price * downPaymentP / ONE_HUND;
         propTaxesP = propTaxesP ? propTaxesP : 0;
-        let propTax = propTaxesD ? propTaxesD : price * propTaxesP / ONE_HUND;
+        let propTax = useAmounts.propTax ? propTaxesD : price * propTaxesP / ONE_HUND;
         homeInsuranceP = homeInsuranceP ? homeInsuranceP : 0;
-        let insur = homeInsuranceD ? homeInsuranceD : price * homeInsuranceP / ONE_HUND;
+        let insur = useAmounts.insurance ? homeInsuranceD : price * homeInsuranceP / ONE_HUND;
         repairsAndMaintP = repairsAndMaintP ? repairsAndMaintP : 0;
-        const rnm = repairsAndMaintD ? repairsAndMaintD : rentalIncomeD * repairsAndMaintP / ONE_HUND;
+        const rnm = useAmounts.rnm ? repairsAndMaintD : rentalIncomeD * repairsAndMaintP / ONE_HUND;
         loanInterestRateP = loanInterestRateP ? loanInterestRateP : 0;
         loanTermYears = loanTermYears ? loanTermYears : 30;
         rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
+
+        if (useRentRange) {
+            rentalIncomeD = slope * price + intercept;
+        }
         otherIncomeD = otherIncomeD ? otherIncomeD : 0;
         utilitiesD = utilitiesD ? utilitiesD : 0;
         otherExpensesD = otherExpensesD ? otherExpensesD : 0;
@@ -122,7 +150,7 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
                 `=O${row}/${MONTHS_PER_YEAR}+P${row}/${MONTHS_PER_YEAR}+Q${row}+R${row}+T${row}`, // (U)
                 `=${vacancyP / ONE_HUND}`, //(V) vacancy %
                 `=M${row}*(1-V${row})+N${row}-U${row}`, //(W) monthly noi
-                `=U${row}+S${row}`, // (X) total monthly expenses (T+capex)
+                `=U${row}+S${row}+L${row}`, // (X) total monthly expenses (U+capex+pni)
                 `=M${row}*(1-V${row})+N${row}-X${row}`, // (Y) cash flow
                 `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}`, //(Z) total investment
                 `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal

@@ -47,6 +47,14 @@ const SidebarContainer = () => {
         subscriptionStatusActive: true,
         addOnPurchaseTier: 'tier0'
     });
+    const [useAmounts, setUseAmounts] = useState({
+        downpayment: false,
+        propTax: false,
+        insurance: false,
+        rnm: false,
+        capex: false,
+    });
+    const [useRentRange, setUseRentRange] = useState(false);
 
     //@ts-ignore
     useEffect(() => {
@@ -101,7 +109,13 @@ const SidebarContainer = () => {
                     console.log('askdfh')
                     // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
                     let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
-                    await serverFunctions.doLTRAna(propertiesSheetData, anaSettings, anaMode);
+                    await serverFunctions.doLTRAna(
+                        propertiesSheetData,
+                        anaSettings,
+                        anaMode,
+                        useAmounts,
+                        useRentRange,
+                        );
                 }}
             >Calculate</Button>
         </>
@@ -128,7 +142,16 @@ const SidebarContainer = () => {
     let inputFields = null;
     switch (anaMode) {
         case CONSTANTS.ANALYSIS_MODES[1]:
-            inputFields = <LTRInput anaSettings={anaSettings} setAnaSettings={setAnaSettings} />
+            inputFields = (
+                <LTRInput
+                    useAmounts={useAmounts}
+                    useRentRange={useRentRange}
+                    setUseAmounts={setUseAmounts}
+                    setUseRentRange={setUseRentRange}
+                    anaSettings={anaSettings}
+                    setAnaSettings={setAnaSettings}
+                />
+            )
             break;
 
         default:
