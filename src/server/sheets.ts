@@ -159,13 +159,41 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
 
     const percentCols = ['G', 'J', 'V', 'AA', 'AB'];
     for (let i = 0; i < percentCols.length; i++) {
-        anaSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.00%");
+        anaSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
     }
 
     const fiatCols = ['F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
     for (let i = 0; i < fiatCols.length; i++) {
         anaSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
     }
+
+
+    // Clear all conditional formatting rules in the sheet
+    anaSheet.clearConditionalFormatRules();
+
+    // Get the range for column A
+    const metricCols = ['AA', 'AB'];
+
+    // Set the conditional formatting rules
+    var rules = anaSheet.getConditionalFormatRules();
+    for (let i = 0; i < metricCols.length; i++) {
+        const range = anaSheet.getRange(`${metricCols[i]}2:${metricCols[i]}`);
+        
+        // Get the rule builder
+        let ruleBuilder = SpreadsheetApp.newConditionalFormatRule();
+        let rule = ruleBuilder
+            .whenNumberLessThan(0)
+            .setBackground("#cc4125")
+            .setRanges([range])
+            .build();
+        rules.push(rule);
+
+        rule = ruleBuilder.setGradientMaxpoint("#38761d").setGradientMinpoint('#ffffff')
+        .setRanges([range])
+        .build();
+        rules.push(rule);
+    }
+    anaSheet.setConditionalFormatRules(rules);
 }
 
 
