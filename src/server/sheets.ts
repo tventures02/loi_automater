@@ -167,6 +167,14 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
         anaSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
     }
 
+    // Get the number of columns in the sheet
+    var numColumns = anaSheet.getLastColumn();
+
+    // Auto resize all columns
+    for (var i = 1; i <= numColumns; i++) {
+        anaSheet.autoResizeColumn(i);
+    }
+
 
     // Clear all conditional formatting rules in the sheet
     anaSheet.clearConditionalFormatRules();
@@ -178,7 +186,7 @@ export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
     var rules = anaSheet.getConditionalFormatRules();
     for (let i = 0; i < metricCols.length; i++) {
         const range = anaSheet.getRange(`${metricCols[i]}2:${metricCols[i]}`);
-        
+
         // Get the rule builder
         let ruleBuilder = SpreadsheetApp.newConditionalFormatRule();
         let rule = ruleBuilder
