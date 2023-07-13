@@ -128,9 +128,9 @@ const SidebarContainer = () => {
     let inputFields = null;
     switch (anaMode) {
         case CONSTANTS.ANALYSIS_MODES[1]:
-            inputFields = <LTRInput anaSettings={anaSettings} setAnaSettings={setAnaSettings}/>
+            inputFields = <LTRInput anaSettings={anaSettings} setAnaSettings={setAnaSettings} />
             break;
-    
+
         default:
             break;
     }
@@ -181,9 +181,9 @@ const SidebarContainer = () => {
 
             </div>
             <div className='bottomDiv'>
-            <Grid item xs={12}>
-                {controls}
-            </Grid>
+                <Grid item xs={12} style={{ width: "100%" }}>
+                    {controls}
+                </Grid>
             </div>
         </div>
     )

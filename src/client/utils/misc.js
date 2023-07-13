@@ -9,6 +9,15 @@ export function round2NearestHundreth(num) {
     return Math.round(num * 100) / 100;
 }
 
+export function getSubArray(arr, element) {
+    var index = arr.indexOf(element);
+  
+    if (index !== -1) {
+      return arr.slice(index);
+    } else {
+      return [];
+    }
+  }
 
 export function isRunningOnClientSide() {
     return typeof (window) !== "undefined";

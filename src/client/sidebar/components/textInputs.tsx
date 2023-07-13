@@ -1,0 +1,46 @@
+import React from 'react';
+import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel } from '@mui/material';
+const TextInput = (props: {
+    labels: Array<string>,
+    keys: Array<string>,
+    textFieldStyle: any,
+    anaSettings: any,
+    setAnaSettings: any,
+}) => {
+    const {
+        labels,
+        keys,
+        textFieldStyle,
+        anaSettings,
+        setAnaSettings,
+    } = props;
+
+
+    const inputFields = labels.map((label, i) => {
+        return (
+            <TextField
+                // @ts-ignore
+                type="number"
+                value={anaSettings[keys[i]] ? anaSettings[keys[i]] : 0}
+                size="small"
+                variant="standard"
+                label={label[0]}
+                onChange={(e) => {
+                    setAnaSettings({
+                        ...anaSettings,
+                        [keys[i]]: parseFloat(e.target.value)
+                    })
+                }}
+                // @ts-ignore
+                style={textFieldStyle}
+            />
+        )
+    });
+    
+    return (
+        <Grid item xs={12}>
+            {inputFields}
+        </Grid>
+    )
+}
+export default TextInput;
