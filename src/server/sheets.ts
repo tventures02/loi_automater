@@ -223,7 +223,7 @@ export const readAndParseSettingsValues = () => {
         utilitiesD: values[19][0],
         hoaFeesD: values[20][0],
         otherExpensesD: values[21][0],
-        rentalIncomeD: values[24][0], otherIncomeD: values[25][0], vacancyP: values[26][0],
+        rentalIncomeD: values[24][0], otherIncomeD: values[25][0], vacancyP: values[26][0], rentalIncomeRange: [values[24][0] - 500, values[24][0]],
         nightlyRateD: values[29][0], availableDaysPerYearForBooking: values[30][0], platformFeeP: values[31][0], cleaningCostD: values[32][0], cleaningChargeD: values[33][0], occupanyRateP: values[34][0],
         annualIncomeGrowthP: values[37][0], annualExpGrowthP: values[38][0]
     };

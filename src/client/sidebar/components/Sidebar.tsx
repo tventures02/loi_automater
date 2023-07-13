@@ -31,7 +31,7 @@ const SidebarContainer = () => {
         utilitiesD: null,
         hoaFeesD: null,
         otherExpensesD: null,
-        rentalIncomeD: 2000, otherIncomeD: 0, vacancyP: 3,
+        rentalIncomeD: 2000, otherIncomeD: 0, vacancyP: 3, rentalIncomeRange: [1000, 2000],
         nightlyRateD: 100, availableDaysPerYearForBooking: 300, platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
         annualIncomeGrowthP: 3, annualExpGrowthP: 2
     });
@@ -44,7 +44,7 @@ const SidebarContainer = () => {
     const [anaMode, setAnaMode] = useState(CONSTANTS.ANALYSIS_MODES[1]);
     const [user, setUser] = useState({
         subscriptionId: '',
-        subscriptionStatusActive: false,
+        subscriptionStatusActive: true,
         addOnPurchaseTier: 'tier0'
     });
 
@@ -72,7 +72,7 @@ const SidebarContainer = () => {
                     setIsLoading(false);
 
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();
-                    setAnaSettings(defaultValues);
+                    setAnaSettings({...anaSettings, ...defaultValues});
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 // import { backendCall } from '../../utils/server-calls';
-import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel } from '@mui/material';
+import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel, Checkbox } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import { getSubArray } from '../../utils/misc';
@@ -32,6 +32,7 @@ const LTRInput = (props: {
         rnm: false,
         capex: false,
     });
+    const [useRentRange, setUseRentRange] = useState(false);
 
     const dpAnaSettingKey = useAmounts.downpayment ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[0];
     const propTaxAnaSettingKey = useAmounts.propTax ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[0];
@@ -50,6 +51,9 @@ const LTRInput = (props: {
     const endExpLabels = CONSTANTS.SETTINGS.EXPENSES.slice(-endExpKeys.length);
 
     const expUseAmountTypes = ['propTax', 'insurance', 'rnm', 'capex'];
+
+    console.log('use range')
+    console.log(useRentRange)
 
     return (
         <div style={{ marginTop: "1em" }}>
@@ -92,6 +96,7 @@ const LTRInput = (props: {
                 </Grid>
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LOAN}
+                    useRentRange={useRentRange}
                     keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LOAN}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
@@ -101,8 +106,15 @@ const LTRInput = (props: {
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
                     <Typography>Rental income</Typography>
                 </Grid>
+                <FormControlLabel control={
+                <Checkbox size="small"
+                    checked={useRentRange}
+                    onChange={(e) => setUseRentRange(e.target.checked)}
+                    inputProps={{ 'aria-label': 'controlled' }}
+                />} label={<div style={{ fontSize: ".8em" }}>Use min/max rent</div>} />
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LTR}
+                    useRentRange={useRentRange}
                     keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
@@ -124,6 +136,7 @@ const LTRInput = (props: {
                 />
                 <TextInputs
                     labels={endExpLabels}
+                    useRentRange={useRentRange}
                     keys={endExpKeys}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
