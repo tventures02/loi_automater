@@ -64,7 +64,7 @@ const LTRInput = (props: {
                 </Grid>
                 <TogglableTextInputs
                     labels={[dpLabel]}
-                    keys={dpAnaSettingKey}
+                    keys={[dpAnaSettingKey]}
                     useAmountStateTypes={['downpayment']}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
