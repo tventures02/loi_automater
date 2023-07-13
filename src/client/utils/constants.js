@@ -17,6 +17,13 @@ module.exports = {
         'Fix and flip',
         'BRRRR'
     ],
+    ANA_OUTPUT_RANGES: {
+        LTR: {
+            startColLessOne: "E",
+            startCol: "F",
+            endCol: "AB"
+        }
+    },
     SETTINGS: {
         VALUES_RANGE: 'B3:B41',
         VALUES: {

@@ -61,22 +61,115 @@ export const readPricesAndAddresses = () => {
     }
 }
 
-export const outputAnaResults = (anaSheetOutput) => {
+export const doLTRAna = (propertiesSheetData, anaSettings, anaMode) => {
+    const {
+        pricesAndAddressesObj,
+        orderedAddresses,
+    } = propertiesSheetData;
+
+    let {
+        downPaymentP,
+        downPaymentD,
+        closingCostsD,
+        loanInterestRateP,
+        points,
+        loanTermYears,
+        propTaxesP,
+        propTaxesD,
+        homeInsuranceP,
+        homeInsuranceD,
+        repairsAndMaintP,
+        repairsAndMaintD,
+        capExP,
+        capExD,
+        managementFeesP,
+        utilitiesD,
+        hoaFeesD,
+        otherExpensesD,
+        rentalIncomeD,
+        otherIncomeD,
+        vacancyP,
+    } = anaSettings;
+    const ONE_HUND = 100;
+    const MONTHS_PER_YEAR = 12;
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const anaSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
-    const dataLen = anaSheetOutput.length;
-    console.log(anaSheetOutput)
-    anaSheet.getRange(`E2:S${dataLen + 1}`).setValues(anaSheetOutput);
-    anaSheet.getRange(`E1:S1`).setValues([
+    const {
+        startCol,
+        endCol,
+        startColLessOne
+    } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
+
+    let row = 2;
+    for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
+        rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
+        const capex = capExD ? capExD : rentalIncomeD * capExP / ONE_HUND;
+        const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
+        downPaymentP = downPaymentP ? downPaymentP : 0;
+        let down = downPaymentD ? downPaymentD : price * downPaymentP / ONE_HUND;
+        propTaxesP = propTaxesP ? propTaxesP : 0;
+        let propTax = propTaxesD ? propTaxesD : price * propTaxesP / ONE_HUND;
+        homeInsuranceP = homeInsuranceP ? homeInsuranceP : 0;
+        let insur = homeInsuranceD ? homeInsuranceD : price * homeInsuranceP / ONE_HUND;
+        repairsAndMaintP = repairsAndMaintP ? repairsAndMaintP : 0;
+        const rnm = repairsAndMaintD ? repairsAndMaintD : rentalIncomeD * repairsAndMaintP / ONE_HUND;
+        loanInterestRateP = loanInterestRateP ? loanInterestRateP : 0;
+        loanTermYears = loanTermYears ? loanTermYears : 30;
+        rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
+        otherIncomeD = otherIncomeD ? otherIncomeD : 0;
+        utilitiesD = utilitiesD ? utilitiesD : 0;
+        otherExpensesD = otherExpensesD ? otherExpensesD : 0;
+        vacancyP = vacancyP ? vacancyP : 0;
+        closingCostsD = closingCostsD ? closingCostsD : 0;
+        managementFeesP = managementFeesP ? managementFeesP : 0;
+
+        anaSheet.getRange(startCol + row + ':' + endCol  + row)
+            .setFormulas([[
+                `=${down}`, // downpayment in dollars (F)
+                `=F${row}/A${row}`, // downpayment in decimal (G)
+                `=A${row}-F${row}`, // principal (H)
+                `=${points ? points : 0}`, //(I)
+                `=${loanInterestRateP / ONE_HUND}`, // loan interest rate in decimal (J)
+                `=${loanTermYears}`, // (K)
+                `=H${row}*(J${row}/${MONTHS_PER_YEAR})/(1-POW(1+(J${row}/${MONTHS_PER_YEAR}),-(K${row}*${MONTHS_PER_YEAR})))`, // (L) monthly PnI
+                `=${rentalIncomeD}`, //(M)
+                `=${otherIncomeD}`, //(N)
+                `=${propTax}`, // (O)
+                `=${insur}`, // (P)
+                `=${rnm}`, // (Q)
+                `=${hoaFeesD ? hoaFeesD : 0}`, // (R)
+                `=${capex}`, // (S)
+                `=${utilitiesD}+${otherExpensesD}+M${row}*${managementFeesP}/${ONE_HUND}`, //(T)
+                `=O${row}/${MONTHS_PER_YEAR}+P${row}/${MONTHS_PER_YEAR}+Q${row}+R${row}+T${row}`, // (U)
+                `=${vacancyP / ONE_HUND}`, //(V) vacancy %
+                `=M${row}*(1-V${row})+N${row}-U${row}`, //(W) monthly noi
+                `=U${row}+S${row}`, // (X) total monthly expenses (T+capex)
+                `=M${row}*(1-V${row})+N${row}-X${row}`, // (Y) cash flow
+                `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}`, //(Z) total investment
+                `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
+                `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
+            ]]);
+            row++
+    }
+    anaSheet.getRange(`${startColLessOne}1:${endCol}1`).setValues([
         ['Analysis type',
         'Down payment ($)',
         'Down payment (%)',
         'Principal ($)',
+        'Points',
         'Loan interest rate (%)',
         'Loan term (years)',
         'Monthly PI payment ($)',
-        'Total monthly revenue ($)',
+        'Monthly rental revenue ($)',
+        'Other monthly revenue ($)',
+        'Annual property tax ($)',
+        'Home insurance ($)',
+        'Monthly repairs & maint. ($)',
+        'Monthly HOA fees ($)',
+        'Monthly Cap Ex ($)',
+        'Other monthly operating expenses ($)',
         'Total monthly op. expenses ($)',
+        'Vacancy (%)',
         'Monthly net operating income ($)',
         'Total monthly expenses ($)',
         'Monthly cash flow ($)',
@@ -84,6 +177,16 @@ export const outputAnaResults = (anaSheetOutput) => {
         'Annual cash on cash return (%)',
         'Cap rate (%)']
     ]).setFontWeight('bold');
+
+    const percentCols = ['G', 'J' ,'V', 'AA', 'AB'];
+    for (let i = 0; i < percentCols.length; i++) {
+        anaSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.00%");
+    }
+
+    const fiatCols = ['F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
+    for (let i = 0; i < fiatCols.length; i++) {
+        anaSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
+    }
 }
 
 
