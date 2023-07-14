@@ -10,6 +10,7 @@ module.exports = {
     LIGHT_GREEN: "#93c47d",
     DARK_RED_BERRY: "#5f2120",
     SETTINGS_SHEETNAME: `Settings`,
+    ANA_RESULTS_SHEETNAME: String.fromCodePoint(0x1F4CB) + 'Analysis results',
     ANALYSIS_MODES: [
         '',
         'Long term rental property',
@@ -19,7 +20,6 @@ module.exports = {
     ],
     ANA_OUTPUT_RANGES: {
         LTR: {
-            startColLessOne: "E",
             startCol: "F",
             endCol: "AB"
         }

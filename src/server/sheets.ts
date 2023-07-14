@@ -85,16 +85,26 @@ export const doLTRAna = (
     const ONE_HUND = 100;
     const MONTHS_PER_YEAR = 12;
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const anaSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
+    let anaResultsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_RESULTS_SHEETNAME);
+    if (!anaResultsSheet) {
+        anaResultsSheet = activeSpreadsheet.insertSheet().setName(CONSTANTS.ANA_RESULTS_SHEETNAME);
+        activeSpreadsheet.setActiveSheet(anaResultsSheet);
+        anaResultsSheet.setFrozenRows(1);
+    }
+    const sheets = activeSpreadsheet.getSheets();
+    activeSpreadsheet.moveActiveSheet(sheets.length - 1);
+
     const {
         startCol,
         endCol,
-        startColLessOne
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
 
     let row = 2;
     for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
-        const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
+        const {
+            price,
+            address,
+        } = pricesAndAddressesObj[orderedAddresses[iProp]];
         rentalIncomeP = rentalIncomeP ? rentalIncomeP : 0;
         let rentalIncomeD = price * rentalIncomeP / ONE_HUND;
         if (rentalIncomeD > maxRentD) rentalIncomeD = maxRentD;
@@ -116,7 +126,6 @@ export const doLTRAna = (
         //     intercept = maxRent - slope * maxPrice;
         //     rentalIncomeD = slope * price + intercept;
 
-
         otherIncomeD = otherIncomeD ? otherIncomeD : 0;
         utilitiesD = utilitiesD ? utilitiesD : 0;
         otherExpensesD = otherExpensesD ? otherExpensesD : 0;
@@ -126,7 +135,7 @@ export const doLTRAna = (
         otherLenderCostsD = otherLenderCostsD ? otherLenderCostsD : 0;
         estRepairCostsD = estRepairCostsD ? estRepairCostsD : 0;
 
-        anaSheet.getRange(startCol + row + ':' + endCol + row)
+        anaResultsSheet.getRange(startCol + row + ':' + endCol + row)
             .setFormulas([[
                 `=${down}`, // downpayment in dollars (F)
                 `=F${row}/A${row}`, // downpayment in decimal (G)
@@ -152,11 +161,20 @@ export const doLTRAna = (
                 `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
                 `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
             ]]);
-        anaSheet.getRange(`E${row}`).setValue([anaMode]);
+            anaResultsSheet.getRange(`E${row}`).setValue([anaMode]);
+
+            //Set price and address
+            anaResultsSheet.getRange(`A${row}`).setValue([price]);
+            anaResultsSheet.getRange(`B${row}`).setValue([address]);
         row++
     }
-    anaSheet.getRange(`${startColLessOne}1:${endCol}1`).setValues([
-        ['Analysis type',
+    anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
+        [
+            'Price',
+            'Address',
+            '',
+            '',
+            'Analysis type',
             'Down payment ($)',
             'Down payment (%)',
             'Principal ($)',
@@ -182,36 +200,36 @@ export const doLTRAna = (
             'Cap rate (%)']
     ]).setFontWeight('bold').setFontSize(12);
 
-    anaSheet.getRange(`A1:B1`).setFontSize(12);
+    anaResultsSheet.getRange(`A1:B1`).setFontSize(12);
 
     const percentCols = ['G', 'J', 'V', 'AA', 'AB'];
     for (let i = 0; i < percentCols.length; i++) {
-        anaSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
+        anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
     }
 
-    const fiatCols = ['F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
+    const fiatCols = ['A','F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
     for (let i = 0; i < fiatCols.length; i++) {
-        anaSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
+        anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
     }
 
     // Get the number of columns in the sheet
-    const numColumns = anaSheet.getLastColumn();
+    const numColumns = anaResultsSheet.getLastColumn();
 
     // Auto resize all columns
     for (let i = 3; i <= numColumns; i++) {
-        anaSheet.autoResizeColumn(i);
+        anaResultsSheet.autoResizeColumn(i);
     }
 
     // Clear all conditional formatting rules in the sheet
-    anaSheet.clearConditionalFormatRules();
+    anaResultsSheet.clearConditionalFormatRules();
 
     // Get the range for column A
     const metricCols = ['AA', 'AB'];
 
     // Set the conditional formatting rules
-    var rules = anaSheet.getConditionalFormatRules();
+    var rules = anaResultsSheet.getConditionalFormatRules();
     for (let i = 0; i < metricCols.length; i++) {
-        const range = anaSheet.getRange(`${metricCols[i]}2:${metricCols[i]}`);
+        const range = anaResultsSheet.getRange(`${metricCols[i]}2:${metricCols[i]}`);
 
         // Get the rule builder
         let ruleBuilder = SpreadsheetApp.newConditionalFormatRule();
@@ -227,7 +245,7 @@ export const doLTRAna = (
             .build();
         rules.push(rule);
     }
-    anaSheet.setConditionalFormatRules(rules);
+    anaResultsSheet.setConditionalFormatRules(rules);
 }
 
 

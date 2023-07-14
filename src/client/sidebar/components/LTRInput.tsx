@@ -67,8 +67,8 @@ const LTRInput = (props: {
                     setUseAmounts={setUseAmounts}
                 />
                 <TextInputs
-                    labels={[CONSTANTS.SETTINGS.PURCHASE[2]]}
-                    keys={['closingCostsD']}
+                    labels={[CONSTANTS.SETTINGS.PURCHASE[2], CONSTANTS.SETTINGS.PURCHASE[3] ,CONSTANTS.SETTINGS.PURCHASE[4]]}
+                    keys={['closingCostsD','estRepairCostsD','otherLenderCostsD',]}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
                     setAnaSettings={setAnaSettings}
