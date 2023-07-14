@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 // import { backendCall } from '../../utils/server-calls';
-import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel, Checkbox } from '@mui/material';
+import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel, Tooltip } from '@mui/material';
+import HelpOutline from '@mui/icons-material/HelpOutline';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import { getSubArray } from '../../utils/misc';
 import TogglableTextInputs from './togglableTextInputs';
 import TextInputs from './textInputs';
+import LTRToolTipMsg from './ltrToolTipMsg';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
 const textFieldStyle = {
@@ -15,7 +17,7 @@ const textFieldStyle = {
     width: '100%',
     backgroundColor: "white",
 };
-
+const helpIconStyle = { fontSize: "1rem", color: "gray", paddingLeft: ".25em", cursor: 'pointer'};
 const LTRInput = (props: {
     anaSettings: any,
     setAnaSettings: any,
@@ -54,7 +56,7 @@ const LTRInput = (props: {
         <div style={{ marginTop: "1em" }}>
             <Grid container style={{ padding: '10px' }}>
                 <Grid item xs={12}>
-                    <Typography>Purchase</Typography>
+                    <Typography className='header'>Purchase</Typography>
                 </Grid>
                 <TogglableTextInputs
                     labels={[dpLabel]}
@@ -75,7 +77,7 @@ const LTRInput = (props: {
                 />
 
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
-                    <Typography>Loan details</Typography>
+                    <Typography className='header'>Loan details</Typography>
                 </Grid>
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LOAN}
@@ -86,7 +88,13 @@ const LTRInput = (props: {
                 />
 
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
-                    <Typography>Rental income</Typography>
+                    <Typography className='header'>
+                        <div style={{display: 'flex',justifyContent: 'center', alignItems: 'center'}}>Rental income
+                        <Tooltip title={<LTRToolTipMsg/>}>
+                            <HelpOutline style={helpIconStyle} />
+                        </Tooltip>
+                        </div>
+                    </Typography>
                 </Grid>
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LTR}
@@ -97,7 +105,7 @@ const LTRInput = (props: {
                 />
 
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
-                    <Typography>Expenses</Typography>
+                    <Typography className='header'>Expenses</Typography>
                 </Grid>
                 <TogglableTextInputs
                     labels={expLabels}

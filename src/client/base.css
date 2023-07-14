@@ -38,6 +38,13 @@ a {
     /* for visibility */
 }
 
+.header {
+    background: ghostwhite;
+    padding: 8px;
+    text-align: center;
+    border-radius: 5px;
+}
+
 .sidebarBody {
     overflow: hidden;
 }
