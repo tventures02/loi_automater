@@ -32,7 +32,7 @@ module.exports = {
                 ['0'],
                 ['3000'],
                 ['1000'], // est upfront cost
-                [''], // other lender costs
+                ['0'], // other lender costs
             ],
             LOAN: [
                 ['5'],

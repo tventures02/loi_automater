@@ -354,3 +354,19 @@ export const makeSettingsSheet = (settingsSheetExists, tempSheet, activeSpreadsh
         tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
     }
 }
+
+export function writeToSettings(anaSettings) {
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
+    let row = 3;
+    const orderedKeys = CONSTANTS.SETTINGS.ORDERED_KEYS;
+    for (let i = 0; i < orderedKeys.length; i++) {
+        
+        const settingsVariables = CONSTANTS.SETTINGS.ANALYSIS_KEYS[orderedKeys[i]];
+        for (let j = 0; j < settingsVariables.length; j++) {
+            settingsSheet.getRange(`B${row}`).setValue([anaSettings[ settingsVariables[j] ]]);
+            row++;
+        }
+        row += 2;
+    }
+}

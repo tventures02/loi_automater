@@ -11,6 +11,7 @@ import {
     readAndParseSettingsValues,
     readPricesAndAddresses,
     doLTRAna,
+    writeToSettings,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -24,4 +25,5 @@ export {
     readAndParseSettingsValues,
     readPricesAndAddresses,
     doLTRAna,
+    writeToSettings,
 };

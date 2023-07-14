@@ -109,14 +109,22 @@ const SidebarContainer = () => {
         <>
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
                 onClick={async () => {
-                    // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
-                    let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
-                    await serverFunctions.doLTRAna(
-                        propertiesSheetData,
-                        anaSettings,
-                        anaMode,
-                        useAmounts,
+                    try {
+                        // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
+                        setIsLoading(true);
+                        let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
+                        serverFunctions.writeToSettings(anaSettings);
+                        await serverFunctions.doLTRAna(
+                            propertiesSheetData,
+                            anaSettings,
+                            anaMode,
+                            useAmounts,
                         );
+                        setIsLoading(false);
+                    } catch (error) {
+                        console.log(error)
+                        setIsLoading(false);
+                    }
                 }}
             >Calculate</Button>
         </>
