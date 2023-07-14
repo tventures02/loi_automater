@@ -7,6 +7,7 @@ import { Grid, Button, MenuItem, TextField } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
 import LTRInput from './LTRInput';
+import Controls from './controls';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
@@ -16,7 +17,7 @@ const textFieldStyle = {
     width: '100%',
     backgroundColor: "white",
 };
-const controlButtonStyle = { width: "100%", marginBottom: "1em" };
+
 const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -113,59 +114,6 @@ const SidebarContainer = () => {
         });
     }
 
-    const renderSheetOptions = () => {
-        let sheetsDropdown = [];
-        for (let i = 0; i < sheet.sheetNames.length; i++) {
-            sheetsDropdown.push(
-                <MenuItem value={sheet.sheetNames[i]}
-                >{sheet.sheetNames[i]}</MenuItem>
-            )
-        }
-        return sheetsDropdown;
-    }
-
-    const controls = (
-        <>
-            <TextField
-                className="textfield-day-32px"
-                select
-                id="select-question"
-                size="small"
-                variant="outlined"
-                label="Choose sheet to analyze"
-                value={sheet.selectedSheet}
-                style={{...textFieldStyle, marginBottom: '1em'}}
-                onChange={(e) => setSheet({
-                        ...sheet,
-                        selectedSheet: e.target.value
-                    })}
-            >
-                {renderSheetOptions()}
-            </TextField>
-            <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
-                disabled={!anaMode || !sheet.selectedSheet}
-                onClick={async () => {
-                    try {
-                        // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
-                        setIsLoading(true);
-                        let propertiesSheetData = await serverFunctions.readPricesAndAddresses(sheet.selectedSheet);
-                        serverFunctions.writeToSettings(anaSettings);
-                        await serverFunctions.doLTRAna(
-                            propertiesSheetData,
-                            anaSettings,
-                            anaMode,
-                            useAmounts,
-                        );
-                        setIsLoading(false);
-                    } catch (error) {
-                        console.log(error)
-                        setIsLoading(false);
-                    }
-                }}
-            >Calculate</Button>
-        </>
-    );
-
     const renderAnalysisOptions = () => {
         let outputTypesDropdown = [];
         for (let i = 0; i < CONSTANTS.ANALYSIS_MODES.length; i++) {
@@ -250,12 +198,18 @@ const SidebarContainer = () => {
                             null
                     }
                 </Grid>
-
-
             </div>
             <div className='bottomDiv' ref={controlsRef}>
                 <Grid item xs={12} style={{ width: "100%", paddingTop: "10px", paddingBottom: "2em" }}>
-                    {controls}
+                    <Controls
+                        sheet={sheet}
+                        setSheet={setSheet}
+                        textFieldStyle={textFieldStyle}
+                        setIsLoading={setIsLoading}
+                        anaSettings={anaSettings}
+                        anaMode={anaMode}
+                        useAmounts={useAmounts}
+                    />
                 </Grid>
             </div>
         </div>
