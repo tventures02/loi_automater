@@ -33,8 +33,6 @@ const LTRInput = (props: {
         setUseRentRange,
     } = props;
 
-
-
     const dpAnaSettingKey = useAmounts.downpayment ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[0];
     const propTaxAnaSettingKey = useAmounts.propTax ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[0];
     const insuranceAnaSettingKey = useAmounts.insurance ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[3] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[2];
@@ -52,10 +50,6 @@ const LTRInput = (props: {
     const endExpLabels = CONSTANTS.SETTINGS.EXPENSES.slice(-endExpKeys.length);
 
     const expUseAmountTypes = ['propTax', 'insurance', 'rnm', 'capex'];
-
-    console.log('use range')
-    console.log(useRentRange)
-
     return (
         <div style={{ marginTop: "1em" }}>
             <Grid container style={{ padding: '10px' }}>
@@ -72,32 +66,19 @@ const LTRInput = (props: {
                     useAmounts={useAmounts}
                     setUseAmounts={setUseAmounts}
                 />
-                <Grid item xs={12}>
-                    <TextField
-                        // @ts-ignore
-                        type="number"
-                        value={anaSettings.closingCostsD ? anaSettings.closingCostsD : 0}
-                        size="small"
-                        variant="standard"
-                        label={CONSTANTS.SETTINGS.PURCHASE[2][0]}
-                        onChange={(e) => {
-                            setAnaSettings({
-                                ...anaSettings,
-                                closingCostsD: parseFloat(e.target.value)
-                            })
-                        }}
-                        // @ts-ignore
-                        style={textFieldStyle}
-                    />
-                </Grid>
-
+                <TextInputs
+                    labels={[CONSTANTS.SETTINGS.PURCHASE[2]]}
+                    keys={['closingCostsD']}
+                    textFieldStyle={textFieldStyle}
+                    anaSettings={anaSettings}
+                    setAnaSettings={setAnaSettings}
+                />
 
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
                     <Typography>Loan details</Typography>
                 </Grid>
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LOAN}
-                    useRentRange={useRentRange}
                     keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LOAN}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
@@ -107,15 +88,8 @@ const LTRInput = (props: {
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
                     <Typography>Rental income</Typography>
                 </Grid>
-                <FormControlLabel control={
-                <Checkbox size="small"
-                    checked={useRentRange}
-                    onChange={(e) => setUseRentRange(e.target.checked)}
-                    inputProps={{ 'aria-label': 'controlled' }}
-                />} label={<div style={{ fontSize: ".8em" }}>Use min/max rent</div>} />
                 <TextInputs
                     labels={CONSTANTS.SETTINGS.LTR}
-                    useRentRange={useRentRange}
                     keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
@@ -137,7 +111,6 @@ const LTRInput = (props: {
                 />
                 <TextInputs
                     labels={endExpLabels}
-                    useRentRange={useRentRange}
                     keys={endExpKeys}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}

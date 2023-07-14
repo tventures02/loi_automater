@@ -21,7 +21,8 @@ const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [anaSettings, setAnaSettings] = useState({
-        downPaymentP: 20, downPaymentD: null, closingCostsD: 3000,
+        downPaymentP: 20, downPaymentD: null,
+        closingCostsD: 3000, estRepairCostsD: 1000, otherLenderCostsD: null,
         loanInterestRateP: 5, points: 0, loanTermYears: 30,
         propTaxesP: 1, propTaxesD: null,
         homeInsuranceP: 1, homeInsuranceD: 2000,
@@ -31,8 +32,10 @@ const SidebarContainer = () => {
         utilitiesD: null,
         hoaFeesD: null,
         otherExpensesD: null,
-        rentalIncomeD: 2000, otherIncomeD: 0, vacancyP: 3, rentalIncomeRange: [1000, 2000],
-        nightlyRateD: 100, availableDaysPerYearForBooking: 300, platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
+        rentalIncomeP: .8, otherIncomeD: 0, vacancyP: 3, minRentD: 1000, maxRentD: 3000,
+        minNightlyRateD: 100, maxNightlyRateD: 300,
+        availableDaysPerYearForBooking: 300,
+        platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
         annualIncomeGrowthP: 3, annualExpGrowthP: 2
     });
     const [addOnPurchaseTier, setPurchaseTier] = useState('tier0');
@@ -106,7 +109,6 @@ const SidebarContainer = () => {
         <>
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
                 onClick={async () => {
-                    console.log('askdfh')
                     // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
                     let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
                     await serverFunctions.doLTRAna(
@@ -114,7 +116,6 @@ const SidebarContainer = () => {
                         anaSettings,
                         anaMode,
                         useAmounts,
-                        useRentRange,
                         );
                 }}
             >Calculate</Button>

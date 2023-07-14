@@ -1,9 +1,5 @@
 const CONSTANTS = require('../client/utils/constants.js');
 
-const getSheets = () => SpreadsheetApp.getActive().getSheets();
-
-const getActiveSheetName = () => SpreadsheetApp.getActive().getSheetName();
-
 export const getUserEmail = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
@@ -45,17 +41,19 @@ export const doLTRAna = (
     anaSettings,
     anaMode,
     useAmounts,
-    useRentRange,
 ) => {
     const {
         pricesAndAddressesObj,
         orderedAddresses,
     } = propertiesSheetData;
+    console.log(anaSettings)
 
     let {
         downPaymentP,
         downPaymentD,
         closingCostsD,
+        estRepairCostsD,
+        otherLenderCostsD,
         loanInterestRateP,
         points,
         loanTermYears,
@@ -71,10 +69,18 @@ export const doLTRAna = (
         utilitiesD,
         hoaFeesD,
         otherExpensesD,
-        rentalIncomeD,
+        rentalIncomeP,
+        minRentD,
+        maxRentD,
         otherIncomeD,
-        rentalIncomeRange,
         vacancyP,
+        minNightlyRateD,
+        maxNightlyRateD,
+        availableDaysPerYearForBooking,
+        platformFeeP,
+        cleaningCostD,
+        cleaningChargeD,
+        occupanyRateP,
     } = anaSettings;
     const ONE_HUND = 100;
     const MONTHS_PER_YEAR = 12;
@@ -86,29 +92,16 @@ export const doLTRAna = (
         startColLessOne
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
 
-    let minPrice = 999999999999;
-    let maxPrice = 0;
-    let slope = 0;
-    let intercept = 0;
-    if (useRentRange) {
-        const minRent = rentalIncomeRange[0];
-        const maxRent = rentalIncomeRange[1];
-        for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
-            const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
-            if (price > maxPrice) maxPrice = price;
-            if (price < minPrice) minPrice = price;
-        }
-
-        slope = (maxRent - minRent) / (maxPrice - minPrice);
-        intercept = maxRent - slope * maxPrice;
-    }
-
     let row = 2;
     for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
-        rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
-        const capex = useAmounts.capex ? capExD : rentalIncomeD * capExP / ONE_HUND;
         const price = pricesAndAddressesObj[orderedAddresses[iProp]].price;
+        rentalIncomeP = rentalIncomeP ? rentalIncomeP : 0;
+        let rentalIncomeD = price * rentalIncomeP / ONE_HUND;
+        if (rentalIncomeD > maxRentD) rentalIncomeD = maxRentD;
+        if (rentalIncomeD < minRentD) rentalIncomeD = minRentD;
+        const capex = useAmounts.capex ? capExD : rentalIncomeD * capExP / ONE_HUND;
         downPaymentP = downPaymentP ? downPaymentP : 0;
+        downPaymentD = downPaymentD ? downPaymentD : 0;
         let down = useAmounts.downpayment ? downPaymentD : price * downPaymentP / ONE_HUND;
         propTaxesP = propTaxesP ? propTaxesP : 0;
         let propTax = useAmounts.propTax ? propTaxesD : price * propTaxesP / ONE_HUND;
@@ -118,17 +111,20 @@ export const doLTRAna = (
         const rnm = useAmounts.rnm ? repairsAndMaintD : rentalIncomeD * repairsAndMaintP / ONE_HUND;
         loanInterestRateP = loanInterestRateP ? loanInterestRateP : 0;
         loanTermYears = loanTermYears ? loanTermYears : 30;
-        rentalIncomeD = rentalIncomeD ? rentalIncomeD : 0;
+        
+        //     slope = (maxRent - minRent) / (maxPrice - minPrice);
+        //     intercept = maxRent - slope * maxPrice;
+        //     rentalIncomeD = slope * price + intercept;
 
-        if (useRentRange) {
-            rentalIncomeD = slope * price + intercept;
-        }
+
         otherIncomeD = otherIncomeD ? otherIncomeD : 0;
         utilitiesD = utilitiesD ? utilitiesD : 0;
         otherExpensesD = otherExpensesD ? otherExpensesD : 0;
         vacancyP = vacancyP ? vacancyP : 0;
         closingCostsD = closingCostsD ? closingCostsD : 0;
         managementFeesP = managementFeesP ? managementFeesP : 0;
+        otherLenderCostsD = otherLenderCostsD ? otherLenderCostsD : 0;
+        estRepairCostsD = estRepairCostsD ? estRepairCostsD : 0;
 
         anaSheet.getRange(startCol + row + ':' + endCol + row)
             .setFormulas([[
@@ -152,10 +148,11 @@ export const doLTRAna = (
                 `=M${row}*(1-V${row})+N${row}-U${row}`, //(W) monthly noi
                 `=U${row}+S${row}+L${row}`, // (X) total monthly expenses (U+capex+pni)
                 `=M${row}*(1-V${row})+N${row}-X${row}`, // (Y) cash flow
-                `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}`, //(Z) total investment
+                `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}+${estRepairCostsD}+${otherLenderCostsD}`, //(Z) total investment
                 `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
                 `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
             ]]);
+        anaSheet.getRange(`E${row}`).setValue([anaMode]);
         row++
     }
     anaSheet.getRange(`${startColLessOne}1:${endCol}1`).setValues([
@@ -205,7 +202,6 @@ export const doLTRAna = (
         anaSheet.autoResizeColumn(i);
     }
 
-
     // Clear all conditional formatting rules in the sheet
     anaSheet.clearConditionalFormatRules();
 
@@ -227,8 +223,8 @@ export const doLTRAna = (
         rules.push(rule);
 
         rule = ruleBuilder.setGradientMaxpoint("#38761d").setGradientMinpoint('#ffffff')
-        .setRanges([range])
-        .build();
+            .setRanges([range])
+            .build();
         rules.push(rule);
     }
     anaSheet.setConditionalFormatRules(rules);
@@ -238,23 +234,28 @@ export const doLTRAna = (
 export const readAndParseSettingsValues = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
-    const values = settingsSheet
+    const val = settingsSheet
         .getRange(CONSTANTS.SETTINGS.VALUES_RANGE).getValues();
-    const settingsValues = {
-        downPaymentP: values[0][0], downPaymentD: values[1][0], closingCostsD: values[2][0],
-        loanInterestRateP: values[5][0], points: values[6][0], loanTermYears: values[7][0],
-        propTaxesP: values[10][0], propTaxesD: values[11][0],
-        homeInsuranceP: values[12][0], homeInsuranceD: values[13][0],
-        repairsAndMaintP: values[14][0], repairsAndMaintD: values[15][0],
-        capExP: values[16][0], capExD: values[17][0],
-        managementFeesP: values[18][0],
-        utilitiesD: values[19][0],
-        hoaFeesD: values[20][0],
-        otherExpensesD: values[21][0],
-        rentalIncomeD: values[24][0], otherIncomeD: values[25][0], vacancyP: values[26][0], rentalIncomeRange: [values[24][0] - 500, values[24][0]],
-        nightlyRateD: values[29][0], availableDaysPerYearForBooking: values[30][0], platformFeeP: values[31][0], cleaningCostD: values[32][0], cleaningChargeD: values[33][0], occupanyRateP: values[34][0],
-        annualIncomeGrowthP: values[37][0], annualExpGrowthP: values[38][0]
-    };
+
+    // Setting the sheet values to an object with the variable of the setting as the key
+    // ie {
+    //    downPaymentP: val[0][0],
+    //    downPaymentD: val[1][0],
+    //    ...
+    // }
+    let settingsValues = {};
+    let iSetting = 0;
+    const settingsKeysOrdered = CONSTANTS.SETTINGS.ORDERED_KEYS;
+    const numSettingsCategories = settingsKeysOrdered.length;
+    for (let i = 0; i < numSettingsCategories; i++) {
+        const settingsVariables = CONSTANTS.SETTINGS.ANALYSIS_KEYS[settingsKeysOrdered[i]];
+        for (let j = 0; j < settingsVariables.length; j++) {
+            settingsValues[settingsVariables[j]] = val[iSetting][0];
+            iSetting++;
+        }
+        iSetting += 2;
+    }
+    // console.log(settingsValues)
     const keys = Object.keys(settingsValues);
     for (let i = 0; i < keys.length; i++) {
         if (settingsValues[keys[i]] === '') settingsValues[keys[i]] = null;

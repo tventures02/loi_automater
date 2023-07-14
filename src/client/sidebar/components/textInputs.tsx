@@ -3,7 +3,6 @@ import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormContro
 const TextInput = (props: {
     labels: Array<string>,
     keys: Array<string>,
-    useRentRange: boolean,
     textFieldStyle: any,
     anaSettings: any,
     setAnaSettings: any,
@@ -11,70 +10,12 @@ const TextInput = (props: {
     const {
         labels,
         keys,
-        useRentRange,
         textFieldStyle,
         anaSettings,
         setAnaSettings,
     } = props;
 
-    console.log('rental income range')
-    console.log(anaSettings.rentalIncomeRange)
-
-    const handleSliderChange = (event, newValue) => {
-        setAnaSettings({
-            ...anaSettings,
-            rentalIncomeRange: newValue,
-        });
-    }
-
-    const valuetext = (value) => {
-        return `$${value}`;
-    }
-
-
     const inputFields = labels.map((label, i) => {
-        if (useRentRange && keys[i] === 'rentalIncomeD') {
-            return (
-                <>
-                    <Grid item xs={6}>
-                        <TextField
-                            // @ts-ignore
-                            type="number"
-                            value={anaSettings.rentalIncomeRange[0] ? anaSettings.rentalIncomeRange[0] : 0}
-                            size="small"
-                            variant="standard"
-                            label={'Min. rent ($)'}
-                            onChange={(e) => {
-                                setAnaSettings({
-                                    ...anaSettings,
-                                    rentalIncomeRange: [e.target.value, anaSettings.rentalIncomeRange[1]]
-                                })
-                            }}
-                            // @ts-ignore
-                            style={textFieldStyle}
-                        />
-                    </Grid>
-                    <Grid item xs={6}>
-                        <TextField
-                            // @ts-ignore
-                            type="number"
-                            value={anaSettings.rentalIncomeRange[1] ? anaSettings.rentalIncomeRange[1] : 0}
-                            size="small"
-                            variant="standard"
-                            label={'Max rent ($)'}
-                            onChange={(e) => {
-                                setAnaSettings({
-                                    ...anaSettings,
-                                    rentalIncomeRange: [anaSettings.rentalIncomeRange[0], e.target.value]
-                                })
-                            }}
-                            // @ts-ignore
-                            style={textFieldStyle}
-                        />
-                    </Grid>
-                </>
-            );
-        }
         return (
             <Grid item xs={12}>
                 <TextField
@@ -98,9 +39,7 @@ const TextInput = (props: {
     });
 
     return (
-        <>
-            {inputFields}
-        </>
+        <>{inputFields}</>
     )
 }
 export default TextInput;

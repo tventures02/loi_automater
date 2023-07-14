@@ -25,12 +25,14 @@ module.exports = {
         }
     },
     SETTINGS: {
-        VALUES_RANGE: 'B3:B41',
+        VALUES_RANGE: 'B3:B45',
         VALUES: {
             PURCHASE: [
                 ['20'],
                 [''],
-                ['3000']
+                ['3000'],
+                ['1000'], // est upfront cost
+                [''], // other lender costs
             ],
             LOAN: [
                 ['5'],
@@ -52,27 +54,32 @@ module.exports = {
                 [''],
             ],
             LTR: [
-                ['2000'],
+                ['.8'], // monthly rent as percent of home value
+                ['1000'],
+                ['3000'],
                 ['0'],
                 ['3'],
             ],
             STR: [
                 ['100'],
                 ['300'],
+                ['300'],
                 ['3'],
                 ['85'],
                 ['95'],
                 ['80'],
             ],
-            TIME: [
-                ['3'],
-                ['2'],
-            ],
+            // TIME: [
+            //     ['3'],
+            //     ['2'],
+            // ],
         },
         PURCHASE: [
             ['Downpayment (%)'],
             ['Downpayment ($)'],
             ['Closing costs ($)'],
+            ['Estimated repair/furnish costs ($)'],
+            ['Other lender costs ($)'],
         ],
         LOAN: [
             ['Loan interest rate (%)'],
@@ -94,35 +101,48 @@ module.exports = {
             ['Other expenses ($/month)'],
         ],
         LTR: [
-            ['Rental income ($/month)'],
+            ['Rental income (% of home value)'],
+            ['Min rent ($/month)'],
+            ['Max rent ($/month)'],
             ['Other income ($/month)'],
             ['Vacancy (%)'],
         ],
         STR: [
-            ['Nightly rate charged to guests ($)'],
+            ['Min nightly rate income ($)'],
+            ['Max nightly rate income ($)'],
             ['# of nights available for booking per year'],
             ['Platform fee (% of gross rent charged)'],
             ['Cleaning cost ($/booking)'],
             ['Cleaning charged to guest ($/booking)'],
             ['Average occupancy rate (%)'],
         ],
-        TIME: [
-            ['Annual income growth (%)'],
-            ['Annual expense growth (%)'],
-        ],
+        // TIME: [
+        //     ['Annual income growth (%)'],
+        //     ['Annual expense growth (%)'],
+        // ],
         LABELS: {
             PURCHASE: 'Purchase values',
             LOAN: 'Loan values',
             EXPENSES: 'Expenses',
             LTR: 'Long term rental values',
             STR: 'Short term rental values',
-            TIME: 'Time dependent values',
+            // TIME: 'Time dependent values',
         },
+        ORDERED_KEYS: [
+            'PURCHASE',
+            'LOAN',
+            'EXPENSES',
+            'LTR',
+            'STR',
+            // 'TIME',
+        ], // these must be in the same order as they appear on the setting sheet
         ANALYSIS_KEYS: {
             PURCHASE: [
                 'downPaymentP',
                 'downPaymentD',
                 'closingCostsD',
+                'estRepairCostsD',
+                'otherLenderCostsD',
             ],
             LOAN: [
                 'loanInterestRateP',
@@ -144,21 +164,28 @@ module.exports = {
                 'otherExpensesD',
             ],
             LTR: [
-                'rentalIncomeD',
+                'rentalIncomeP',
+                'minRentD',
+                'maxRentD',
                 'otherIncomeD',
                 'vacancyP',
             ],
             STR: [
-                'nightlyRateD',
+                'minNightlyRateD',
+                'maxNightlyRateD',
                 'availableDaysPerYearForBooking',
                 'platformFeeP',
                 'cleaningCostD',
                 'cleaningChargeD',
                 'occupanyRateP',
             ],
+            // TIME: [
+            //     'annualIncomeGrowthP',
+            //     'annualExpenseGrowthP',
+            // ]
         }
     },
-    SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations. All $ amounts take precendence over percentages.',
+    SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations.',
     ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',
     FREE_FEATURES: ["600 free GRE vocabulary words",
         "Review up to 10 flashcards per set",
