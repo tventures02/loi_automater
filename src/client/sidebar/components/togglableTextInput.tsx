@@ -62,23 +62,25 @@ const TogglableTextInput = (props: {
 
     return (
         <>
-            <Grid item xs={6}>
+            <Grid item xs={8}>
                 {textField}
             </Grid>
-            <Grid item xs={6} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Grid item xs={4} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'auto' }}>
                 <FormControlLabel
                     style={{ marginLeft: '0', marginRight: '0' }}
                     control={
-                        <Switch checked={useAmounts[useAmountStateType]} onChange={(e) => {
-                            setUseAmounts({
-                                ...useAmounts,
-                                [useAmountStateType]: e.target.checked,
-                            })
-                        }
-                        } name={`toggle${keyStr}`} />
+                        <Tooltip title={'Use dollar amount instead of %.'}>
+                            <Switch checked={useAmounts[useAmountStateType]} size="small" onChange={(e) => {
+                                setUseAmounts({
+                                    ...useAmounts,
+                                    [useAmountStateType]: e.target.checked,
+                                })
+                            }
+                            } name={`toggle${keyStr}`} />
+                        </Tooltip>
                     }
-                    labelPlacement={'start'}
-                    label={<div style={{ fontSize: ".7em", color: '#666666' }}>Use $</div>}
+                    labelPlacement="end"
+                    label={<div style={{ fontSize: ".7em", color: '#999999' }}>Use $</div>}
                 />
             </Grid>
         </>
