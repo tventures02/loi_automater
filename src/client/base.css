@@ -1,5 +1,6 @@
 body {
     font-family: Helvetica;
+    margin: 0!important;
 }
 
 a {
@@ -24,18 +25,20 @@ a {
 }
 
 .topDiv {
-    height: 90%;
+    /* height: 90%; */
+    padding: 8px;
     overflow-y: auto;
     /* makes it vertically scrollable */
 }
 
 .bottomDiv {
-    height: 10%;
-    background-color: #F3F3F3;
+    /* height: 10%; */
+    min-height: 100px;
+    /* background-color: #F3F3F3; */
     display: flex;
     align-items: center;
     justify-content: center;
-    /* for visibility */
+    border-top: 1px solid #efefef;
 }
 
 .header {

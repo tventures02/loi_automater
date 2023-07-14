@@ -1,6 +1,6 @@
 const CONSTANTS = require('../client/utils/constants.js');
 
-export const getUserEmail = () => {
+export const getInitData = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
     if (!settingsSheet) {
@@ -8,12 +8,31 @@ export const getUserEmail = () => {
         let sheets = activeSpreadsheet.getSheets();
         activeSpreadsheet.setActiveSheet(sheets[0]);
     }
-    return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
+
+    // Get all sheets in the spreadsheet
+    var sheets = activeSpreadsheet.getSheets();
+
+    // Initialize an empty array to hold the sheet names
+    var sheetNames = [];
+
+    // Loop through each sheet and push its name to the array
+    for (var i = 0; i < sheets.length; i++) {
+        var sheetName = sheets[i].getName();
+        if (sheetName !== CONSTANTS.ANA_RESULTS_SHEETNAME &&
+            sheetName !== CONSTANTS.SETTINGS_SHEETNAME) {
+            sheetNames.push(sheetName);
+        }
+    }
+
+    return {
+        email: Session.getActiveUser().getEmail(), // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
+        sheetNames,
+    }
 }
 
-export const readPricesAndAddresses = () => {
+export const readPricesAndAddresses = (selectedSheet) => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const anaSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_SHEETNAME);
+    const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
     const values = anaSheet
         .getRange('A2:B101').getValues();
     let pricesAndAddressesObj = {};
@@ -122,7 +141,7 @@ export const doLTRAna = (
         const rnm = useAmounts.rnm ? repairsAndMaintD : rentalIncomeD * repairsAndMaintP / ONE_HUND;
         loanInterestRateP = loanInterestRateP ? loanInterestRateP : 0;
         loanTermYears = loanTermYears ? loanTermYears : 30;
-        
+
         //     slope = (maxRent - minRent) / (maxPrice - minPrice);
         //     intercept = maxRent - slope * maxPrice;
         //     rentalIncomeD = slope * price + intercept;
@@ -162,11 +181,11 @@ export const doLTRAna = (
                 `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
                 `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
             ]]);
-            anaResultsSheet.getRange(`E${row}`).setValue([anaMode]);
+        anaResultsSheet.getRange(`E${row}`).setValue([anaMode]);
 
-            //Set price and address
-            anaResultsSheet.getRange(`A${row}`).setValue([price]);
-            anaResultsSheet.getRange(`B${row}`).setValue([address]);
+        //Set price and address
+        anaResultsSheet.getRange(`A${row}`).setValue([price]);
+        anaResultsSheet.getRange(`B${row}`).setValue([address]);
         row++
     }
     anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
@@ -208,7 +227,7 @@ export const doLTRAna = (
         anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
     }
 
-    const fiatCols = ['A','F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
+    const fiatCols = ['A', 'F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
     for (let i = 0; i < fiatCols.length; i++) {
         anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
     }
@@ -361,10 +380,10 @@ export function writeToSettings(anaSettings) {
     let row = 3;
     const orderedKeys = CONSTANTS.SETTINGS.ORDERED_KEYS;
     for (let i = 0; i < orderedKeys.length; i++) {
-        
+
         const settingsVariables = CONSTANTS.SETTINGS.ANALYSIS_KEYS[orderedKeys[i]];
         for (let j = 0; j < settingsVariables.length; j++) {
-            settingsSheet.getRange(`B${row}`).setValue([anaSettings[ settingsVariables[j] ]]);
+            settingsSheet.getRange(`B${row}`).setValue([anaSettings[settingsVariables[j]]]);
             row++;
         }
         row += 2;

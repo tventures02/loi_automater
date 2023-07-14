@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 // import { backendCall } from '../../utils/server-calls';
@@ -38,7 +38,7 @@ const SidebarContainer = () => {
         platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
         annualIncomeGrowthP: 3, annualExpGrowthP: 2
     });
-    const [addOnPurchaseTier, setPurchaseTier] = useState('tier0');
+    const controlsRef = useRef(null);
     const [messages, setMessages] = useState({
         trialMessage: null,
         statusMessage: null,
@@ -57,6 +57,10 @@ const SidebarContainer = () => {
         rnm: false,
         capex: false,
     });
+    const [sheet, setSheet] = useState({
+        sheetNames: [],
+        selectedSheet: '',
+    });
     const [useRentRange, setUseRentRange] = useState(false);
 
     //@ts-ignore
@@ -65,8 +69,12 @@ const SidebarContainer = () => {
             const getData = async () => {
                 try {
                     setIsLoading(true);
-                    const email = await serverFunctions.getUserEmail();
-                    setUserEmail(email);
+                    const data = await serverFunctions.getInitData();
+                    setUserEmail(data.email);
+                    setSheet({
+                        selectedSheet: data.sheetNames[0] ? data.sheetNames[0] : '',
+                        sheetNames: data.sheetNames,
+                    });
                     // const subStatusResp = await getSubscriptionPaidStatus(email);
                     // console.log(subStatusResp)
                     // if (subStatusResp.success) {
@@ -105,14 +113,42 @@ const SidebarContainer = () => {
         });
     }
 
+    const renderSheetOptions = () => {
+        let sheetsDropdown = [];
+        for (let i = 0; i < sheet.sheetNames.length; i++) {
+            sheetsDropdown.push(
+                <MenuItem value={sheet.sheetNames[i]}
+                >{sheet.sheetNames[i]}</MenuItem>
+            )
+        }
+        return sheetsDropdown;
+    }
+
     const controls = (
         <>
+            <TextField
+                className="textfield-day-32px"
+                select
+                id="select-question"
+                size="small"
+                variant="outlined"
+                label="Choose sheet to analyze"
+                value={sheet.selectedSheet}
+                style={{...textFieldStyle, marginBottom: '1em'}}
+                onChange={(e) => setSheet({
+                        ...sheet,
+                        selectedSheet: e.target.value
+                    })}
+            >
+                {renderSheetOptions()}
+            </TextField>
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
+                disabled={!anaMode || !sheet.selectedSheet}
                 onClick={async () => {
                     try {
                         // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
                         setIsLoading(true);
-                        let propertiesSheetData = await serverFunctions.readPricesAndAddresses();
+                        let propertiesSheetData = await serverFunctions.readPricesAndAddresses(sheet.selectedSheet);
                         serverFunctions.writeToSettings(anaSettings);
                         await serverFunctions.doLTRAna(
                             propertiesSheetData,
@@ -167,9 +203,14 @@ const SidebarContainer = () => {
             break;
     }
 
+    let topDivHeight = '80vh';
+    if (controlsRef?.current) {
+        topDivHeight = `calc(100vh - ${controlsRef.current.clientHeight}px)`;
+    }
+
     return (
         <div className='container'>
-            <div className='topDiv'>
+            <div className='topDiv' style={{ height: topDivHeight }}>
                 {
                     messages.errorMessage ?
                         <Grid xs={12} container style={errorMsgStyle}>
@@ -212,8 +253,8 @@ const SidebarContainer = () => {
 
 
             </div>
-            <div className='bottomDiv'>
-                <Grid item xs={12} style={{ width: "100%" }}>
+            <div className='bottomDiv' ref={controlsRef}>
+                <Grid item xs={12} style={{ width: "100%", paddingTop: "10px", paddingBottom: "2em" }}>
                     {controls}
                 </Grid>
             </div>

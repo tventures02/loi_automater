@@ -53,7 +53,7 @@ const LTRInput = (props: {
 
     const expUseAmountTypes = ['propTax', 'insurance', 'rnm', 'capex'];
     return (
-        <div style={{ marginTop: "1em" }}>
+        <div style={{ marginTop: "1em", paddingBottom: '2em' }}>
             <Grid container style={{ padding: '10px' }}>
                 <Grid item xs={12}>
                     <Typography className='header'>Purchase</Typography>

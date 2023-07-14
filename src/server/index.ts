@@ -7,7 +7,7 @@ import {
 
 import {
     generateTemplateScript,
-    getUserEmail,
+    getInitData,
     readAndParseSettingsValues,
     readPricesAndAddresses,
     doLTRAna,
@@ -21,7 +21,7 @@ export {
     showGenTemplate,
     openSidebar,
     generateTemplateScript,
-    getUserEmail,
+    getInitData,
     readAndParseSettingsValues,
     readPricesAndAddresses,
     doLTRAna,
