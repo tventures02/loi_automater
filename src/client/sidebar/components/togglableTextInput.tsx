@@ -39,7 +39,7 @@ const TogglableTextInput = (props: {
             <TextField
                 // @ts-ignore
                 type="number"
-                value={value ? value : 0}
+                value={value !== null && value !== undefined ? value : ''}
                 size="small"
                 variant="standard"
                 label={label}

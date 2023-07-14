@@ -21,9 +21,14 @@ const TextInput = (props: {
                 <TextField
                     // @ts-ignore
                     type="number"
-                    value={anaSettings[keys[i]] ? anaSettings[keys[i]] : 0}
+                    value={anaSettings[keys[i]] !== null && anaSettings[keys[i]] !== undefined ? anaSettings[keys[i]] : ''}
                     size="small"
                     variant="standard"
+                    InputProps={{
+                        inputProps: {
+                            min: 0,
+                        }
+                    }}
                     label={label[0]}
                     onChange={(e) => {
                         setAnaSettings({

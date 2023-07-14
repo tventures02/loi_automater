@@ -86,6 +86,7 @@ export const doLTRAna = (
     const MONTHS_PER_YEAR = 12;
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     let anaResultsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_RESULTS_SHEETNAME);
+    activeSpreadsheet.setActiveSheet(anaResultsSheet);
     if (!anaResultsSheet) {
         anaResultsSheet = activeSpreadsheet.insertSheet().setName(CONSTANTS.ANA_RESULTS_SHEETNAME);
         activeSpreadsheet.setActiveSheet(anaResultsSheet);

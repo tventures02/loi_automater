@@ -29,7 +29,7 @@ module.exports = {
         VALUES: {
             PURCHASE: [
                 ['20'],
-                [''],
+                ['0'],
                 ['3000'],
                 ['1000'], // est upfront cost
                 [''], // other lender costs
@@ -41,17 +41,17 @@ module.exports = {
             ],
             EXPENSES: [
                 ['1'],
-                [''],
+                ['0'],
                 ['1'],
                 ['2000'],
                 ['5'],
-                [''],
+                ['0'],
                 ['5'],
-                [''],
+                ['0'],
                 ['10'],
-                [''],
-                [''],
-                [''],
+                ['0'],
+                ['0'],
+                ['0'],
             ],
             LTR: [
                 ['.8'], // monthly rent as percent of home value
