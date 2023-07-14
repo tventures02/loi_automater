@@ -166,7 +166,16 @@ const SidebarContainer = () => {
                         label="Choose analysis type"
                         value={anaMode}
                         style={textFieldStyle}
-                        onChange={(e) => setAnaMode(e.target.value)}
+                        onChange={(e) => {
+                            setAnaMode(e.target.value);
+                            if (e.target.value === CONSTANTS.ANALYSIS_MODES[2]) {//STR 
+                                setUseAmounts({
+                                    ...useAmounts,
+                                    capex: true,
+                                    rnm: true,
+                                });
+                            }
+                        }}
                     >
                         {renderAnalysisOptions()}
                     </TextField>

@@ -16,6 +16,7 @@ const TogglableTextInput = (props: {
     setUseAmounts: any,
     useAmountStateType: string,
     textFieldStyle: any,
+    anaMode: string,
 }) => {
     const {
         label,
@@ -27,6 +28,7 @@ const TogglableTextInput = (props: {
         setUseAmounts,
         useAmountStateType,
         textFieldStyle,
+        anaMode,
     } = props;
 
     const adornmentText = useAmounts[useAmountStateType] ? '$' : '%';
@@ -71,6 +73,10 @@ const TogglableTextInput = (props: {
                     control={
                         <Tooltip title={`Use ${useAmounts[useAmountStateType] ? 'percentage' : 'dollar amount'} instead of ${adornmentText}.`}>
                             <Switch checked={useAmounts[useAmountStateType]} size="small" onChange={(e) => {
+                                if (anaMode === CONSTANTS.ANALYSIS_MODES[2] && //STR
+                                    (keyStr === 'capExD' || keyStr === 'repairsAndMaintD')) {
+                                    return;
+                                }
                                 setUseAmounts({
                                     ...useAmounts,
                                     [useAmountStateType]: e.target.checked,

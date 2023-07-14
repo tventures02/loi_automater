@@ -11,6 +11,7 @@ const TogglableTextInputs = (props: {
     setAnaSettings: any,
     useAmounts: any,
     setUseAmounts: any,
+    anaMode: string,
 }) => {
     const {
         labels,
@@ -21,11 +22,13 @@ const TogglableTextInputs = (props: {
         setAnaSettings,
         useAmounts,
         setUseAmounts,
+        anaMode,
     } = props;
 
     const inputFields = labels.map((label, i) => {
         return (
             <TogglableTextInput
+                anaMode={anaMode}
                 label={label}
                 useAmounts={useAmounts}
                 keyStr={keys[i]}

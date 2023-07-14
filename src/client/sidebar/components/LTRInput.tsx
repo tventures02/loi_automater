@@ -83,6 +83,7 @@ const LTRInput = (props: {
                     <Typography className='header'>Purchase</Typography>
                 </Grid>
                 <TogglableTextInputs
+                    anaMode={anaMode}
                     labels={[dpLabel]}
                     keys={[dpAnaSettingKey]}
                     useAmountStateTypes={['downpayment']}
@@ -135,6 +136,7 @@ const LTRInput = (props: {
                     <Typography className='header'>Expenses</Typography>
                 </Grid>
                 <TogglableTextInputs
+                    anaMode={anaMode}
                     labels={expLabels}
                     keys={expKeys}
                     useAmountStateTypes={expUseAmountTypes}
