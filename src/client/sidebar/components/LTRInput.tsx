@@ -9,6 +9,7 @@ import { getSubArray } from '../../utils/misc';
 import TogglableTextInputs from './togglableTextInputs';
 import TextInputs from './textInputs';
 import LTRToolTipMsg from './ltrToolTipMsg';
+import STRToolTipMsg from './strToolTipMsg';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
 const textFieldStyle = {
@@ -17,8 +18,9 @@ const textFieldStyle = {
     width: '100%',
     backgroundColor: "white",
 };
-const helpIconStyle = { fontSize: "1rem", color: "gray", paddingLeft: ".25em", cursor: 'pointer'};
+const helpIconStyle = { fontSize: "1rem", color: "gray", paddingLeft: ".25em", cursor: 'pointer' };
 const LTRInput = (props: {
+    anaMode: string,
     anaSettings: any,
     setAnaSettings: any,
     useAmounts: any,
@@ -27,6 +29,7 @@ const LTRInput = (props: {
     setUseRentRange: any,
 }) => {
     const {
+        anaMode,
         anaSettings,
         setAnaSettings,
         useAmounts,
@@ -34,6 +37,8 @@ const LTRInput = (props: {
         setUseAmounts,
         setUseRentRange,
     } = props;
+
+    if (anaMode === '') return null;
 
     const dpAnaSettingKey = useAmounts.downpayment ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[0];
     const propTaxAnaSettingKey = useAmounts.propTax ? CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[1] : CONSTANTS.SETTINGS.ANALYSIS_KEYS.EXPENSES[0];
@@ -52,6 +57,25 @@ const LTRInput = (props: {
     const endExpLabels = CONSTANTS.SETTINGS.EXPENSES.slice(-endExpKeys.length);
 
     const expUseAmountTypes = ['propTax', 'insurance', 'rnm', 'capex'];
+
+    let incomeLabels = [];
+    let incomeKeys = [];
+    let incomeToolTipBlurb = null;
+    switch (anaMode) {
+        case CONSTANTS.ANALYSIS_MODES[1]: // LTR
+            incomeLabels = CONSTANTS.SETTINGS.LTR;
+            incomeKeys = CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR;
+            incomeToolTipBlurb = <LTRToolTipMsg />;
+            break;
+        case CONSTANTS.ANALYSIS_MODES[2]: // STR
+            incomeLabels = CONSTANTS.SETTINGS.STR;
+            incomeKeys = CONSTANTS.SETTINGS.ANALYSIS_KEYS.STR;
+            incomeToolTipBlurb = <STRToolTipMsg />;
+            break;
+
+        default:
+            break;
+    }
     return (
         <div style={{ marginTop: "1em", paddingBottom: '2em' }}>
             <Grid container style={{ padding: '10px' }}>
@@ -69,8 +93,9 @@ const LTRInput = (props: {
                     setUseAmounts={setUseAmounts}
                 />
                 <TextInputs
-                    labels={[CONSTANTS.SETTINGS.PURCHASE[2], CONSTANTS.SETTINGS.PURCHASE[3] ,CONSTANTS.SETTINGS.PURCHASE[4]]}
-                    keys={['closingCostsD','estRepairCostsD','otherLenderCostsD',]}
+                    anaMode={anaMode}
+                    labels={[CONSTANTS.SETTINGS.PURCHASE[2], CONSTANTS.SETTINGS.PURCHASE[3], CONSTANTS.SETTINGS.PURCHASE[4]]}
+                    keys={['closingCostsD', 'estRepairCostsD', 'otherLenderCostsD',]}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
                     setAnaSettings={setAnaSettings}
@@ -80,6 +105,7 @@ const LTRInput = (props: {
                     <Typography className='header'>Loan details</Typography>
                 </Grid>
                 <TextInputs
+                    anaMode={anaMode}
                     labels={CONSTANTS.SETTINGS.LOAN}
                     keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LOAN}
                     textFieldStyle={textFieldStyle}
@@ -89,16 +115,17 @@ const LTRInput = (props: {
 
                 <Grid item xs={12} style={{ marginTop: "4em" }}>
                     <Typography className='header'>
-                        <div style={{display: 'flex',justifyContent: 'center', alignItems: 'center'}}>Rental income
-                        <Tooltip title={<LTRToolTipMsg/>}>
-                            <HelpOutline style={helpIconStyle} />
-                        </Tooltip>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Rental income
+                            <Tooltip title={incomeToolTipBlurb}>
+                                <HelpOutline style={helpIconStyle} />
+                            </Tooltip>
                         </div>
                     </Typography>
                 </Grid>
                 <TextInputs
-                    labels={CONSTANTS.SETTINGS.LTR}
-                    keys={CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR}
+                    anaMode={anaMode}
+                    labels={incomeLabels}
+                    keys={incomeKeys}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
                     setAnaSettings={setAnaSettings}
@@ -118,6 +145,7 @@ const LTRInput = (props: {
                     setUseAmounts={setUseAmounts}
                 />
                 <TextInputs
+                    anaMode={anaMode}
                     labels={endExpLabels}
                     keys={endExpKeys}
                     textFieldStyle={textFieldStyle}

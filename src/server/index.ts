@@ -10,7 +10,7 @@ import {
     getInitData,
     readAndParseSettingsValues,
     readPricesAndAddresses,
-    doLTRAna,
+    doAna,
     writeToSettings,
 } from './sheets';
 
@@ -24,6 +24,6 @@ export {
     getInitData,
     readAndParseSettingsValues,
     readPricesAndAddresses,
-    doLTRAna,
+    doAna,
     writeToSettings,
 };

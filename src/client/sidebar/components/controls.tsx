@@ -59,7 +59,7 @@ const Controls = (props: {
                         setIsLoading(true);
                         let propertiesSheetData = await serverFunctions.readPricesAndAddresses(sheet.selectedSheet);
                         serverFunctions.writeToSettings(anaSettings);
-                        await serverFunctions.doLTRAna(
+                        await serverFunctions.doAna(
                             propertiesSheetData,
                             anaSettings,
                             anaMode,

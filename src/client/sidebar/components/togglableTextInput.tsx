@@ -69,7 +69,7 @@ const TogglableTextInput = (props: {
                 <FormControlLabel
                     style={{ marginLeft: '0', marginRight: '0' }}
                     control={
-                        <Tooltip title={'Use dollar amount instead of %.'}>
+                        <Tooltip title={`Use ${useAmounts[useAmountStateType] ? 'percentage' : 'dollar amount'} instead of ${adornmentText}.`}>
                             <Switch checked={useAmounts[useAmountStateType]} size="small" onChange={(e) => {
                                 setUseAmounts({
                                     ...useAmounts,

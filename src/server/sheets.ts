@@ -55,7 +55,7 @@ export const readPricesAndAddresses = (selectedSheet) => {
     }
 }
 
-export const doLTRAna = (
+export const doAna = (
     propertiesSheetData,
     anaSettings,
     anaMode,
@@ -100,6 +100,7 @@ export const doLTRAna = (
         cleaningCostD,
         cleaningChargeD,
         occupanyRateP,
+        avgStayDuration,
     } = anaSettings;
     const ONE_HUND = 100;
     const MONTHS_PER_YEAR = 12;
@@ -113,11 +114,36 @@ export const doLTRAna = (
     }
     const sheets = activeSpreadsheet.getSheets();
     activeSpreadsheet.moveActiveSheet(sheets.length - 1);
+    // Get the range of all cells in the sheet
+    anaResultsSheet.getDataRange().setNumberFormat('General');
+    anaResultsSheet.clear();
 
-    const {
+    let {
         startCol,
         endCol,
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
+    let slope = 0;
+    let intercept = 0;
+    let minPrice = 999999999999;
+    let maxPrice = 0;
+    if (anaMode === CONSTANTS.ANALYSIS_MODES[2]) {
+        for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
+            const {
+                price,
+            } = pricesAndAddressesObj[orderedAddresses[iProp]];
+            if (price > maxPrice) maxPrice = price;
+            if (price < minPrice) minPrice = price;
+        }
+        if (maxPrice !== minPrice) {
+            slope = (maxNightlyRateD - minNightlyRateD) / (maxPrice - minPrice);
+            intercept = maxNightlyRateD - slope * maxPrice;
+        }
+        else {
+            intercept = (maxNightlyRateD + minNightlyRateD) / 2;
+        }
+    }
+
+
 
     let row = 2;
     for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
@@ -142,10 +168,6 @@ export const doLTRAna = (
         loanInterestRateP = loanInterestRateP ? loanInterestRateP : 0;
         loanTermYears = loanTermYears ? loanTermYears : 30;
 
-        //     slope = (maxRent - minRent) / (maxPrice - minPrice);
-        //     intercept = maxRent - slope * maxPrice;
-        //     rentalIncomeD = slope * price + intercept;
-
         otherIncomeD = otherIncomeD ? otherIncomeD : 0;
         utilitiesD = utilitiesD ? utilitiesD : 0;
         otherExpensesD = otherExpensesD ? otherExpensesD : 0;
@@ -155,31 +177,86 @@ export const doLTRAna = (
         otherLenderCostsD = otherLenderCostsD ? otherLenderCostsD : 0;
         estRepairCostsD = estRepairCostsD ? estRepairCostsD : 0;
 
+        const commonCalcs = [
+            `=${down}`, // downpayment in dollars (F)
+            `=F${row}/A${row}`, // downpayment in decimal (G)
+            `=A${row}-F${row}`, // principal (H)
+            `=${points ? points : 0}`, //(I)
+            `=${loanInterestRateP / ONE_HUND}`, // loan interest rate in decimal (J)
+            `=${loanTermYears}`, // (K)
+            `=H${row}*(J${row}/${MONTHS_PER_YEAR})/(1-POW(1+(J${row}/${MONTHS_PER_YEAR}),-(K${row}*${MONTHS_PER_YEAR})))`, // (L) monthly PnI
+        ];
+
+        const commonExps = [
+            `=${propTax}`,
+            `=${insur}`,
+        ];
+
+        let calcs = [];
+        switch (anaMode) {
+            case CONSTANTS.ANALYSIS_MODES[1]:
+                calcs = [
+                    `=${rentalIncomeD}`, //(M)
+                    `=${otherIncomeD}`, //(N)
+                    ...commonExps, // O & P
+                    `=${rnm}`, // (Q)
+                    `=${hoaFeesD ? hoaFeesD : 0}`, // (R)
+                    `=${capex}`, // (S) 
+                    `=${utilitiesD}+${otherExpensesD}+M${row}*${managementFeesP}/${ONE_HUND}`, //(T)
+                    `=O${row}/${MONTHS_PER_YEAR}+P${row}/${MONTHS_PER_YEAR}+Q${row}+R${row}+T${row}`, // (U) propTax + insur +rnm + hoa + other expenses summed
+                    `=${vacancyP / ONE_HUND}`, //(V) vacancy %
+                    `=M${row}*(1-V${row})+N${row}-U${row}`, //(W) monthly noi
+                    `=U${row}+S${row}+L${row}`, // (X) total monthly expenses (U+capex+pni)
+                    `=M${row}*(1-V${row})+N${row}-X${row}`, // (Y) cash flow
+                    `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}+${estRepairCostsD}+${otherLenderCostsD}`, //(Z) total investment
+                    `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
+                    `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
+                ];
+                break;
+            case CONSTANTS.ANALYSIS_MODES[2]:
+                const resultantNightlyRate = slope * price + intercept;
+                startCol = CONSTANTS.ANA_OUTPUT_RANGES.STR.startCol;
+                endCol = CONSTANTS.ANA_OUTPUT_RANGES.STR.endCol;
+                calcs = [
+                    `=${resultantNightlyRate}`, //(M)
+                    `=${availableDaysPerYearForBooking}`, //(N)
+                    `=${occupanyRateP / ONE_HUND}`, //(O)
+                    `=${platformFeeP / ONE_HUND}`, //(P)
+                    `=${cleaningChargeD}`, //(Q)
+                    `=${avgStayDuration}`, //(R)
+                    `=FLOOR(N${row}*O${row})`, //(S) nights booked
+                    `=FLOOR(S${row}/R${row})`, //(T) # of annual bookings
+                    `=T${row}*R${row}`, //(U) actual nights paid for per year
+                    `=U${row}*M${row}+Q${row}*T${row}`, //(V) total annual rev
+                    // Expenses
+                    `=${cleaningCostD}`, //(W) cleaning cost per booking
+                    `=W${row}*T${row}`, //(X) total annual cleaning costs
+                    `=V${row}*P${row}`, //(Y) approx annual fees paid to platform
+                    ...commonExps, // (Z & AA)
+                    `=${rnm}`, // (AB) $
+                    `=${hoaFeesD ? hoaFeesD : 0}`, // (AC) $
+                    `=${capex}`, // (AD) $
+                    `=V${row}*${managementFeesP}/${ONE_HUND}`, // (AE) annual management fees
+                    `=(${utilitiesD}+${otherExpensesD})*${MONTHS_PER_YEAR}`, // (AF) other annual expenses
+                    `=X${row}+Y${row}+Z${row}+AA${row}+(AB${row}+AC${row})*${MONTHS_PER_YEAR}+AE${row}+AF${row}`, // (AG) total annual operating expenses
+                    // Metrics
+                    `=V${row}-AG${row}`, //(AH) annual noi
+                    `=AG${row}+(AD${row}+L${row})*${MONTHS_PER_YEAR}`, // (AI) total annual expenses (AG+capex+pni)
+                    `=V${row}-AI${row}`, // (AJ) annual cash flow
+                    `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}+${estRepairCostsD}+${otherLenderCostsD}`, //(AK) total investment
+                    `=AJ${row}/AK${row}`, //(AL) annual cash on cash return in decimal
+                    `=AH${row}/A${row}`, //(AM) cap rate
+                ];
+                break;
+
+            default:
+                break;
+        }
+
         anaResultsSheet.getRange(startCol + row + ':' + endCol + row)
             .setFormulas([[
-                `=${down}`, // downpayment in dollars (F)
-                `=F${row}/A${row}`, // downpayment in decimal (G)
-                `=A${row}-F${row}`, // principal (H)
-                `=${points ? points : 0}`, //(I)
-                `=${loanInterestRateP / ONE_HUND}`, // loan interest rate in decimal (J)
-                `=${loanTermYears}`, // (K)
-                `=H${row}*(J${row}/${MONTHS_PER_YEAR})/(1-POW(1+(J${row}/${MONTHS_PER_YEAR}),-(K${row}*${MONTHS_PER_YEAR})))`, // (L) monthly PnI
-                `=${rentalIncomeD}`, //(M)
-                `=${otherIncomeD}`, //(N)
-                `=${propTax}`, // (O)
-                `=${insur}`, // (P)
-                `=${rnm}`, // (Q)
-                `=${hoaFeesD ? hoaFeesD : 0}`, // (R)
-                `=${capex}`, // (S)
-                `=${utilitiesD}+${otherExpensesD}+M${row}*${managementFeesP}/${ONE_HUND}`, //(T)
-                `=O${row}/${MONTHS_PER_YEAR}+P${row}/${MONTHS_PER_YEAR}+Q${row}+R${row}+T${row}`, // (U)
-                `=${vacancyP / ONE_HUND}`, //(V) vacancy %
-                `=M${row}*(1-V${row})+N${row}-U${row}`, //(W) monthly noi
-                `=U${row}+S${row}+L${row}`, // (X) total monthly expenses (U+capex+pni)
-                `=M${row}*(1-V${row})+N${row}-X${row}`, // (Y) cash flow
-                `=F${row}+${closingCostsD}+I${row}*H${row}/${ONE_HUND}+${estRepairCostsD}+${otherLenderCostsD}`, //(Z) total investment
-                `=Y${row}*${MONTHS_PER_YEAR}/Z${row}`, //(AA) cash on cash return in decimal
-                `=W${row}*${MONTHS_PER_YEAR}/A${row}`, //(AB) cap rate
+                ...commonCalcs,
+                ...calcs,
             ]]);
         anaResultsSheet.getRange(`E${row}`).setValue([anaMode]);
 
@@ -188,49 +265,102 @@ export const doLTRAna = (
         anaResultsSheet.getRange(`B${row}`).setValue([address]);
         row++
     }
-    anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
-        [
-            'Price',
-            'Address',
-            '',
-            '',
-            'Analysis type',
-            'Down payment ($)',
-            'Down payment (%)',
-            'Principal ($)',
-            'Points',
-            'Loan interest rate (%)',
-            'Loan term (years)',
-            'Monthly PI payment ($)',
-            'Monthly rental revenue ($)',
-            'Other monthly revenue ($)',
-            'Annual property tax ($)',
-            'Home insurance ($)',
-            'Monthly repairs & maint. ($)',
-            'Monthly HOA fees ($)',
-            'Monthly Cap Ex ($)',
-            'Other monthly operating expenses ($)',
-            'Total monthly op. expenses ($)',
-            'Vacancy (%)',
-            'Monthly net operating income ($)',
-            'Total monthly expenses ($)',
-            'Monthly cash flow ($)',
-            'Total initial investment ($)',
-            'Annual cash-on-cash return (%)',
-            'Cap rate (%)']
-    ]).setFontWeight('bold').setFontSize(12);
+
+    const commonHeaders = [
+        'Price',
+        'Address',
+        '',
+        '',
+        'Analysis type',
+        'Down payment ($)',
+        'Down payment (%)',
+        'Principal ($)',
+        'Points',
+        'Loan interest rate (%)',
+        'Loan term (years)',
+        'Monthly PI payment ($)',
+    ];
+
+    switch (anaMode) {
+        case CONSTANTS.ANALYSIS_MODES[1]:
+            anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
+                [
+                    ...commonHeaders,
+                    'Monthly rental revenue ($)',
+                    'Other monthly revenue ($)',
+                    'Annual property tax ($)',
+                    'Home insurance ($)',
+                    'Monthly repairs & maint. ($)',
+                    'Monthly HOA fees ($)',
+                    'Monthly Cap Ex ($)',
+                    'Other monthly operating expenses ($)',
+                    'Total monthly op. expenses ($)',
+                    'Vacancy (%)',
+                    'Monthly net operating income ($)',
+                    'Total monthly expenses ($)',
+                    'Monthly cash flow ($)',
+                    'Total initial investment ($)',
+                    'Annual cash-on-cash return (%)',
+                    'Cap rate (%)']
+            ]).setFontWeight('bold').setFontSize(12);
+            let percentCols = ['G', 'J', 'V', 'AA', 'AB'];
+            for (let i = 0; i < percentCols.length; i++) {
+                anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
+            }
+        
+            let fiatCols = ['A', 'F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
+            for (let i = 0; i < fiatCols.length; i++) {
+                anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
+            }
+            break;
+        case CONSTANTS.ANALYSIS_MODES[2]:
+            anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
+                [
+                    ...commonHeaders,
+                    'Nightly rate charged ($)',
+                    'Available nights for booking per year',
+                    'Occupancy rate (%)',
+                    'Platform fee (%)',
+                    'Cleaning charge per booking ($)',
+                    'Average stay duration (nights)',
+                    'Nights booked per year',
+                    'Number of annual bookings',
+                    'Actual nights booked per year',
+                    'Total annual revenue ($)',
+                    'Cleaning cost per booking ($)',
+                    'Annual cleaning costs ($)',
+                    'Est. annual platform fees ($)',
+                    'Annual property tax ($)',
+                    'Home insurance ($)',
+                    'Monthly repairs & maint. ($)',
+                    'Monthly HOA fees ($)',
+                    'Monthly Cap Ex ($)',
+                    'Est. annual management fees ($)',
+                    'Other annual expenses ($)',
+                    'Total annual op. expenses ($)',
+                    'Annual net operating income ($)',
+                    'Total annual expenses ($)',
+                    'Annual cash flow ($)',
+                    'Total initial investment ($)',
+                    'Annual cash-on-cash return (%)',
+                    'Cap rate (%)']
+            ]).setFontWeight('bold').setFontSize(12);
+            percentCols = ['G', 'J', 'O', 'P', 'AL', 'AM'];
+            for (let i = 0; i < percentCols.length; i++) {
+                anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
+            }
+        
+            fiatCols = ['A', 'F', 'H', 'L', 'M', 'Q', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK',];
+            for (let i = 0; i < fiatCols.length; i++) {
+                anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
+            }
+            break;
+        default:
+            break;
+
+    }
 
     anaResultsSheet.getRange(`A1:B1`).setFontSize(12);
-
-    const percentCols = ['G', 'J', 'V', 'AA', 'AB'];
-    for (let i = 0; i < percentCols.length; i++) {
-        anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
-    }
-
-    const fiatCols = ['A', 'F', 'H', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'W', 'X', 'Y', 'Z'];
-    for (let i = 0; i < fiatCols.length; i++) {
-        anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
-    }
 
     // Get the number of columns in the sheet
     const numColumns = anaResultsSheet.getLastColumn();
@@ -244,7 +374,10 @@ export const doLTRAna = (
     anaResultsSheet.clearConditionalFormatRules();
 
     // Get the range for column A
-    const metricCols = ['AA', 'AB'];
+    let metricCols = ['AA', 'AB'];
+    if (anaMode === CONSTANTS.ANALYSIS_MODES[2]) {
+        metricCols = ['AL', 'AM'];
+    }
 
     // Set the conditional formatting rules
     var rules = anaResultsSheet.getConditionalFormatRules();

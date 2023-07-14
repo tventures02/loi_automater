@@ -36,7 +36,7 @@ const SidebarContainer = () => {
         rentalIncomeP: .8, otherIncomeD: 0, vacancyP: 3, minRentD: 1000, maxRentD: 3000,
         minNightlyRateD: 100, maxNightlyRateD: 300,
         availableDaysPerYearForBooking: 300,
-        platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80,
+        platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80, avgStayDuration: 5,
         annualIncomeGrowthP: 3, annualExpGrowthP: 2
     });
     const controlsRef = useRef(null);
@@ -132,25 +132,6 @@ const SidebarContainer = () => {
     console.log(anaSettings)
     console.log(anaMode)
 
-    let inputFields = null;
-    switch (anaMode) {
-        case CONSTANTS.ANALYSIS_MODES[1]:
-            inputFields = (
-                <LTRInput
-                    useAmounts={useAmounts}
-                    useRentRange={useRentRange}
-                    setUseAmounts={setUseAmounts}
-                    setUseRentRange={setUseRentRange}
-                    anaSettings={anaSettings}
-                    setAnaSettings={setAnaSettings}
-                />
-            )
-            break;
-
-        default:
-            break;
-    }
-
     let topDivHeight = '80vh';
     if (controlsRef?.current) {
         topDivHeight = `calc(100vh - ${controlsRef.current.clientHeight}px)`;
@@ -191,12 +172,15 @@ const SidebarContainer = () => {
                     </TextField>
                 </Grid>
                 <Grid xs={12} container>
-                    {
-                        anaMode !== '' ?
-                            inputFields
-                            :
-                            null
-                    }
+                    <LTRInput
+                        anaMode={anaMode}
+                        useAmounts={useAmounts}
+                        useRentRange={useRentRange}
+                        setUseAmounts={setUseAmounts}
+                        setUseRentRange={setUseRentRange}
+                        anaSettings={anaSettings}
+                        setAnaSettings={setAnaSettings}
+                    />
                 </Grid>
             </div>
             <div className='bottomDiv' ref={controlsRef}>

@@ -22,6 +22,10 @@ module.exports = {
         LTR: {
             startCol: "F",
             endCol: "AB"
+        },
+        STR: {
+            startCol: "F",
+            endCol: "AM"
         }
     },
     SETTINGS: {
@@ -68,6 +72,7 @@ module.exports = {
                 ['85'],
                 ['95'],
                 ['80'],
+                ['5'], // averaged nights stay per guest
             ],
             // TIME: [
             //     ['3'],
@@ -115,6 +120,7 @@ module.exports = {
             ['Cleaning cost ($/booking)'],
             ['Cleaning charged to guest ($/booking)'],
             ['Average occupancy rate (%)'],
+            ['Average guest stay duration (days)'],
         ],
         // TIME: [
         //     ['Annual income growth (%)'],
@@ -178,6 +184,7 @@ module.exports = {
                 'cleaningCostD',
                 'cleaningChargeD',
                 'occupanyRateP',
+                'avgStayDuration'
             ],
             // TIME: [
             //     'annualIncomeGrowthP',
