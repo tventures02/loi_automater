@@ -19,23 +19,19 @@ const textFieldStyle = {
     backgroundColor: "white",
 };
 const helpIconStyle = { fontSize: "1rem", color: "gray", paddingLeft: ".25em", cursor: 'pointer' };
-const LTRInput = (props: {
+const RentalInput = (props: {
     anaMode: string,
     anaSettings: any,
     setAnaSettings: any,
     useAmounts: any,
-    useRentRange: any,
     setUseAmounts: any,
-    setUseRentRange: any,
 }) => {
     const {
         anaMode,
         anaSettings,
         setAnaSettings,
         useAmounts,
-        useRentRange,
         setUseAmounts,
-        setUseRentRange,
     } = props;
 
     if (anaMode === '') return null;
@@ -72,7 +68,6 @@ const LTRInput = (props: {
             incomeKeys = CONSTANTS.SETTINGS.ANALYSIS_KEYS.STR;
             incomeToolTipBlurb = <STRToolTipMsg />;
             break;
-
         default:
             break;
     }
@@ -96,7 +91,7 @@ const LTRInput = (props: {
                 <TextInputs
                     anaMode={anaMode}
                     labels={[CONSTANTS.SETTINGS.PURCHASE[2], CONSTANTS.SETTINGS.PURCHASE[3], CONSTANTS.SETTINGS.PURCHASE[4]]}
-                    keys={['closingCostsD', 'estRepairCostsD', 'otherLenderCostsD',]}
+                    keys={[CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[2], CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[3], CONSTANTS.SETTINGS.ANALYSIS_KEYS.PURCHASE[4],]}
                     textFieldStyle={textFieldStyle}
                     anaSettings={anaSettings}
                     setAnaSettings={setAnaSettings}
@@ -158,4 +153,4 @@ const LTRInput = (props: {
         </div>
     )
 }
-export default LTRInput;
+export default RentalInput;

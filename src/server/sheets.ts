@@ -101,6 +101,13 @@ export const doAna = (
         cleaningChargeD,
         occupanyRateP,
         avgStayDuration,
+        desiredProfitD,
+        purchaseClosingCostD,
+        repairCostsD,
+        holdingCostsD,
+        holdingTimeMonths,
+        agentCommissionP,
+        fnfSaleClosingCostsD,
     } = anaSettings;
     const ONE_HUND = 100;
     const MONTHS_PER_YEAR = 12;

@@ -16,7 +16,6 @@ module.exports = {
         'Long term rental property',
         'Short term rental property',
         'Fix and flip',
-        'BRRRR'
     ],
     ANA_OUTPUT_RANGES: {
         LTR: {
@@ -29,7 +28,7 @@ module.exports = {
         }
     },
     SETTINGS: {
-        VALUES_RANGE: 'B3:B45',
+        VALUES_RANGE: 'B3:B53',
         VALUES: {
             PURCHASE: [
                 ['20'],
@@ -74,6 +73,15 @@ module.exports = {
                 ['80'],
                 ['5'], // averaged nights stay per guest
             ],
+            FNF: [
+                [''],
+                [''],
+                [''],
+                [''],
+                ['3'],
+                ['6'], // percent agent commission
+                [''],
+            ]
             // TIME: [
             //     ['3'],
             //     ['2'],
@@ -122,6 +130,15 @@ module.exports = {
             ['Average occupancy rate (%)'],
             ['Average guest stay duration (days)'],
         ],
+        FNF: [
+            ['Desired profit ($)'],
+            ['Purchase closing cost ($)'],
+            ['Repair costs ($)'],
+            ['Holding costs ($/month)'],
+            ['Holding time before sale (months)'],
+            ['Agent commission at sale (%)'],
+            ['Sale closing costs ($)'],
+        ],
         // TIME: [
         //     ['Annual income growth (%)'],
         //     ['Annual expense growth (%)'],
@@ -132,6 +149,7 @@ module.exports = {
             EXPENSES: 'Expenses',
             LTR: 'Long term rental values',
             STR: 'Short term rental values',
+            FNF: 'Fix and flip values',
             // TIME: 'Time dependent values',
         },
         ORDERED_KEYS: [
@@ -140,6 +158,7 @@ module.exports = {
             'EXPENSES',
             'LTR',
             'STR',
+            'FNF',
             // 'TIME',
         ], // these must be in the same order as they appear on the setting sheet
         ANALYSIS_KEYS: {
@@ -185,6 +204,15 @@ module.exports = {
                 'cleaningChargeD',
                 'occupanyRateP',
                 'avgStayDuration'
+            ],
+            FNF: [
+                'desiredProfitD',
+                'purchaseClosingCostD',
+                'repairCostsD',
+                'holdingCostsD',
+                'holdingTimeMonths',
+                'agentCommissionP',
+                'fnfSaleClosingCostsD',
             ],
             // TIME: [
             //     'annualIncomeGrowthP',

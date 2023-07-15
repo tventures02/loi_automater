@@ -6,7 +6,8 @@ import { Grid, Button, MenuItem, TextField } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
-import LTRInput from './LTRInput';
+import RentalInput from './rentalInput';
+import FNFInput from './fnfInput';
 import Controls from './controls';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
 
@@ -37,7 +38,14 @@ const SidebarContainer = () => {
         minNightlyRateD: 100, maxNightlyRateD: 300,
         availableDaysPerYearForBooking: 300,
         platformFeeP: 3, cleaningCostD: 85, cleaningChargeD: 95, occupanyRateP: 80, avgStayDuration: 5,
-        annualIncomeGrowthP: 3, annualExpGrowthP: 2
+        annualIncomeGrowthP: 3, annualExpGrowthP: 2,
+        desiredProfitD: 0,
+        purchaseClosingCostD: 0,
+        repairCostsD: 0,
+        holdingCostsD: 0,
+        holdingTimeMonths: 3,
+        agentCommissionP: 6,
+        fnfSaleClosingCostsD: 0,
     });
     const controlsRef = useRef(null);
     const [messages, setMessages] = useState({
@@ -62,7 +70,6 @@ const SidebarContainer = () => {
         sheetNames: [],
         selectedSheet: '',
     });
-    const [useRentRange, setUseRentRange] = useState(false);
 
     //@ts-ignore
     useEffect(() => {
@@ -137,6 +144,24 @@ const SidebarContainer = () => {
         topDivHeight = `calc(100vh - ${controlsRef.current.clientHeight}px)`;
     }
 
+    let inputFieldsComponent = null;
+    if (anaMode === CONSTANTS.ANALYSIS_MODES[1] ||
+        anaMode === CONSTANTS.ANALYSIS_MODES[2]) {
+        inputFieldsComponent = <RentalInput
+            anaMode={anaMode}
+            useAmounts={useAmounts}
+            setUseAmounts={setUseAmounts}
+            anaSettings={anaSettings}
+            setAnaSettings={setAnaSettings}
+        />;
+    }
+    else if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) {
+        inputFieldsComponent = <FNFInput
+            anaSettings={anaSettings}
+            setAnaSettings={setAnaSettings}
+        />;
+    }
+
     return (
         <div className='container'>
             <div className='topDiv' style={{ height: topDivHeight }}>
@@ -181,15 +206,7 @@ const SidebarContainer = () => {
                     </TextField>
                 </Grid>
                 <Grid xs={12} container>
-                    <LTRInput
-                        anaMode={anaMode}
-                        useAmounts={useAmounts}
-                        useRentRange={useRentRange}
-                        setUseAmounts={setUseAmounts}
-                        setUseRentRange={setUseRentRange}
-                        anaSettings={anaSettings}
-                        setAnaSettings={setAnaSettings}
-                    />
+                    {inputFieldsComponent}
                 </Grid>
             </div>
             <div className='bottomDiv' ref={controlsRef}>
