@@ -458,6 +458,8 @@ export const doAna = (
     // Clear all conditional formatting rules in the sheet
     anaResultsSheet.clearConditionalFormatRules();
 
+    anaResultsSheet.getRange(`A${row}`).setFontSize(8).setFontColor("#980000").setValue(CONSTANTS.DISCLAIMER);
+
     if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) return;
 
     // Get the range for column A

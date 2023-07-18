@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import { Grid, Button, MenuItem, TextField } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
+import AlertDialog from '../../utils/AlertDialog';
 
 const controlButtonStyle = { width: "100%", marginBottom: "1em" };
 const Controls = (props: {
@@ -25,6 +26,8 @@ const Controls = (props: {
         filledOutARVs,
     } = props;
 
+    const [openDisclaimer, setOpenDisclaimer] = useState(false);
+
     const renderSheetOptions = () => {
         let sheetsDropdown = [];
         for (let i = 0; i < sheet.sheetNames.length; i++) {
@@ -38,6 +41,19 @@ const Controls = (props: {
 
     return (
         <>
+        {
+                    openDisclaimer ?
+                        <AlertDialog
+                            showAlertFlag={openDisclaimer}
+                            contentJSX={<div style={{fontSize: ".7em"}}>{CONSTANTS.DISCLAIMER}</div>}
+                            title={"Disclaimer"}
+                            handleCloseAlert={(event, reason: string) => {
+                                setOpenDisclaimer(false);
+                            }}
+                        />
+                        :
+                        null
+                }
             <TextField
                 className="textfield-day-32px"
                 select
@@ -75,6 +91,11 @@ const Controls = (props: {
                     }
                 }}
             >Calculate</Button>
+            <Grid container>
+                <Grid item xs={12} style={{fontSize: '.7em', textAlign: "center"}}>
+                    <a onClick={() => setOpenDisclaimer(true)} style={{cursor: "pointer"}}>Disclaimer</a>
+                </Grid>
+            </Grid>
         </>
     )
 }

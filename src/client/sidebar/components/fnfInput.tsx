@@ -37,7 +37,7 @@ const FNFInput = (props: {
                 </Grid>
                 <Grid item xs={12}>
                     <FormControlLabel control={
-                        <Checkbox size="small" onChange={(e) => setFilledOutARVs(e.target.checked)} checked={filledOutARVs} />
+                        <Checkbox onChange={(e) => setFilledOutARVs(e.target.checked)} checked={filledOutARVs} />
                     }
                         style={{ marginTop: "25px"}}
                         label={<span style={{fontSize: ".75em" }}><b>Starting in row 2, fill in "After repair values ($)" in column C in the sheet you want to analyze.</b></span>} />

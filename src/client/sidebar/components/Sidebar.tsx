@@ -214,7 +214,7 @@ const SidebarContainer = () => {
                 </Grid>
             </div>
             <div className='bottomDiv' ref={controlsRef}>
-                <Grid item xs={12} style={{ width: "100%", paddingTop: "10px", paddingBottom: "2em" }}>
+                <Grid item xs={12} style={{ width: "100%", paddingTop: "10px" }}>
                     <Controls
                         sheet={sheet}
                         setSheet={setSheet}
