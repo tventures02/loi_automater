@@ -100,7 +100,8 @@ const SidebarContainer = () => {
                     setIsLoading(false);
 
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();
-                    setAnaSettings({...anaSettings, ...defaultValues});
+                    setAnaSettings({...anaSettings, ...defaultValues.settingsValues});
+                    setUseAmounts({...useAmounts, ...defaultValues.useAmountFlags});
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');

@@ -518,7 +518,22 @@ export const readAndParseSettingsValues = () => {
     for (let i = 0; i < keys.length; i++) {
         if (settingsValues[keys[i]] === '') settingsValues[keys[i]] = null;
     }
-    return settingsValues;
+
+    const flags = settingsSheet
+        .getRange(CONSTANTS.SETTINGS.FLAG_RANGES).getValues();
+        console.log(flags)
+    const useAmountFlags = {
+        downpayment: flags[0][0],
+        propTax: flags[1][0],
+        insurance: flags[2][0],
+        rnm: flags[3][0],
+        capex: flags[4][0],
+    }
+
+    return {
+        settingsValues,
+        useAmountFlags,
+    }
 }
 
 export const generateTemplateScript = () => {
@@ -591,10 +606,12 @@ export const makeSettingsSheet = (settingsSheetExists, tempSheet, activeSpreadsh
             row = endRow + 2;
         }
         tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
+        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_LABEL_RANGES).setValues([['Use downpayment $ amount'],['Use property tax $ amount'],['Use insurance $ amount'],['Use repairs/maintanence $ amount'],['Use capex $ amount'],]);
+        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_RANGES).setValues([['FALSE'],['FALSE'],['FALSE'],['FALSE'],['FALSE'],]);
     }
 }
 
-export function writeToSettings(anaSettings) {
+export function writeToSettings(anaSettings, useAmounts) {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
     let row = 3;
@@ -608,4 +625,12 @@ export function writeToSettings(anaSettings) {
         }
         row += 2;
     }
+
+    let useAmountFlags = [['FALSE'],['FALSE'],['FALSE'],['FALSE'],['FALSE'],];
+    useAmountFlags[0] = [useAmounts.downpayment ? 'TRUE' : 'FALSE'];
+    useAmountFlags[1] = [useAmounts.propTax ? 'TRUE' : 'FALSE'];
+    useAmountFlags[2] = [useAmounts.insurance ? 'TRUE' : 'FALSE'];
+    useAmountFlags[3] = [useAmounts.rnm ? 'TRUE' : 'FALSE'];
+    useAmountFlags[4] = [useAmounts.capex ? 'TRUE' : 'FALSE'];
+    settingsSheet.getRange(CONSTANTS.SETTINGS.FLAG_RANGES).setValues(useAmountFlags);
 }

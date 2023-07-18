@@ -33,6 +33,8 @@ module.exports = {
     },
     SETTINGS: {
         VALUES_RANGE: 'B3:B53',
+        FLAG_RANGES: 'E3:E7',
+        FLAG_LABEL_RANGES: 'D3:D7',
         VALUES: {
             PURCHASE: [
                 ['20'],
