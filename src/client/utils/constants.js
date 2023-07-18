@@ -25,7 +25,11 @@ module.exports = {
         STR: {
             startCol: "F",
             endCol: "AM"
-        }
+        },
+        FNF: {
+            startCol: "C",
+            endCol: "U"
+        },
     },
     SETTINGS: {
         VALUES_RANGE: 'B3:B53',

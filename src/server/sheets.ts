@@ -30,13 +30,19 @@ export const getInitData = () => {
     }
 }
 
-export const readPricesAndAddresses = (selectedSheet) => {
+export const readPricesAndAddresses = (selectedSheet, anaMode: string) => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
     const values = anaSheet
         .getRange('A2:B101').getValues();
     let pricesAndAddressesObj = {};
     let orderedAddresses = [];
+    const fnfAna = anaMode === CONSTANTS.ANALYSIS_MODES[3];
+    let arvs = [];
+    let arvsRaw = null;
+    if (fnfAna) {
+        arvsRaw = anaSheet.getRange('C2:C101').getValues();
+    }
     for (let i = 0; i < values.length; i++) {
         const priceFloat = parseFloat(values[i][0]);
         const address = values[i][1];
@@ -47,11 +53,15 @@ export const readPricesAndAddresses = (selectedSheet) => {
                 index: i,
             };
             orderedAddresses.push(address);
+            if (fnfAna) {
+                arvs.push(arvsRaw[i][0]);
+            }
         }
     }
     return {
         pricesAndAddressesObj,
-        orderedAddresses
+        orderedAddresses,
+        arvs,
     }
 }
 
@@ -64,6 +74,7 @@ export const doAna = (
     const {
         pricesAndAddressesObj,
         orderedAddresses,
+        arvs,
     } = propertiesSheetData;
     console.log(anaSettings)
 
@@ -184,7 +195,7 @@ export const doAna = (
         otherLenderCostsD = otherLenderCostsD ? otherLenderCostsD : 0;
         estRepairCostsD = estRepairCostsD ? estRepairCostsD : 0;
 
-        const commonCalcs = [
+        let commonCalcs = [
             `=${down}`, // downpayment in dollars (F)
             `=F${row}/A${row}`, // downpayment in decimal (G)
             `=A${row}-F${row}`, // principal (H)
@@ -255,7 +266,33 @@ export const doAna = (
                     `=AH${row}/A${row}`, //(AM) cap rate
                 ];
                 break;
+            case CONSTANTS.ANALYSIS_MODES[3]:
+                commonCalcs = [];
+                startCol = CONSTANTS.ANA_OUTPUT_RANGES.FNF.startCol;
+                endCol = CONSTANTS.ANA_OUTPUT_RANGES.FNF.endCol;
+                calcs = [
+                    `=${arvs[iProp]}`, //(C)
+                    ``, //(D)
+                    ``, //(E)
+                    `=${purchaseClosingCostD}`, //(F)
+                    `=${repairCostsD}`, //(G)
+                    `=${holdingCostsD}`, //(H) per month
+                    `=${holdingTimeMonths}`, //(I)
+                    `=H${row}*I${row}`, //(J) total holding costs
+                    `=${fnfSaleClosingCostsD}`, //(K)
+                    `=${agentCommissionP}/${ONE_HUND}`, //(L) percent
+                    `=C${row}*L${row}`, //(M) // real estate agent sale fees
+                    `=${desiredProfitD}`, //(N) desired profit
+                    `=F${row}+G${row}+J${row}+K${row}+M${row}`, //(O) total costs
+                    `=C${row}-O${row}-N${row}`, //(P) maximum purchase price (arv - total costs - desired profit)
+                    `=P${row}/A${row}`, //(Q) max purchase price to sale price ratio
+                    `=N${row}/O${row}`, //(R) immediate ROI based on no loans or leverage
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*45/31-P${row}`, //(S) profit if sold at 45 days
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*90/31-P${row}`, //(T) profit if sold at 45 days
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*270/31-P${row}`, //(U) profit if sold at 45 days
+                ];
 
+                break;
             default:
                 break;
         }
@@ -356,8 +393,47 @@ export const doAna = (
             for (let i = 0; i < percentCols.length; i++) {
                 anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
             }
-        
+
             fiatCols = ['A', 'F', 'H', 'L', 'M', 'Q', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK',];
+            for (let i = 0; i < fiatCols.length; i++) {
+                anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
+            }
+            break;
+
+        case CONSTANTS.ANALYSIS_MODES[3]:
+            anaResultsSheet.getRange(`A1:${endCol}1`).setValues([
+                [
+                    'Price',
+                    'Address',
+                    'After repair value ($)', //C
+                    '',
+                    'Analysis type',
+                    'Purchase closing costs ($)', //F
+                    'Rehab costs ($)', //G
+                    'Monthly holding costs ($/month)', // H
+                    'Total holding time (months)',
+                    'Total holding costs ($)', //J
+                    'Sale closing costs ($)', // K
+                    'Real estate agent fees at sale (%)', //L
+                    'Agent fees at sale ($)', //M
+                    'Desired profit ($)', //N
+                    'Total costs ($)', //O
+                    'Maximum purchase price ($)',//P
+                    'Max. purchase price to sale price ratio', //Q
+                    'ROI (%)', //R
+                    'Profit if sold in 45 days ($)', //S
+                    'Profit if sold in 90 days ($)', //T
+                    'Profit if sold in 270 days ($)',//U
+
+                ]
+            ]).setFontWeight('bold').setFontSize(12);
+
+            percentCols = ['L', 'R'];
+            for (let i = 0; i < percentCols.length; i++) {
+                anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
+            }
+
+            fiatCols = ['A', 'C', 'F', 'G', 'H', 'J', 'K', 'M', 'N', 'O', 'P', 'T', 'U', 'S'];
             for (let i = 0; i < fiatCols.length; i++) {
                 anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
             }
@@ -379,6 +455,8 @@ export const doAna = (
 
     // Clear all conditional formatting rules in the sheet
     anaResultsSheet.clearConditionalFormatRules();
+
+    if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) return;
 
     // Get the range for column A
     let metricCols = ['AA', 'AB'];
