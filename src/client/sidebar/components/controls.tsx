@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import { Grid, Button, MenuItem, TextField } from '@mui/material';
+import CONSTANTS from '../../utils/constants';
 
 const controlButtonStyle = { width: "100%", marginBottom: "1em" };
 const Controls = (props: {
@@ -11,6 +12,7 @@ const Controls = (props: {
     anaSettings,
     anaMode,
     useAmounts,
+    filledOutARVs: boolean,
 }) => {
     const {
         sheet,
@@ -20,6 +22,7 @@ const Controls = (props: {
         anaSettings,
         anaMode,
         useAmounts,
+        filledOutARVs,
     } = props;
 
     const renderSheetOptions = () => {
@@ -52,7 +55,7 @@ const Controls = (props: {
                 {renderSheetOptions()}
             </TextField>
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
-                disabled={!anaMode || !sheet.selectedSheet}
+                disabled={!anaMode || !sheet.selectedSheet || (!filledOutARVs && anaMode === CONSTANTS.ANALYSIS_MODES[3])}
                 onClick={async () => {
                     try {
                         // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);

@@ -53,7 +53,7 @@ const SidebarContainer = () => {
         statusMessage: null,
         errorMessage: null,
     });
-    const [anaMode, setAnaMode] = useState(CONSTANTS.ANALYSIS_MODES[1]);
+    const [anaMode, setAnaMode] = useState(CONSTANTS.ANALYSIS_MODES[3]);
     const [user, setUser] = useState({
         subscriptionId: '',
         subscriptionStatusActive: true,
@@ -66,6 +66,7 @@ const SidebarContainer = () => {
         rnm: false,
         capex: false,
     });
+    const [filledOutARVs, setFilledOutARVs] = useState(false);
     const [sheet, setSheet] = useState({
         sheetNames: [],
         selectedSheet: '',
@@ -159,6 +160,8 @@ const SidebarContainer = () => {
         inputFieldsComponent = <FNFInput
             anaSettings={anaSettings}
             setAnaSettings={setAnaSettings}
+            setFilledOutARVs={setFilledOutARVs}
+            filledOutARVs={filledOutARVs}
         />;
     }
 
@@ -218,6 +221,7 @@ const SidebarContainer = () => {
                         setIsLoading={setIsLoading}
                         anaSettings={anaSettings}
                         anaMode={anaMode}
+                        filledOutARVs={filledOutARVs}
                         useAmounts={useAmounts}
                     />
                 </Grid>

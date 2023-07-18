@@ -74,13 +74,13 @@ module.exports = {
                 ['5'], // averaged nights stay per guest
             ],
             FNF: [
-                [''],
-                [''],
-                [''],
-                [''],
+                ['0'],
+                ['0'],
+                ['0'],
+                ['0'],
                 ['3'],
                 ['6'], // percent agent commission
-                [''],
+                ['0'],
             ]
             // TIME: [
             //     ['3'],
@@ -132,7 +132,7 @@ module.exports = {
         ],
         FNF: [
             ['Desired profit ($)'],
-            ['Purchase closing cost ($)'],
+            ['Closing costs ($)'],
             ['Repair costs ($)'],
             ['Holding costs ($/month)'],
             ['Holding time before sale (months)'],
