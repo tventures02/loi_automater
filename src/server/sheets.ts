@@ -285,11 +285,12 @@ export const doAna = (
                     `=${desiredProfitD}`, //(N) desired profit
                     `=F${row}+G${row}+J${row}+K${row}+M${row}`, //(O) total costs
                     `=C${row}-O${row}-N${row}`, //(P) maximum purchase price (arv - total costs - desired profit)
-                    `=P${row}/A${row}`, //(Q) max purchase price to sale price ratio
-                    `=N${row}/O${row}`, //(R) immediate ROI based on no loans or leverage
-                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*45/31-P${row}`, //(S) profit if sold at 45 days
-                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*90/31-P${row}`, //(T) profit if sold at 45 days
-                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*270/31-P${row}`, //(U) profit if sold at 45 days
+                    `=O${row}+P${row}`, //(Q) total investment
+                    `=IF(P${row}>0,P${row}/A${row},0)`, //(R) max purchase price to sale price ratio
+                    `=IF(P${row}>0,N${row}/Q${row},0)`, //(S) immediate ROI based on no loans or leverage
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*45/31-P${row}`, //(T) profit if sold at 45 days
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*90/31-P${row}`, //(U) profit if sold at 45 days
+                    `=C${row}-F${row}-G${row}-K${row}-M${row}-H${row}*270/31-P${row}`, //(V) profit if sold at 45 days
                 ];
 
                 break;
@@ -409,7 +410,7 @@ export const doAna = (
                     '',
                     'Analysis type',
                     'Purchase closing costs ($)', //F
-                    'Rehab costs ($)', //G
+                    'Est. rehab costs ($)', //G
                     'Monthly holding costs ($/month)', // H
                     'Total holding time (months)',
                     'Total holding costs ($)', //J
@@ -417,23 +418,24 @@ export const doAna = (
                     'Real estate agent fees at sale (%)', //L
                     'Agent fees at sale ($)', //M
                     'Desired profit ($)', //N
-                    'Total costs ($)', //O
-                    'Maximum purchase price ($)',//P
-                    'Max. purchase price to sale price ratio', //Q
-                    'ROI (%)', //R
-                    'Profit if sold in 45 days ($)', //S
-                    'Profit if sold in 90 days ($)', //T
-                    'Profit if sold in 270 days ($)',//U
+                    'Total expenses ($)', //O
+                    'Purchase price ($)',//P
+                    'Total investment ($)',//Q
+                    'Purchase price to sale price ratio', //R
+                    'ROI at time of sale (%)', //S
+                    'Profit if sold in 45 days ($)', //T
+                    'Profit if sold in 90 days ($)', //U
+                    'Profit if sold in 270 days ($)',//V
 
                 ]
             ]).setFontWeight('bold').setFontSize(12);
 
-            percentCols = ['L', 'R'];
+            percentCols = ['L', 'S'];
             for (let i = 0; i < percentCols.length; i++) {
                 anaResultsSheet.getRange(`${percentCols[i]}:${percentCols[i]}`).setNumberFormat("0.0%");
             }
 
-            fiatCols = ['A', 'C', 'F', 'G', 'H', 'J', 'K', 'M', 'N', 'O', 'P', 'T', 'U', 'S'];
+            fiatCols = ['A', 'C', 'F', 'G', 'H', 'J', 'K', 'M', 'N', 'O', 'P', 'T', 'U', 'V', 'Q'];
             for (let i = 0; i < fiatCols.length; i++) {
                 anaResultsSheet.getRange(`${fiatCols[i]}:${fiatCols[i]}`).setNumberFormat("$###,###,##0");
             }

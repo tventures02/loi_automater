@@ -28,7 +28,7 @@ module.exports = {
         },
         FNF: {
             startCol: "C",
-            endCol: "U"
+            endCol: "V"
         },
     },
     SETTINGS: {
