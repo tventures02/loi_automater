@@ -35,7 +35,7 @@ const ActivationModal = () => {
     const [tier, setTier] = useState('tier1');
     const [userEmail, setUserEmail] = useState('');
     const [message, setMessage] = useState('');
-    const [functionalityTier, setFunctionalityTier] = useState(0); // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
+    const [functionalityTier, setFunctionalityTier] = useState(NONE); // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
     const [clientSecret, setClientSecret] = useState(null);
     const [stripeSubId, setSubId] = useState(null);
     const [billingPeriod, setBillingPeriod] = useState('monthly');

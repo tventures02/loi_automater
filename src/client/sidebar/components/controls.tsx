@@ -14,6 +14,7 @@ const Controls = (props: {
     anaMode,
     useAmounts,
     filledOutARVs: boolean,
+    functionalityTier: boolean,
 }) => {
     const {
         sheet,
@@ -24,6 +25,7 @@ const Controls = (props: {
         anaMode,
         useAmounts,
         filledOutARVs,
+        functionalityTier,
     } = props;
 
     const [openDisclaimer, setOpenDisclaimer] = useState(false);
@@ -83,6 +85,7 @@ const Controls = (props: {
                             anaSettings,
                             anaMode,
                             useAmounts,
+                            functionalityTier,
                         );
                         setIsLoading(false);
                     } catch (error) {

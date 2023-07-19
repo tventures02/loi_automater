@@ -1,4 +1,9 @@
 const CONSTANTS = require('../client/utils/constants.js');
+const {
+    NONE,
+    FULL_FUNC,
+    FULL_FUNC_SUB,
+} = CONSTANTS.FUNC_TIERS;
 
 export const getUserEmail = () => {
     // // @ts-ignore
@@ -76,6 +81,7 @@ export const doAna = (
     anaSettings,
     anaMode,
     useAmounts,
+    functionalityTier,
 ) => {
     const {
         pricesAndAddressesObj,
@@ -146,12 +152,15 @@ export const doAna = (
         startCol,
         endCol,
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
+
+    let numProperties = functionalityTier === NONE ? 2 : orderedAddresses.length;
+
     let slope = 0;
     let intercept = 0;
     let minPrice = 999999999999;
     let maxPrice = 0;
     if (anaMode === CONSTANTS.ANALYSIS_MODES[2]) {
-        for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
+        for (let iProp = 0; iProp < numProperties; iProp++) {
             const {
                 price,
             } = pricesAndAddressesObj[orderedAddresses[iProp]];
@@ -170,7 +179,7 @@ export const doAna = (
 
 
     let row = 2;
-    for (let iProp = 0; iProp < orderedAddresses.length; iProp++) {
+    for (let iProp = 0; iProp < numProperties; iProp++) {
         const {
             price,
             address,

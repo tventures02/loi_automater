@@ -10,7 +10,7 @@ import RentalInput from './rentalInput';
 import FNFInput from './fnfInput';
 import Controls from './controls';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
-import { generateDataToServer } from '../../utils/misc';
+import { generateDataToServer, determineUserFunctionalityFromUserDoc } from '../../utils/misc';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const textFieldStyle = {
@@ -23,7 +23,7 @@ const {
     NONE,
     FULL_FUNC,
     FULL_FUNC_SUB,
-} = CONSTANTS.FUNC_TIERS
+} = CONSTANTS.FUNC_TIERS;
 
 const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);
@@ -77,6 +77,7 @@ const SidebarContainer = () => {
         sheetNames: [],
         selectedSheet: '',
     });
+    const [functionalityTier, setFunctionalityTier] = useState(NONE);
 
     //@ts-ignore
     useEffect(() => {
@@ -101,6 +102,9 @@ const SidebarContainer = () => {
                             preventAddingUserToDb),
                         'gworkspace/getSubscriptionPaidStatus');
                     console.log(subStatusResp)
+
+                    const functionalityTier = determineUserFunctionalityFromUserDoc(subStatusResp.user);
+                    setFunctionalityTier(functionalityTier);
                     if (subStatusResp.success) {
                         setUser({
                             ...user,
@@ -197,7 +201,7 @@ const SidebarContainer = () => {
                 }
                 <Grid xs={12} container>
                     {
-                        !user.subscriptionStatusActive ?
+                        functionalityTier === NONE ?
                             <CTA message={{ msg: messages.trialMessage }} singleLineCTA={true} />
                             :
                             null
@@ -242,6 +246,7 @@ const SidebarContainer = () => {
                         anaMode={anaMode}
                         filledOutARVs={filledOutARVs}
                         useAmounts={useAmounts}
+                        functionalityTier={functionalityTier}
                     />
                 </Grid>
             </div>
