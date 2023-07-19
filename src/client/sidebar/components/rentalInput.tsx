@@ -79,7 +79,7 @@ const RentalInput = (props: {
                 incomeLabels = incomeLabels.slice(2);
                 incomeKeys = incomeKeys.slice(2);
             }
-            incomeToolTipBlurb = <STRToolTipMsg />;
+            incomeToolTipBlurb = <STRToolTipMsg userHasPaid={userHasPaid}/>;
             break;
         default:
             break;
