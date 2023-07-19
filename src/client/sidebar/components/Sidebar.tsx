@@ -178,6 +178,7 @@ const SidebarContainer = () => {
             setUseAmounts={setUseAmounts}
             anaSettings={anaSettings}
             setAnaSettings={setAnaSettings}
+            userHasPaid={functionalityTier !== NONE}
         />;
     }
     else if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) {

@@ -1,10 +1,18 @@
 import React from 'react';
-const LTRToolTipMsg = () => {
+const STRToolTipMsg = (props) => {
+    const text = props.userHasPaid ? 'If not, t' : 'T';
     return (
         <div style={{ fontSize: '1.2em' }}>
-            <div>Check below to manually input nightly rates for each property in Column C of the sheet.</div>
-            <br /><br />
-            <div>If not, the min and max nightly rate incomes presented here allow for estimating MULTIPLE, differently-priced properties.</div>
+            {
+                props.userHasPaid ?
+                    <>
+                        <div>Check below to manually input nightly rates for each property in Column C of the sheet.</div>
+                        <br /><br />
+                    </>
+                    :
+                    null
+            }
+            <div>{text}he min and max nightly rate incomes presented here allow for estimating MULTIPLE, differently-priced properties.</div>
             <br /><br />
             <div>The min and max rates are applied to the lowest and highest priced properties for sale. The rates for the properties in between the min and max prices are scaled accordingly. </div>
             <br /><br />
@@ -12,4 +20,4 @@ const LTRToolTipMsg = () => {
         </div>
     )
 }
-export default LTRToolTipMsg;
+export default STRToolTipMsg;

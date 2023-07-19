@@ -44,8 +44,10 @@ export const getInitData = () => {
 export const readPricesAndAddresses = (selectedSheet, anaMode: string, useAmounts) => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
+    let lastRow = anaSheet.getLastRow();
+    if (lastRow > 1000 ) lastRow = 1000;
     const values = anaSheet
-        .getRange('A2:B101').getValues();
+        .getRange(`A2:B${lastRow}`).getValues();
     let pricesAndAddressesObj = {};
     let orderedAddresses = [];
     const fnfAna = anaMode === CONSTANTS.ANALYSIS_MODES[3];
@@ -54,10 +56,10 @@ export const readPricesAndAddresses = (selectedSheet, anaMode: string, useAmount
     let rentsFromSheet = [];
     let rentsFromSheetRaw = null;
     if (fnfAna) {
-        arvsRaw = anaSheet.getRange('C2:C101').getValues();
+        arvsRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
     }
     if (useAmounts.colCRents) {
-        rentsFromSheetRaw = anaSheet.getRange('C2:C101').getValues();
+        rentsFromSheetRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
     }
     for (let i = 0; i < values.length; i++) {
         const priceFloat = parseFloat(values[i][0]);
@@ -163,7 +165,9 @@ export const doAna = (
         endCol,
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
 
-    let numProperties = functionalityTier === NONE ? 2 : orderedAddresses.length;
+    const userHasNotPaid = functionalityTier === NONE;
+    const numProperties = userHasNotPaid ? 2 : orderedAddresses.length;
+    if (userHasNotPaid) useAmounts.colCRents = false;
 
     let slope = 0;
     let intercept = 0;

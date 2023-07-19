@@ -48,7 +48,7 @@ export function TierCard(props) {
         cardStyle
     } = props;
 
-    const spanStyle = { "fontSize": ".75em", "display": "flex", "alignItems": "center" };
+    const spanStyle = { "fontSize": ".85em", "display": "flex", "alignItems": "center" };
 
     // Define the features of the tier
     const features = props.features.map((feature, ind) => {
@@ -63,7 +63,18 @@ export function TierCard(props) {
                 ...featureStyle,
                 // @ts-ignore
                 paddingLeft: "1em",
-            }
+            };
+        }
+
+        if (feature.includes("<link>")) {
+            var beforeLink = feature.match(/(.*?)(?=<link>)/);
+            var insideLink = feature.match(/<link>(.*?)<\/link>/);
+            beforeLink = beforeLink && beforeLink[1] ? beforeLink[1].trim() : 'No text before link';
+            insideLink = insideLink && insideLink[1] ? insideLink[1] : 'No link text found';
+            feature = <>
+                {beforeLink} <a href="https://chrome.google.com/webstore/detail/z-real-estate-scraper/jdidjlghecfpaedabjinjfpdlcioeklo">{insideLink}</a>
+            </>;
+            featureStyling.spanStyle = {...spanStyle, display: 'block'};
         }
         return (
             <div style={featureStyle}>

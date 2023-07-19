@@ -25,6 +25,7 @@ const RentalInput = (props: {
     setAnaSettings: any,
     useAmounts: any,
     setUseAmounts: any,
+    userHasPaid: boolean,
 }) => {
     const {
         anaMode,
@@ -32,6 +33,7 @@ const RentalInput = (props: {
         setAnaSettings,
         useAmounts,
         setUseAmounts,
+        userHasPaid,
     } = props;
 
     if (anaMode === '') return null;
@@ -67,7 +69,7 @@ const RentalInput = (props: {
                 incomeLabels = incomeLabels.slice(3);
                 incomeKeys = incomeKeys.slice(3);
             }
-            incomeToolTipBlurb = <LTRToolTipMsg />;
+            incomeToolTipBlurb = <LTRToolTipMsg userHasPaid={userHasPaid}/>;
             break;
         case CONSTANTS.ANALYSIS_MODES[2]: // STR
             incomeLabels = CONSTANTS.SETTINGS.STR;
@@ -129,10 +131,15 @@ const RentalInput = (props: {
                         </div>
                     </Typography>
                 </Grid>
-                <FormControlLabel control={<Checkbox size="small"
-                    onChange={(e) => setUseAmounts({ ...useAmounts, colCRents: e.target.checked })} checked={useAmounts.colCRents} />}
-                    style={{ marginTop: "0", marginBottom: "0" }}
-                    label={<span style={{ fontSize: ".75em" }}>{rentFromSheetText}</span>} />
+                {
+                    userHasPaid ?
+                        <FormControlLabel control={<Checkbox size="small"
+                            onChange={(e) => setUseAmounts({ ...useAmounts, colCRents: e.target.checked })} checked={useAmounts.colCRents} />}
+                            style={{ marginTop: "0", marginBottom: "0" }}
+                            label={<span style={{ fontSize: ".75em" }}>{rentFromSheetText}</span>} />
+                        :
+                        null
+                }
                 <TextInputs
                     anaMode={anaMode}
                     labels={incomeLabels}
