@@ -9,9 +9,36 @@ export function round2NearestHundreth(num) {
     return Math.round(num * 100) / 100;
 }
 
+export function generateDataToServer(email, addOnPurchaseTier, appCode, appVariant, preventAddingUserToDb = false) {
+    return {
+        email,
+        addOnPurchaseTier,
+        app: appCode,
+        preventAddingUserToDb,
+        appVariant,
+    };
+}
+
+export function checkHasUserPaid(stripePaymentsArray) {
+    // This array has the form:
+    // stripe_payment_methods = [
+    //     'trialPaymentId',...
+    //     'pm_1JKCMZEdBjmrg9yM6bNmB4zw',...
+    //     'pm_1JKCMZEdBjmrg9yM6bNasfsd',...
+    // ]
+
+    let tempPaymentMethodsArray = stripePaymentsArray.slice(); // clone of array        
+    let index = tempPaymentMethodsArray.indexOf('trialPaymentId');
+    if (index > -1) {
+        tempPaymentMethodsArray.splice(index, 1);
+    }
+
+    return tempPaymentMethodsArray.length > 0; //if there are stripe payment method ids left, the user has paid for the add-on before
+}
+
 export function getSubArray(arr, element) {
     var index = arr.indexOf(element);
-  
+
     if (index !== -1) {
       return arr.slice(index);
     } else {

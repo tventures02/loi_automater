@@ -7,7 +7,8 @@ export const onOpen = (e) => {
   menu.createMenu('Z Real Estate Calculator')
       .addSubMenu(menu.createMenu('Start Here')
           .addItem('Generate Template', 'showGenTemplate'))
-      .addItem('Open Calculator', 'openSidebar').addToUi();
+      .addItem('Open Calculator', 'openSidebar')
+      .addItem('Upgrade to premium', 'showActivationModal').addToUi();
 };
 
 export const showGenTemplate = () => {
@@ -19,6 +20,14 @@ export const showGenTemplate = () => {
     ui.showModalDialog(html, "Generate a template to start")
 }
 
+export const showActivationModal = () => {
+    const ui = SpreadsheetApp.getUi();
+    let html = HtmlService.createHtmlOutputFromFile("activation")
+        .setWidth(1500)
+        .setHeight(800)
+        .setTitle("Buy the Premium Features of This Add-on");
+    ui.showModalDialog(html, 'Upgrade to Premium Features');
+}
 export const openSidebar = () => {
   const html = HtmlService.createHtmlOutputFromFile('sidebar').setTitle("Z Real Estate Calculator");
   SpreadsheetApp.getUi().showSidebar(html);

@@ -58,6 +58,12 @@ const clientEntrypoints = [
         filename: 'sidebar',
         template: './src/client/sidebar/index.html',
     },
+    {
+        name: 'CLIENT - Activation',
+        entry: './src/client/activation/index.js',
+        filename: 'activation',
+        template: './src/client/activation/index.html',
+    },
 ];
 
 // define certificate locations

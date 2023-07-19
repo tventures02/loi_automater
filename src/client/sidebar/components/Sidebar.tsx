@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
-// import { backendCall } from '../../utils/server-calls';
+import { backendCall } from '../../utils/server-calls';
 import { Grid, Button, MenuItem, TextField } from '@mui/material';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
@@ -10,6 +10,7 @@ import RentalInput from './rentalInput';
 import FNFInput from './fnfInput';
 import Controls from './controls';
 // import { amplitudeDataHandler } from "../../utils/amplitude";
+import { generateDataToServer } from '../../utils/misc';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const textFieldStyle = {
@@ -53,7 +54,7 @@ const SidebarContainer = () => {
         statusMessage: null,
         errorMessage: null,
     });
-    const [anaMode, setAnaMode] = useState(CONSTANTS.ANALYSIS_MODES[3]);
+    const [anaMode, setAnaMode] = useState('');
     const [user, setUser] = useState({
         subscriptionId: '',
         subscriptionStatusActive: true,
@@ -84,19 +85,31 @@ const SidebarContainer = () => {
                         selectedSheet: data.sheetNames[0] ? data.sheetNames[0] : '',
                         sheetNames: data.sheetNames,
                     });
-                    // const subStatusResp = await getSubscriptionPaidStatus(email);
-                    // console.log(subStatusResp)
-                    // if (subStatusResp.success) {
-                    //     setSubscriptionStatusActive(subStatusResp.subscriptionStatusActive);
-                    //     setUser(subStatusResp.user);
-                    // }
-                    // else {
-                    //     setIsLoading(false);
-                    //     setMessages({
-                    //         ...messages,
-                    //         errorMessage: 'Could not retreive data from our servers. You can still use the free version of this add-on. Please contact tidisventures@gmail.com or try refreshing the page.',
-                    //     });
-                    // }
+
+                    const preventAddingUserToDb = false;
+                    const subStatusResp = await backendCall(
+                        generateDataToServer(
+                            data.email,
+                            user.addOnPurchaseTier,
+                            CONSTANTS.APP_CODE,
+                            CONSTANTS.APP_VARIANT,
+                            preventAddingUserToDb),
+                        'gworkspace/getSubscriptionPaidStatus');
+                    console.log(subStatusResp)
+                    if (subStatusResp.success) {
+                        setUser({
+                            ...user,
+                            ...subStatusResp.user,
+                            subscriptionStatusActive: subStatusResp.subscriptionStatusActive,
+                        });
+                    }
+                    else {
+                        setIsLoading(false);
+                        setMessages({
+                            ...messages,
+                            errorMessage: 'Could not retreive data from our servers. You can still use the free version of this add-on. Please contact tidisventures@gmail.com or try refreshing the page.',
+                        });
+                    }
                     setIsLoading(false);
 
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();

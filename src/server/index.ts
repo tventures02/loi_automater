@@ -3,6 +3,7 @@ import {
     onOpen,
     showGenTemplate,
     openSidebar,
+    showActivationModal,
 } from './ui';
 
 import {
@@ -12,6 +13,7 @@ import {
     readPricesAndAddresses,
     doAna,
     writeToSettings,
+    getUserEmail,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -26,4 +28,6 @@ export {
     readPricesAndAddresses,
     doAna,
     writeToSettings,
+    showActivationModal,
+    getUserEmail,
 };

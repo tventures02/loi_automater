@@ -1,5 +1,11 @@
 const CONSTANTS = require('../client/utils/constants.js');
 
+export const getUserEmail = () => {
+    // // @ts-ignore
+    // console.log(ad)
+    return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)       
+}
+
 export const getInitData = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
