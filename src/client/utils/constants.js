@@ -237,7 +237,7 @@ module.exports = {
     ],
     PRO_FEATURES: ["Everything in Free tier plus...",
         "Analyze unlimited properties at a time",
-        "Manually input each properties rent in the sheet"
+        "Use values from the sheet to specify each property's rent (or revenue) for input to the calculator"
     ],
     ELITE_FEATURES: ["Everything in Pro tier forever, plus...",
         "Premium access to the <link>Z Real Estate Scraper Chrome Extension</link>",
@@ -247,8 +247,8 @@ module.exports = {
         'Premium access to Z Real Estate Calculator forever'
     ],
     STRIPE_BADGE: "https://s3.amazonaws.com/blueplanit.co/stripebadge.png",
-    SUPPORT_PAGE: "https://tidisventures.com/google-workspace-addon-support",
-    PRIVACY_PAGE: "https://flashcardlab.co/privacy-policy?policy=flashcard-lab",
+    SUPPORT_PAGE: "https://tidisventures.com/support?app=z-real-estate-calculator-support",
+    TERMS: "https://tidisventures.com/terms-and-conditions?app=z-real-estate-calculator-terms",
     DEFAULT_LABELS: ['Price', 'Address'],
     HEADERS_RANGE: 'A1:B1',
     DOC_BASE_URL:'https://docs.google.com/document/d/',
