@@ -38,7 +38,7 @@ const FNFInput = (props: {
                 <Grid item xs={12}>
                     <FormControlLabel control={<Checkbox onChange={(e) => setFilledOutARVs(e.target.checked)} checked={filledOutARVs} />}
                         style={{ marginTop: "25px"}}
-                        label={<span style={{fontSize: ".75em" }}>Fill in "After repair values ($)" in column C in the sheet you want to analyze. <a href="https://tidisventures.com/extensions/z-real-estate-scraper" target="_blank">Help.</a></span>} />
+                        label={<span style={{fontSize: ".75em" }}>Fill in "After repair values ($)" in column C in the sheet you want to analyze. <a href={CONSTANTS.SUPPORT_PAGE} target="_blank">Help.</a></span>} />
                 </Grid>
                 {
                     filledOutARVs ?
