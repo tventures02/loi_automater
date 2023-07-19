@@ -55,7 +55,7 @@ const SidebarContainer = () => {
     });
     const controlsRef = useRef(null);
     const [messages, setMessages] = useState({
-        trialMessage: null,
+        trialMessage: 'This free version limits analyzing up to 2 properties at a time.',
         statusMessage: null,
         errorMessage: null,
     });

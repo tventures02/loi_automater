@@ -96,7 +96,7 @@ const Controls = (props: {
             >Calculate</Button>
             <Grid container>
                 <Grid item xs={12} style={{fontSize: '.7em', textAlign: "center"}}>
-                    <a onClick={() => setOpenDisclaimer(true)} style={{cursor: "pointer"}}>Disclaimer</a>
+                    <a onClick={() => setOpenDisclaimer(true)} style={{cursor: "pointer"}}>Disclaimer</a> | <a href="https://tidisventures.com/privacy-policy?policy=z-real-estate-calculator" target="_blank">Terms and Conditions</a>
                 </Grid>
             </Grid>
         </>

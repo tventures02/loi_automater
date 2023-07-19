@@ -32,7 +32,7 @@ function CTA({ message, singleLineCTA, styleOverride, ctaText = null }) {
         )
     }
     return (
-        <Grid container>
+        <Grid container style={{marginBottom: '8px'}}>
             <Grid xs={12} style={gridStyle}>
                 {msg}
             </Grid>

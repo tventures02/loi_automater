@@ -176,8 +176,6 @@ export const doAna = (
         }
     }
 
-
-
     let row = 2;
     for (let iProp = 0; iProp < numProperties; iProp++) {
         const {
