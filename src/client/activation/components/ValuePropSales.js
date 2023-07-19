@@ -16,7 +16,6 @@ function ValuePropSales(props) {
         setIsTierLoading,
         setIsLoading,
         billingPeriod,
-        showMobileLinkInGSheetFeatures
     } = props;
 
     let tier0Price = 0;
@@ -50,7 +49,6 @@ function ValuePropSales(props) {
                             price={tier0Price}
                             cardTier={'tier0'}
                             selectedTier={tier}
-                            showMobileLinkInGSheetFeatures={showMobileLinkInGSheetFeatures}
                         />
                     </Grid>
                     <Grid item xs={4} style={tierCardStyle}>
@@ -63,7 +61,6 @@ function ValuePropSales(props) {
                             price={tier1Price}
                             cardTier={'tier1'}
                             selectedTier={tier}
-                            showMobileLinkInGSheetFeatures={showMobileLinkInGSheetFeatures}
                         />
                     </Grid>
                 </Grid>

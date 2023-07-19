@@ -1,6 +1,6 @@
 import React from "react";
 import { Grid, Typography } from '@mui/material';
-
+const centsStyle= { fontSize: '.44em', position: 'relative', top:'-.25em' };
 function PriceDisplay({ priceText }) {
     if (!priceText) return null;
     const priceSplitArray = priceText.split('.');
@@ -11,11 +11,12 @@ function PriceDisplay({ priceText }) {
     }
     return (
         <span>
-            <Typography align="center" variant="h2" component="div" style={{display: "flex", alignItems: "center"}}>
+            <Typography align="center" variant="h2" component="div" style={{display: "flex", alignItems: "center",paddingRight: '7px'}}>
                 {dollarText}
                 {
                     centsText ?
-                        <span style={{ fontSize: '.35em' }}>
+                    // @ts-ignore
+                        <span style={centsStyle}>
                             .{centsText}
                         </span>
                         :

@@ -5,7 +5,6 @@ import { useStripe, useElements } from '@stripe/react-stripe-js';
 import StripeForm from './StripeForm';
 
 const SalesView = ({
-    showMobileLinkInGSheetFeatures,
     isLoading,
     setIsLoading,
     prices,
@@ -57,7 +56,6 @@ const SalesView = ({
                             setIsTierLoading={setIsTierLoading}
                             billingPeriod={billingPeriod}
                             setIsLoading={setIsLoading}
-                            showMobileLinkInGSheetFeatures={showMobileLinkInGSheetFeatures}
                         />
                         :
                         null

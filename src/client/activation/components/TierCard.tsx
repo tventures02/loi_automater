@@ -41,7 +41,7 @@ export function TierCard(props) {
         cardTier,
         selectedTier,
         email,
-        showMobileLinkInGSheetFeatures,
+        functionalityTier,
     } = props;
 
     let {
@@ -88,7 +88,7 @@ export function TierCard(props) {
     }
 
     let priceDisplayElem = <PriceDisplay priceText={price ? price.toString() : null} />;
-    let paymentMethod: any = 'One time purchase';
+    let paymentMethod: any = cardTier === 'tier0' ? 'One time purchase' : 'Billed monthly';
 
     if (!price) paymentMethod = null;
 
@@ -122,6 +122,14 @@ export function TierCard(props) {
                                 {/* @ts-ignore */}
                                 <span style={dollarSignStyle}>$</span>
                                 {priceDisplayElem}
+                                {
+                                    cardTier === 'tier1' ?
+                                        <Typography align="center" variant="h6" component="div">
+                                            /month
+                                        </Typography>
+                                        :
+                                        null
+                                }
                             </div>
                         </Grid>
                         : null
@@ -137,12 +145,6 @@ export function TierCard(props) {
                     {/* Features list and tier-based text */}
                     <Grid item xs={12} style={{ "margin": "10px", marginBottom: "1em", "textAlign": "left", minHeight: "250px" }}>
                         {features}
-                        {
-                            showMobileLinkInGSheetFeatures && cardTier === 'tier0' ?
-                                <MobileFeature email={email} />
-                                :
-                                null
-                        }
                     </Grid>
                     <Grid container>
                         {price !== '0' && price ?

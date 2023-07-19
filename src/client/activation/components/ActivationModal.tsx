@@ -9,14 +9,18 @@ import { serverFunctionErrorHandler } from '../../utils/misc';
 import { Elements } from '@stripe/react-stripe-js';
 import LoadingAnimation from '../../utils/LoadingAnimation';
 import { loadStripe } from '@stripe/stripe-js';
-import ValuePropStatusAndUpgrade from './ValuePropStatusAndUpgrade';
-import { generateDataToServer, checkHasUserPaid } from '../../utils/misc';
+import { generateDataToServer, determineUserFunctionalityFromUserDoc } from '../../utils/misc';
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_API_KEY);
 let options = {
     // passing the client secret obtained from the server
     clientSecret: null,
 };
+const {
+    NONE,
+    FULL_FUNC,
+    FULL_FUNC_SUB,
+} = CONSTANTS.FUNC_TIERS
 
 const ActivationModal = () => {
     const [isLoading, setIsLoading] = useState(true);
@@ -31,11 +35,10 @@ const ActivationModal = () => {
     const [tier, setTier] = useState('tier1');
     const [userEmail, setUserEmail] = useState('');
     const [message, setMessage] = useState('');
-    const [userHasPaid, setUserHasPaid] = useState(false);
+    const [functionalityTier, setFunctionalityTier] = useState(0); // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
     const [clientSecret, setClientSecret] = useState(null);
     const [stripeSubId, setSubId] = useState(null);
     const [billingPeriod, setBillingPeriod] = useState('monthly');
-    const [showMobileLinkInGSheetFeatures, setShowMobileLinkInGSheetFeatures] = useState(false);
     const [user, setUser] = useState({
         email: '',
         addOnPurchaseTier: 'tier0',
@@ -53,7 +56,6 @@ const ActivationModal = () => {
                 }
                 setUserEmail(email);
                 const resp = await getPaidStatus(email);
-                console.log('haskdjfa')
                 console.log(resp)
                 if (resp.success) {
                     // // Send to Amplitude
@@ -68,18 +70,12 @@ const ActivationModal = () => {
 
                     setUser(resp.user);
                     setPrices(resp.prices);
-                    console.log('checking has user paid')
-                    const userHasPaid = checkHasUserPaid(resp.user.stripe_payment_methods);
-                    console.log('done')
-                    console.log(userHasPaid)
-                    if (userHasPaid) {
-                        setUserHasPaid(true);
-                        await getNewPaymentIntent(email, 'tier0');
-                    }
-                    else {
-                        await getNewPaymentIntent(email, tier);
+                    const functionalityTier = determineUserFunctionalityFromUserDoc(resp.user);
+                    setFunctionalityTier(functionalityTier);
+                    if (functionalityTier === NONE) {
                         setMessage("You're using a free version. See below for pricing.");
                     }
+                    await getNewPaymentIntent(email, tier);
                     setIsLoading(false);
                 }
                 else {
@@ -189,7 +185,7 @@ console.log(paymentIntentResp)
 
     const initPurchaseIntent = async (email_in: string, tier: string) => {
         if (tier === 'tier0') {
-            return await backendCall({ app: CONSTANTS.APP_CODE, tier }, 'gworkspace/createRegularPaymentIntent');
+            return await backendCall({ app: CONSTANTS.APP_CODE, tier, appVariant: CONSTANTS.APP_VARIANT }, 'gworkspace/createRegularPaymentIntent');
         }
 
         //////////////////////////////////////
@@ -201,6 +197,7 @@ console.log(paymentIntentResp)
             app: CONSTANTS.APP_CODE,
             addOnPurchaseTier: 'tier1',
             add_invoice_items: [],
+            appVariant: CONSTANTS.APP_VARIANT
         };
         // if (subOneTimeChargePriceId) {
         //     subPaymentParams = {
@@ -228,34 +225,37 @@ console.log(paymentIntentResp)
             return;
         }
 
-        // The payment succeeded!
-        const dataToServer = {
-            email: userEmail,
-            stripe_payment_method: result.paymentIntent.payment_method,
-            addOnPurchaseTier: overwriteTier ? overwriteTier : tier,
-            app: CONSTANTS.APP_CODE,
-            subscriptionId: stripeSubId ? stripeSubId : null,
-        };
-
         // sendToAmplitude(
         //     CONSTANTS.AMPLITUDE.SUCCESSFUL_PURCHASE,
         //     null,
         //     userEmail, userHasPaid
         // );
 
-        // const tvBackendResp = await backendCall(dataToServer, 'gworkspace/addPaidUser');
-        // if (tvBackendResp.success) {
-        //     setPaymentStatusMsg(tvBackendResp.message);
-        //     setUserHasPaid(tvBackendResp.userHasPaid);
-        //     setUser(tvBackendResp.user);
-        // }
-        // else { // Stripe payment succeeded but an error occurred when saving user data to bp database
-        //     setErrorMsg(tvBackendResp.message);
-        //     setUserHasPaid(false);
-        // }
-        // if (userEmail) {
-        //     backendCall({ email: userEmail, app: "flashcardlab", updateType: 'reset' }, 'gworkspace/updateActionCntr');
-        // }
+         // The payment succeeded!
+         const dataToServer = {
+            email: userEmail,
+            stripe_payment_method: result.paymentIntent.payment_method,
+            addOnPurchaseTier: overwriteTier ? overwriteTier : tier,
+            app: CONSTANTS.APP_CODE,
+            subscriptionId: stripeSubId ? stripeSubId : null,
+        };
+        let updatedUserResp = await backendCall(dataToServer, 'gworkspace/updateSubscriptionUser');
+        if (!updatedUserResp.success) {
+            // Unsuccessfully entered data in to db
+            setErrorMsg(updatedUserResp.message);
+        }
+        else {
+            // Successfully entered data in to db
+            setUser({ ...user, ...updatedUserResp.user });
+            const functionalityTier = determineUserFunctionalityFromUserDoc(updatedUserResp.user);
+            setFunctionalityTier(functionalityTier);
+            setPaymentStatusMsg(updatedUserResp.message);
+        }
+
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth' // Optional smooth scrolling animation
+        });
         setIsLoading(false);
     }
 
@@ -275,22 +275,24 @@ console.log(paymentIntentResp)
         )
     }
 
+    if (functionalityTier !== NONE) return (
+        <Grid style={{ marginBottom: '2em', minHeight: '80vh', textAlign: "center" }} item xs={12} >
+            {
+                paymentStatusMsg ?
+                    <>
+                        <b>{paymentStatusMsg}</b>
+                    </> : null
+            }
+            <br /><br />
+            
+            <p>You must be logged into the browser with your Google account associated with</p>
+            <p style={{ fontSize: "1.5em" }}><b>{userEmail}</b></p>
+            <p>to use the features. You can manage your subscription in the extension's "Subscription Settings" page.</p>
+            {/* <Contact privacyURL={privacyURL} /> */}
+        </Grid>
+    )
+
     if (!isLoading && !clientSecret) return <div>Could not communicate with Stripe. Please contact support at tidisventures@gmail.com.</div>
-    if (userHasPaid) return (
-        <Elements stripe={stripePromise} options={options} key={clientSecret}>
-            <ValuePropStatusAndUpgrade
-                paymentStatusMsg={paymentStatusMsg}
-                userEmail={userEmail}
-                user={user}
-                prices={prices}
-                showMobileLinkInGSheetFeatures={showMobileLinkInGSheetFeatures}
-                setErrorMsg={setErrorMsg}
-                clientSecret={clientSecret}
-                userHasPaid={userHasPaid}
-                processPaymentRespAndSetStates={processPaymentRespAndSetStates}
-            />
-        </Elements>
-    );
 
     console.log(prices)
     return (
@@ -303,7 +305,6 @@ console.log(paymentIntentResp)
                 <Grid container direction="column" alignItems="center" style={{ height: "100%", margin: "auto" }}>
                     <Grid container alignItems="center" style={{ height: "100%", minHeight: "510px" }}>
                         <SalesView
-                            showMobileLinkInGSheetFeatures={showMobileLinkInGSheetFeatures}
                             isLoading={isLoading}
                             setIsLoading={setIsLoading}
                             isTierLoading={isTierLoading}

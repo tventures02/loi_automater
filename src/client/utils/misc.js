@@ -1,3 +1,5 @@
+import CONSTANTS from '../utils/constants';
+
 export function constructHTMLData(data) {
     if (data) {
         return "<div id='mydata_htmlservice' style='display:none;'>" + Utilities.base64Encode(JSON.stringify(data)) + "</div>"
@@ -19,21 +21,19 @@ export function generateDataToServer(email, addOnPurchaseTier, appCode, appVaria
     };
 }
 
-export function checkHasUserPaid(stripePaymentsArray) {
-    // This array has the form:
-    // stripe_payment_methods = [
-    //     'trialPaymentId',...
-    //     'pm_1JKCMZEdBjmrg9yM6bNmB4zw',...
-    //     'pm_1JKCMZEdBjmrg9yM6bNasfsd',...
-    // ]
-
-    let tempPaymentMethodsArray = stripePaymentsArray.slice(); // clone of array        
-    let index = tempPaymentMethodsArray.indexOf('trialPaymentId');
-    if (index > -1) {
-        tempPaymentMethodsArray.splice(index, 1);
+export function determineUserFunctionalityFromUserDoc(user) {
+    // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
+    const {
+        NONE,
+        FULL_FUNC,
+        FULL_FUNC_SUB,
+    } = CONSTANTS.FUNC_TIERS;
+    const stripePaymentMethodsLen = user.stripe_payment_methods.length;
+    if (stripePaymentMethodsLen === 1) return NONE;
+    else if (stripePaymentMethodsLen > 1 && !user.subscriptionId) {
+        return FULL_FUNC;
     }
-
-    return tempPaymentMethodsArray.length > 0; //if there are stripe payment method ids left, the user has paid for the add-on before
+    else if (user.subscriptionId) return FULL_FUNC_SUB;
 }
 
 export function getSubArray(arr, element) {

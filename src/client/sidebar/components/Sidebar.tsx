@@ -19,6 +19,11 @@ const textFieldStyle = {
     width: '100%',
     backgroundColor: "white",
 };
+const {
+    NONE,
+    FULL_FUNC,
+    FULL_FUNC_SUB,
+} = CONSTANTS.FUNC_TIERS
 
 const SidebarContainer = () => {
     const [userEmail, setUserEmail] = useState(null);

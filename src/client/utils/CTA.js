@@ -17,20 +17,14 @@ function CTA({ message, singleLineCTA, styleOverride, ctaText = null }) {
             size="small"
             variant="contained"
             color="primary"
-            onClick={() => {
-                // serverFunctions.showActivationModal()
-            }
-            }>See pricing</Button>
+            onClick={() => serverFunctions.showActivationModal()}>See pricing</Button>
     );
     if (singleLineCTA) {
         if (styleOverride) alertStyle = { ...alertStyle, ...styleOverride };
         return (
             <Paper style={alertStyle} variant="outlined">
                 <span>
-                    {msg} <b><a onClick={() => {
-                        // serverFunctions.showActivationModal()
-                    }
-                    } style={linkStyle}>
+                    {msg} <b><a onClick={() => serverFunctions.showActivationModal()} style={linkStyle}>
                         {ctaText ? ctaText : CONSTANTS.VIEW_ACT_CTA}
                     </a></b>
                 </span>
