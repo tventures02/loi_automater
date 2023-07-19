@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 // import { backendCall } from '../../utils/server-calls';
-import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel, Tooltip } from '@mui/material';
+import { Grid, FormControl, Typography, TextField, FormLabel, Switch, FormControlLabel, Tooltip, Checkbox } from '@mui/material';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 // import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
@@ -57,15 +57,26 @@ const RentalInput = (props: {
     let incomeLabels = [];
     let incomeKeys = [];
     let incomeToolTipBlurb = null;
+    let rentFromSheetText = '';
     switch (anaMode) {
         case CONSTANTS.ANALYSIS_MODES[1]: // LTR
             incomeLabels = CONSTANTS.SETTINGS.LTR;
             incomeKeys = CONSTANTS.SETTINGS.ANALYSIS_KEYS.LTR;
+            rentFromSheetText = 'Input rents in column C.';
+            if (useAmounts.colCRents) {
+                incomeLabels = incomeLabels.slice(3);
+                incomeKeys = incomeKeys.slice(3);
+            }
             incomeToolTipBlurb = <LTRToolTipMsg />;
             break;
         case CONSTANTS.ANALYSIS_MODES[2]: // STR
             incomeLabels = CONSTANTS.SETTINGS.STR;
             incomeKeys = CONSTANTS.SETTINGS.ANALYSIS_KEYS.STR;
+            rentFromSheetText = 'Input nightly rates in column C.';
+            if (useAmounts.colCRents) {
+                incomeLabels = incomeLabels.slice(2);
+                incomeKeys = incomeKeys.slice(2);
+            }
             incomeToolTipBlurb = <STRToolTipMsg />;
             break;
         default:
@@ -118,6 +129,10 @@ const RentalInput = (props: {
                         </div>
                     </Typography>
                 </Grid>
+                <FormControlLabel control={<Checkbox size="small"
+                    onChange={(e) => setUseAmounts({ ...useAmounts, colCRents: e.target.checked })} checked={useAmounts.colCRents} />}
+                    style={{ marginTop: "0", marginBottom: "0" }}
+                    label={<span style={{ fontSize: ".75em" }}>{rentFromSheetText}</span>} />
                 <TextInputs
                     anaMode={anaMode}
                     labels={incomeLabels}

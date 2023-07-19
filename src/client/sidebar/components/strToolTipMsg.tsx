@@ -2,7 +2,9 @@ import React from 'react';
 const LTRToolTipMsg = () => {
     return (
         <div style={{ fontSize: '1.2em' }}>
-            <div>The min and max nightly rate incomes presented here allow for estimating MULTIPLE, differently-priced properties.</div>
+            <div>Check below to manually input nightly rates for each property in Column C of the sheet.</div>
+            <br /><br />
+            <div>If not, the min and max nightly rate incomes presented here allow for estimating MULTIPLE, differently-priced properties.</div>
             <br /><br />
             <div>The min and max rates are applied to the lowest and highest priced properties for sale. The rates for the properties in between the min and max prices are scaled accordingly. </div>
             <br /><br />

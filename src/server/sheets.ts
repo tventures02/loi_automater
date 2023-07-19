@@ -41,7 +41,7 @@ export const getInitData = () => {
     }
 }
 
-export const readPricesAndAddresses = (selectedSheet, anaMode: string) => {
+export const readPricesAndAddresses = (selectedSheet, anaMode: string, useAmounts) => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
     const values = anaSheet
@@ -51,8 +51,13 @@ export const readPricesAndAddresses = (selectedSheet, anaMode: string) => {
     const fnfAna = anaMode === CONSTANTS.ANALYSIS_MODES[3];
     let arvs = [];
     let arvsRaw = null;
+    let rentsFromSheet = [];
+    let rentsFromSheetRaw = null;
     if (fnfAna) {
         arvsRaw = anaSheet.getRange('C2:C101').getValues();
+    }
+    if (useAmounts.colCRents) {
+        rentsFromSheetRaw = anaSheet.getRange('C2:C101').getValues();
     }
     for (let i = 0; i < values.length; i++) {
         const priceFloat = parseFloat(values[i][0]);
@@ -67,12 +72,16 @@ export const readPricesAndAddresses = (selectedSheet, anaMode: string) => {
             if (fnfAna) {
                 arvs.push(arvsRaw[i][0]);
             }
+            if (useAmounts.colCRents) {
+                rentsFromSheet.push(rentsFromSheetRaw[i][0]);
+            }
         }
     }
     return {
         pricesAndAddressesObj,
         orderedAddresses,
         arvs,
+        rentsFromSheet,
     }
 }
 
@@ -87,6 +96,7 @@ export const doAna = (
         pricesAndAddressesObj,
         orderedAddresses,
         arvs,
+        rentsFromSheet,
     } = propertiesSheetData;
     console.log(anaSettings)
 
@@ -186,6 +196,10 @@ export const doAna = (
         let rentalIncomeD = price * rentalIncomeP / ONE_HUND;
         if (rentalIncomeD > maxRentD) rentalIncomeD = maxRentD;
         if (rentalIncomeD < minRentD) rentalIncomeD = minRentD;
+
+        if (useAmounts.colCRents) {
+            rentalIncomeD = rentsFromSheet[iProp];
+        }
         const capex = useAmounts.capex ? capExD : rentalIncomeD * capExP / ONE_HUND;
         downPaymentP = downPaymentP ? downPaymentP : 0;
         downPaymentD = downPaymentD ? downPaymentD : 0;
@@ -245,7 +259,10 @@ export const doAna = (
                 ];
                 break;
             case CONSTANTS.ANALYSIS_MODES[2]:
-                const resultantNightlyRate = slope * price + intercept;
+                let resultantNightlyRate = slope * price + intercept;
+                if (useAmounts.colCRents) {
+                    resultantNightlyRate = rentsFromSheet[iProp];
+                }
                 startCol = CONSTANTS.ANA_OUTPUT_RANGES.STR.startCol;
                 endCol = CONSTANTS.ANA_OUTPUT_RANGES.STR.endCol;
                 calcs = [
@@ -471,6 +488,7 @@ export const doAna = (
     // Clear all conditional formatting rules in the sheet
     anaResultsSheet.clearConditionalFormatRules();
 
+    row++;
     anaResultsSheet.getRange(`A${row}`).setFontSize(8).setFontColor("#980000").setValue(CONSTANTS.DISCLAIMER);
 
     if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) return;
@@ -536,13 +554,13 @@ export const readAndParseSettingsValues = () => {
 
     const flags = settingsSheet
         .getRange(CONSTANTS.SETTINGS.FLAG_RANGES).getValues();
-        console.log(flags)
     const useAmountFlags = {
         downpayment: flags[0][0],
         propTax: flags[1][0],
         insurance: flags[2][0],
         rnm: flags[3][0],
         capex: flags[4][0],
+        colCRents: flags[5][0],
     }
 
     return {
@@ -621,8 +639,8 @@ export const makeSettingsSheet = (settingsSheetExists, tempSheet, activeSpreadsh
             row = endRow + 2;
         }
         tempSheet.getRange('A1').setValue(CONSTANTS.SETTINGS_NOTE).setFontColor('red').setFontWeight('bold').setFontSize(12);
-        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_LABEL_RANGES).setValues([['Use downpayment $ amount'],['Use property tax $ amount'],['Use insurance $ amount'],['Use repairs/maintanence $ amount'],['Use capex $ amount'],]);
-        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_RANGES).setValues([['FALSE'],['FALSE'],['FALSE'],['FALSE'],['FALSE'],]);
+        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_LABEL_RANGES).setValues([['Use downpayment $ amount'],['Use property tax $ amount'],['Use insurance $ amount'],['Use repairs/maintanence $ amount'],['Use capex $ amount'],['Manually input rent']]);
+        tempSheet.getRange(CONSTANTS.SETTINGS.FLAG_RANGES).setValues([['FALSE'],['FALSE'],['FALSE'],['FALSE'],['FALSE'],['FALSE']]);
     }
 }
 
@@ -647,5 +665,6 @@ export function writeToSettings(anaSettings, useAmounts) {
     useAmountFlags[2] = [useAmounts.insurance ? 'TRUE' : 'FALSE'];
     useAmountFlags[3] = [useAmounts.rnm ? 'TRUE' : 'FALSE'];
     useAmountFlags[4] = [useAmounts.capex ? 'TRUE' : 'FALSE'];
+    useAmountFlags[5] = [useAmounts.colCRents ? 'TRUE' : 'FALSE'];
     settingsSheet.getRange(CONSTANTS.SETTINGS.FLAG_RANGES).setValues(useAmountFlags);
 }

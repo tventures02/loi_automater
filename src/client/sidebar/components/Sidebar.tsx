@@ -71,6 +71,7 @@ const SidebarContainer = () => {
         insurance: false,
         rnm: false,
         capex: false,
+        colCRents: false,
     });
     const [filledOutARVs, setFilledOutARVs] = useState(false);
     const [sheet, setSheet] = useState({
