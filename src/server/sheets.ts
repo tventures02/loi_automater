@@ -102,6 +102,7 @@ export const doAna = (
     } = propertiesSheetData;
     console.log(anaSettings)
 
+
     let {
         downPaymentP,
         downPaymentD,
@@ -524,6 +525,14 @@ export const doAna = (
         rules.push(rule);
     }
     anaResultsSheet.setConditionalFormatRules(rules);
+
+    // Settings sheet stuff
+    let tempSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
+    if (!tempSheet) {
+        makeSettingsSheet(false, tempSheet, activeSpreadsheet);
+    }
+
+    activeSpreadsheet.setActiveSheet(anaResultsSheet);
 }
 
 
