@@ -148,12 +148,12 @@ export const doAna = (
     const MONTHS_PER_YEAR = 12;
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     let anaResultsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.ANA_RESULTS_SHEETNAME);
-    activeSpreadsheet.setActiveSheet(anaResultsSheet);
     if (!anaResultsSheet) {
         anaResultsSheet = activeSpreadsheet.insertSheet().setName(CONSTANTS.ANA_RESULTS_SHEETNAME);
         activeSpreadsheet.setActiveSheet(anaResultsSheet);
         anaResultsSheet.setFrozenRows(1);
     }
+    
     const sheets = activeSpreadsheet.getSheets();
     activeSpreadsheet.moveActiveSheet(sheets.length - 1);
     // Get the range of all cells in the sheet
