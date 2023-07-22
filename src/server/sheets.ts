@@ -153,7 +153,7 @@ export const doAna = (
         activeSpreadsheet.setActiveSheet(anaResultsSheet);
         anaResultsSheet.setFrozenRows(1);
     }
-    
+    activeSpreadsheet.setActiveSheet(anaResultsSheet);
     const sheets = activeSpreadsheet.getSheets();
     activeSpreadsheet.moveActiveSheet(sheets.length - 1);
     // Get the range of all cells in the sheet
@@ -204,6 +204,7 @@ export const doAna = (
         if (useAmounts.colCRents) {
             rentalIncomeD = rentsFromSheet[iProp];
         }
+        rentalIncomeD = Math.round(rentalIncomeD);
         const capex = useAmounts.capex ? capExD : rentalIncomeD * capExP / ONE_HUND;
         downPaymentP = downPaymentP ? downPaymentP : 0;
         downPaymentD = downPaymentD ? downPaymentD : 0;
@@ -263,7 +264,7 @@ export const doAna = (
                 ];
                 break;
             case CONSTANTS.ANALYSIS_MODES[2]:
-                let resultantNightlyRate = slope * price + intercept;
+                let resultantNightlyRate = Math.round(slope * price + intercept);
                 if (useAmounts.colCRents) {
                     resultantNightlyRate = rentsFromSheet[iProp];
                 }
@@ -453,9 +454,9 @@ export const doAna = (
                     'Agent fees at sale ($)', //M
                     'Desired profit ($)', //N
                     'Total expenses ($)', //O
-                    'Purchase price ($)',//P
+                    'Max. allowable offer ($)',//P
                     'Total investment ($)',//Q
-                    'Purchase price to sale price ratio', //R
+                    'Max. allowable offer to sale price ratio', //R
                     'ROI at time of sale (%)', //S
                     'Profit if sold in 45 days ($)', //T
                     'Profit if sold in 90 days ($)', //U
