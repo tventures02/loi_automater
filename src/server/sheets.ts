@@ -47,7 +47,7 @@ export const readPricesAndAddresses = (selectedSheet: string, anaMode: string, u
         const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
         if (!anaSheet) throw Error(`No sheet named "${selectedSheet}" found. Please reopen the calculator to reload the sheets.`)
         let lastRow = anaSheet.getLastRow();
-        if (lastRow < 1) throw Error(`No data found in "${selectedSheet}" sheet. Starting in row 2, please enter property prices in column A and addresses in column B. Or go to Extensions -> Start here -> Generate Template.`)
+        if (lastRow < 1) throw Error(`No data found in "${selectedSheet}" sheet. Starting in row 2, please enter property prices in column A and addresses in column B. Or go to Extensions -> Start Here -> Generate Template.`)
         if (lastRow > 1000 ) lastRow = 1000;
         const values = anaSheet
             .getRange(`A2:B${lastRow}`).getValues();

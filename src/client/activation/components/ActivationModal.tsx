@@ -10,6 +10,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import LoadingAnimation from '../../utils/LoadingAnimation';
 import { loadStripe } from '@stripe/stripe-js';
 import { generateDataToServer, determineUserFunctionalityFromUserDoc } from '../../utils/misc';
+import Contact from './Contact';
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_API_KEY);
 let options = {
@@ -287,8 +288,8 @@ console.log(paymentIntentResp)
             
             <p>You must be logged into the browser with your Google account associated with</p>
             <p style={{ fontSize: "1.5em" }}><b>{userEmail}</b></p>
-            <p>to use the features. You can manage your subscription in the extension's "Subscription Settings" page.</p>
-            {/* <Contact privacyURL={privacyURL} /> */}
+            <p>to use the features. If you purchased a subscription, you can manage your subscription in the extension's "Subscription Settings" page.</p>
+            <Contact/>
         </Grid>
     )
 

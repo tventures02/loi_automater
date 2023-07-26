@@ -7,7 +7,7 @@ function Contact(props) {
         <Grid container>
             <Grid xs={9} style={{ margin: "auto", marginTop: "20px", "textAlign": "center", "color": "#666666", "fontSize": ".8em" }}>
                 <div>
-                    <b>We do not store your credit card information. Please see our <a className="no-underline font-link-blue" href={CONSTANTS.PRIVACY_PAGE}>privacy policy</a>'s. If you have any questions or issues, please email
+                    <b>We do not store your credit card information. Please see our <a className="no-underline font-link-blue" href={CONSTANTS.PRIVACY_PAGE}>privacy policy</a>. If you have any questions or issues, please email
                         <a className="no-underline font-link-blue" href="mailto:
             tidisventure@gmail.com">{" "}tidisventure@gmail.com{"."}</a>
                     </b>

@@ -11,6 +11,7 @@ module.exports = {
     DARK_RED_BERRY: "#5f2120",
     SETTINGS_SHEETNAME: `Settings`,
     ANA_RESULTS_SHEETNAME: String.fromCodePoint(0x1F4CB) + 'Analysis results',
+    PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-scraper-chrome-ext-privacy-policy',
     ANALYSIS_MODES: [
         '',
         'Long term rental property',
@@ -237,7 +238,8 @@ module.exports = {
     ],
     PRO_FEATURES: ["Everything in Free tier plus...",
         "Analyze unlimited properties at a time",
-        "Use values from the sheet to specify each property's rent (or revenue) for input to the calculator"
+        "Use values from the sheet to specify each property's rent (or revenue) for input to the calculator",
+        "One time purchase"
     ],
     ELITE_FEATURES: ["Everything in Pro tier forever, plus...",
         "Premium access to the <link>Z Real Estate Scraper Chrome Extension</link>",
