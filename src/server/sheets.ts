@@ -41,50 +41,60 @@ export const getInitData = () => {
     }
 }
 
-export const readPricesAndAddresses = (selectedSheet, anaMode: string, useAmounts) => {
-    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
-    let lastRow = anaSheet.getLastRow();
-    if (lastRow > 1000 ) lastRow = 1000;
-    const values = anaSheet
-        .getRange(`A2:B${lastRow}`).getValues();
-    let pricesAndAddressesObj = {};
-    let orderedAddresses = [];
-    const fnfAna = anaMode === CONSTANTS.ANALYSIS_MODES[3];
-    let arvs = [];
-    let arvsRaw = null;
-    let rentsFromSheet = [];
-    let rentsFromSheetRaw = null;
-    if (fnfAna) {
-        arvsRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
-    }
-    if (useAmounts.colCRents) {
-        rentsFromSheetRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
-    }
-    for (let i = 0; i < values.length; i++) {
-        const priceFloat = parseFloat(values[i][0]);
-        const address = values[i][1];
-        if (address && priceFloat) {
-            pricesAndAddressesObj[address] = {
-                price: priceFloat,
-                address,
-                index: i,
-            };
-            orderedAddresses.push(address);
-            if (fnfAna) {
-                arvs.push(arvsRaw[i][0]);
-            }
-            if (useAmounts.colCRents) {
-                rentsFromSheet.push(rentsFromSheetRaw[i][0]);
+export const readPricesAndAddresses = (selectedSheet: string, anaMode: string, useAmounts) => {
+    try {
+        const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+        const anaSheet = activeSpreadsheet.getSheetByName(selectedSheet);
+        if (!anaSheet) throw Error(`No sheet named ${selectedSheet} found.`)
+        let lastRow = anaSheet.getLastRow();
+        if (lastRow > 1000 ) lastRow = 1000;
+        const values = anaSheet
+            .getRange(`A2:B${lastRow}`).getValues();
+        let pricesAndAddressesObj = {};
+        let orderedAddresses = [];
+        const fnfAna = anaMode === CONSTANTS.ANALYSIS_MODES[3];
+        let arvs = [];
+        let arvsRaw = null;
+        let rentsFromSheet = [];
+        let rentsFromSheetRaw = null;
+        if (fnfAna) {
+            arvsRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
+        }
+        if (useAmounts.colCRents) {
+            rentsFromSheetRaw = anaSheet.getRange(`C2:C${lastRow}`).getValues();
+        }
+        for (let i = 0; i < values.length; i++) {
+            const priceFloat = parseFloat(values[i][0]);
+            const address = values[i][1];
+            if (address && priceFloat) {
+                pricesAndAddressesObj[address] = {
+                    price: priceFloat,
+                    address,
+                    index: i,
+                };
+                orderedAddresses.push(address);
+                if (fnfAna) {
+                    arvs.push(arvsRaw[i][0]);
+                }
+                if (useAmounts.colCRents) {
+                    rentsFromSheet.push(rentsFromSheetRaw[i][0]);
+                }
             }
         }
+        return {
+            success: true,
+            pricesAndAddressesObj,
+            orderedAddresses,
+            arvs,
+            rentsFromSheet,
+        }
+    } catch (error) {
+        return {
+            success: false,
+            message: error.message ? error.message : JSON.stringify(error),
+        }
     }
-    return {
-        pricesAndAddressesObj,
-        orderedAddresses,
-        arvs,
-        rentsFromSheet,
-    }
+
 }
 
 export const doAna = (

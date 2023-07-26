@@ -79,6 +79,8 @@ const Controls = (props: {
                         // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
                         setIsLoading(true);
                         let propertiesSheetData = await serverFunctions.readPricesAndAddresses(sheet.selectedSheet, anaMode, useAmounts);
+                        if (!propertiesSheetData.success) throw Error(propertiesSheetData.message);
+
                         serverFunctions.writeToSettings(anaSettings, useAmounts);
                         await serverFunctions.doAna(
                             propertiesSheetData,
@@ -90,6 +92,7 @@ const Controls = (props: {
                         setIsLoading(false);
                     } catch (error) {
                         console.log(error)
+                        alert(error)
                         setIsLoading(false);
                     }
                 }}

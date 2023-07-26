@@ -238,7 +238,7 @@ const SidebarContainer = () => {
                         inputFieldsComponent ?
                             inputFieldsComponent :
                             <div className='helpTextSidebar'>
-                                <h3>New?</h3>
+                                <h3>To start:</h3>
                                 1. Input property prices in column A and addresses in column B in a sheet. Start on row 2.
                                 <br /><br />
                                 2. Then, choose analysis from dropdown.
