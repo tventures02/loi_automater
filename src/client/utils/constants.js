@@ -11,7 +11,7 @@ module.exports = {
     DARK_RED_BERRY: "#5f2120",
     SETTINGS_SHEETNAME: `Settings`,
     ANA_RESULTS_SHEETNAME: String.fromCodePoint(0x1F4CB) + 'Analysis results',
-    PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-scraper-chrome-ext-privacy-policy',
+    PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-calc-gsheets-addon-privacy-policy',
     ANALYSIS_MODES: [
         '',
         'Long term rental property',
