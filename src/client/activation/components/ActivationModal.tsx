@@ -288,7 +288,6 @@ console.log(paymentIntentResp)
             
             <p>You must be logged into the browser with your Google account associated with</p>
             <p style={{ fontSize: "1.5em" }}><b>{userEmail}</b></p>
-            <p>to use the features. If you purchased a subscription, you can manage your subscription in the extension's "Subscription Settings" page.</p>
             <Contact/>
         </Grid>
     )
