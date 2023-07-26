@@ -43,35 +43,49 @@ const Controls = (props: {
 
     return (
         <>
-        {
-                    openDisclaimer ?
-                        <AlertDialog
-                            showAlertFlag={openDisclaimer}
-                            contentJSX={<div style={{fontSize: ".7em"}}>{CONSTANTS.DISCLAIMER}</div>}
-                            title={"Disclaimer"}
-                            handleCloseAlert={(event, reason: string) => {
-                                setOpenDisclaimer(false);
-                            }}
-                        />
-                        :
-                        null
-                }
-            <TextField
-                className="textfield-day-32px"
-                select
-                id="select-question"
-                size="small"
-                variant="outlined"
-                label="Choose sheet to analyze"
-                value={sheet.selectedSheet}
-                style={{...textFieldStyle, marginBottom: '1em'}}
-                onChange={(e) => setSheet({
-                        ...sheet,
-                        selectedSheet: e.target.value
-                    })}
-            >
-                {renderSheetOptions()}
-            </TextField>
+            {
+                openDisclaimer ?
+                    <AlertDialog
+                        showAlertFlag={openDisclaimer}
+                        contentJSX={<div style={{ fontSize: ".7em" }}>{CONSTANTS.DISCLAIMER}</div>}
+                        title={"Disclaimer"}
+                        handleCloseAlert={(event, reason: string) => {
+                            setOpenDisclaimer(false);
+                        }}
+                    />
+                    :
+                    null
+            }
+            <Grid container>
+                <Grid item xs={10}>
+                    <TextField
+                        className="textfield-day-32px"
+                        select
+                        id="select-question"
+                        size="small"
+                        variant="outlined"
+                        label="Choose sheet to analyze"
+                        value={sheet.selectedSheet}
+                        style={{ ...textFieldStyle, marginBottom: '1em' }}
+                        onChange={(e) => setSheet({
+                            ...sheet,
+                            selectedSheet: e.target.value
+                        })}
+                    >
+                        {renderSheetOptions()}
+                    </TextField>
+                </Grid>
+                <Grid item xs={2} className='sheetSelectionRefresh'>
+                    <a onClick={async () => {
+                        const data = await serverFunctions.getInitData();
+                        setSheet({
+                            selectedSheet: data.sheetNames[0] ? data.sheetNames[0] : '',
+                            sheetNames: data.sheetNames,
+                        });
+                    }} style={{cursor: "pointer"}}>Refresh sheets</a>
+                </Grid>
+            </Grid>
+
             <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
                 disabled={!anaMode || !sheet.selectedSheet || (!filledOutARVs && anaMode === CONSTANTS.ANALYSIS_MODES[3])}
                 onClick={async () => {

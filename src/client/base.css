@@ -63,3 +63,11 @@ a {
     font-size: .75em;
     padding: 10px;
 }
+
+.sheetSelectionRefresh {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: .57em;
+    text-align: center;
+}
