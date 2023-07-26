@@ -160,7 +160,7 @@ const SidebarContainer = () => {
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
-    console.log('render side bar')
+    // console.log('render side bar')
     console.log(anaSettings)
     console.log(anaMode)
 
@@ -234,7 +234,18 @@ const SidebarContainer = () => {
                     </TextField>
                 </Grid>
                 <Grid xs={12} container>
-                    {inputFieldsComponent}
+                    {
+                        inputFieldsComponent ?
+                            inputFieldsComponent :
+                            <div className='helpTextSidebar'>
+                                <h3>New?</h3>
+                                1. Input property prices in column A and addresses in column B in a sheet. Start on row 2.
+                                <br /><br />
+                                2. Then, choose analysis from dropdown.
+                                <br /><br />
+                                3. Click 'Calculate'.
+                            </div>
+                    }
                 </Grid>
             </div>
             <div className='bottomDiv' ref={controlsRef}>
