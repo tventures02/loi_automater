@@ -260,7 +260,7 @@ const SidebarContainer = () => {
                                 <br /><br />
                                 2. Then, choose analysis from dropdown.
                                 <br /><br />
-                                3. Click 'Calculate'. <a href={config.gwsCalcYTURL} target="_blank" style={{ cursor: 'pointer' }}>See a short video.</a>
+                                3. Click 'Calculate'. <a href={config.gwsCalcYTURL} target="_blank" style={{ cursor: 'pointer' }}>Watch a short video.</a>
                             </div>
                     }
                 </Grid>
