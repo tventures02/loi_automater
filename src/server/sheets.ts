@@ -111,7 +111,7 @@ export const doAna = (
         arvs,
         rentsFromSheet,
     } = propertiesSheetData;
-    console.log(anaSettings)
+    // console.log(anaSettings)
 
 
     let {
@@ -628,7 +628,7 @@ export const generateTemplateScript = () => {
         }
 
     } catch (error) {
-        console.log(error)
+        // console.log(error)
         return {
             success: false,
             message: error.message,

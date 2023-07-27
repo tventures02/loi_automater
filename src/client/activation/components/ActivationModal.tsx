@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-// import { sendToAmplitude, amplitudeDataHandler } from "../../utils/amplitude";
+import { sendToAmplitude } from "../../utils/amplitude";
 import { Grid } from "@mui/material";
 import { serverFunctions } from '../../utils/serverFunctions';
 import CONSTANTS from '../../utils/constants';
@@ -57,17 +57,10 @@ const ActivationModal = () => {
                 }
                 setUserEmail(email);
                 const resp = await getPaidStatus(email);
-                console.log(resp)
+                // console.log(resp)
                 if (resp.success) {
-                    // // Send to Amplitude
-                    // try {
-                    //     amplitudeDataHandler(email, {
-                    //         'eventName': CONSTANTS.AMPLITUDE.VIEWED_PRICING_MODAL,
-                    //     }, resp.userHasPaid);
-                    // }
-                    // catch (e) {
-                    //     // do nothing for now
-                    // }
+                    // Send to Amplitude
+                    sendToAmplitude(CONSTANTS.AMPLITUDE.VIEWED_PRICING_MODAL, null, user);
 
                     setUser(resp.user);
                     setPrices(resp.prices);
@@ -109,8 +102,6 @@ const ActivationModal = () => {
         }
         // console.log('payment intent resp')
         // console.log(paymentIntentResp)
-        console.log('payment intent resp')
-console.log(paymentIntentResp)
         if (paymentIntentResp.success) {
             const clientSecretTemp = paymentIntentResp.clientSecret ? paymentIntentResp.clientSecret : paymentIntentResp.client_secret;
             if (!clientSecretTemp) {
@@ -226,12 +217,6 @@ console.log(paymentIntentResp)
             return;
         }
 
-        // sendToAmplitude(
-        //     CONSTANTS.AMPLITUDE.SUCCESSFUL_PURCHASE,
-        //     null,
-        //     userEmail, userHasPaid
-        // );
-
          // The payment succeeded!
          const dataToServer = {
             email: userEmail,
@@ -240,6 +225,10 @@ console.log(paymentIntentResp)
             app: CONSTANTS.APP_CODE,
             subscriptionId: stripeSubId ? stripeSubId : null,
         };
+
+        // Send to Amplitude
+        sendToAmplitude(CONSTANTS.AMPLITUDE.PURCHASED, dataToServer, user);
+
         let updatedUserResp = await backendCall(dataToServer, 'gworkspace/updateSubscriptionUser');
         if (!updatedUserResp.success) {
             // Unsuccessfully entered data in to db

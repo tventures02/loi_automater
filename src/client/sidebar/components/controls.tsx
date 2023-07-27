@@ -15,6 +15,8 @@ const Controls = (props: {
     useAmounts,
     filledOutARVs: boolean,
     functionalityTier: boolean,
+    sendToAmplitude: any,
+    user: any,
 }) => {
     const {
         sheet,
@@ -26,6 +28,8 @@ const Controls = (props: {
         useAmounts,
         filledOutARVs,
         functionalityTier,
+        sendToAmplitude,
+        user,
     } = props;
 
     const [openDisclaimer, setOpenDisclaimer] = useState(false);
@@ -93,6 +97,14 @@ const Controls = (props: {
                         // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);
                         setIsLoading(true);
                         let propertiesSheetData = await serverFunctions.readPricesAndAddresses(sheet.selectedSheet, anaMode, useAmounts);
+                        let eventProperties = {
+                            anaSettings,
+                            firstAddress: null,
+                        };
+                        if (propertiesSheetData.success && propertiesSheetData.orderedAddresses.length) {
+                            eventProperties.firstAddress = propertiesSheetData.orderedAddresses[0];
+                        }
+                        sendToAmplitude(CONSTANTS.AMPLITUDE.CLICKED_CALC, eventProperties, user);
                         if (!propertiesSheetData.success) throw Error(propertiesSheetData.message);
 
                         serverFunctions.writeToSettings(anaSettings, useAmounts);

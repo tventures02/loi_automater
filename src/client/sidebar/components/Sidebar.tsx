@@ -3,13 +3,12 @@ import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 import { backendCall } from '../../utils/server-calls';
 import { Grid, Button, MenuItem, TextField } from '@mui/material';
-// import { generateDataToServer } from '../../utils/misc';
 import CONSTANTS from '../../utils/constants';
 import CTA from '../../utils/CTA';
 import RentalInput from './rentalInput';
 import FNFInput from './fnfInput';
 import Controls from './controls';
-// import { amplitudeDataHandler } from "../../utils/amplitude";
+import { sendToAmplitude } from "../../utils/amplitude";
 import { generateDataToServer, determineUserFunctionalityFromUserDoc } from '../../utils/misc';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
@@ -61,6 +60,7 @@ const SidebarContainer = () => {
     });
     const [anaMode, setAnaMode] = useState('');
     const [user, setUser] = useState({
+        email: '',
         subscriptionId: '',
         subscriptionStatusActive: true,
         addOnPurchaseTier: 'tier0'
@@ -105,16 +105,18 @@ const SidebarContainer = () => {
                             CONSTANTS.APP_VARIANT,
                             preventAddingUserToDb),
                         'gworkspace/getSubscriptionPaidStatus');
-                    console.log(subStatusResp)
+                    // console.log(subStatusResp)
 
                     const functionalityTier = determineUserFunctionalityFromUserDoc(subStatusResp.user);
                     setFunctionalityTier(functionalityTier);
                     if (subStatusResp.success) {
-                        setUser({
+                        const localUser = {
                             ...user,
                             ...subStatusResp.user,
                             subscriptionStatusActive: subStatusResp.subscriptionStatusActive,
-                        });
+                        };
+                        sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, localUser);
+                        setUser(localUser);
                     }
                     else {
                         setIsLoading(false);
@@ -123,6 +125,7 @@ const SidebarContainer = () => {
                             errorMessage: 'Could not retreive data from our servers. You can still use the free version of this add-on. Please contact tidisventures@gmail.com or try refreshing the page.',
                         });
                     }
+                    
                     setIsLoading(false);
 
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();
@@ -178,8 +181,8 @@ const SidebarContainer = () => {
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
     // console.log('render side bar')
-    console.log(anaSettings)
-    console.log(anaMode)
+    // console.log(anaSettings)
+    // console.log(anaMode)
 
     let topDivHeight = '80vh';
     if (controlsRef?.current) {
@@ -238,6 +241,7 @@ const SidebarContainer = () => {
                         style={textFieldStyle}
                         onChange={(e) => {
                             setAnaMode(e.target.value);
+                            sendToAmplitude(CONSTANTS.AMPLITUDE.SELECTED_ANA_TYPE, { anaMode: e.target.value }, user);
                             if (e.target.value === CONSTANTS.ANALYSIS_MODES[2]) {//STR 
                                 setUseAmounts({
                                     ...useAmounts,
@@ -277,6 +281,8 @@ const SidebarContainer = () => {
                         filledOutARVs={filledOutARVs}
                         useAmounts={useAmounts}
                         functionalityTier={functionalityTier}
+                        sendToAmplitude={sendToAmplitude}
+                        user={user}
                     />
                 </Grid>
             </div>
