@@ -28,6 +28,7 @@ export function determineUserFunctionalityFromUserDoc(user) {
         FULL_FUNC,
         FULL_FUNC_SUB,
     } = CONSTANTS.FUNC_TIERS;
+    if (!user || !user.stripe_payment_methods) return NONE;
     const stripePaymentMethodsLen = user.stripe_payment_methods.length;
     if (stripePaymentMethodsLen === 1) return NONE;
     else if (stripePaymentMethodsLen > 1 && !user.subscriptionId) {

@@ -60,7 +60,7 @@ const ActivationModal = () => {
                 // console.log(resp)
                 if (resp.success) {
                     // Send to Amplitude
-                    sendToAmplitude(CONSTANTS.AMPLITUDE.VIEWED_PRICING_MODAL, null, user);
+                    sendToAmplitude(CONSTANTS.AMPLITUDE.VIEWED_PRICING_MODAL, null, resp.user);
 
                     setUser(resp.user);
                     setPrices(resp.prices);
