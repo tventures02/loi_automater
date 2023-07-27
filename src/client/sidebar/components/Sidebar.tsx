@@ -79,6 +79,9 @@ const SidebarContainer = () => {
         selectedSheet: '',
     });
     const [functionalityTier, setFunctionalityTier] = useState(NONE);
+    const [config, setConfig] = useState({
+        gwsCalcYTURL: 'https://www.youtube.com/watch?v=c0-1-zYiCMU'
+    });
 
     //@ts-ignore
     useEffect(() => {
@@ -125,6 +128,14 @@ const SidebarContainer = () => {
                     const defaultValues = await serverFunctions.readAndParseSettingsValues();
                     setAnaSettings({...anaSettings, ...defaultValues.settingsValues});
                     setUseAmounts({...useAmounts, ...defaultValues.useAmountFlags});
+
+                    let configObj = await getConfigFromBackend(); // set the html search strings for scraping the page
+                    if (configObj) {
+                        setConfig({
+                            ...config,
+                            ...configObj,
+                        });
+                    }
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
@@ -137,6 +148,12 @@ const SidebarContainer = () => {
             handleError(e.message);
         }
     }, []);
+
+    const getConfigFromBackend = async () => {
+        const resp = await backendCall({ app: CONSTANTS.APP_CODE }, 'config/getConfig');
+        if (resp.success) return resp.params;
+        else return null;
+    }
 
     const handleError = (errorMsg) => {
         setIsLoading(false);
@@ -243,7 +260,7 @@ const SidebarContainer = () => {
                                 <br /><br />
                                 2. Then, choose analysis from dropdown.
                                 <br /><br />
-                                3. Click 'Calculate'.
+                                3. Click 'Calculate'. <a href={config.gwsCalcYTURL} target="_blank" style={{ cursor: 'pointer' }}>See a short video.</a>
                             </div>
                     }
                 </Grid>
