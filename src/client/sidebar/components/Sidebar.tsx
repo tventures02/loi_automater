@@ -90,6 +90,10 @@ const SidebarContainer = () => {
                 try {
                     setIsLoading(true);
                     const data = await serverFunctions.getInitData();
+                    const {
+                        idToken,
+                        aud,
+                    } = data;
                     setUserEmail(data.email);
                     setSheet({
                         selectedSheet: data.sheetNames[0] ? data.sheetNames[0] : '',
@@ -97,14 +101,19 @@ const SidebarContainer = () => {
                     });
 
                     const preventAddingUserToDb = false;
-                    const subStatusResp = await backendCall(
-                        generateDataToServer(
+                    const dataToServer = {
+                        ...generateDataToServer(
                             data.email,
                             user.addOnPurchaseTier,
                             CONSTANTS.APP_CODE,
                             CONSTANTS.APP_VARIANT,
                             preventAddingUserToDb),
-                        'gworkspace/getSubscriptionPaidStatus');
+                        clientId: aud,
+                    };
+                    const subStatusResp = await backendCall(
+                        dataToServer,
+                        'gworkspace/getSubscriptionPaidStatus',
+                        idToken);
                     // console.log(subStatusResp)
 
                     const functionalityTier = determineUserFunctionalityFromUserDoc(subStatusResp.user);

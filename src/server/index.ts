@@ -14,6 +14,7 @@ import {
     doAna,
     writeToSettings,
     getUserEmail,
+    getUserData,
 } from './sheets';
 
 // Public functions must be exported as named exports
@@ -30,4 +31,5 @@ export {
     writeToSettings,
     showActivationModal,
     getUserEmail,
+    getUserData,
 };

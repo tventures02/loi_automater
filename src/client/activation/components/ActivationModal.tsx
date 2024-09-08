@@ -51,12 +51,16 @@ const ActivationModal = () => {
     useEffect(() => {
         const getData = async () => {
             try {
-                const email = await serverFunctions.getUserEmail();
+                // Get user data
+                const userData = await serverFunctions.getUserData();
+                const {
+                    email,
+                } = userData;
                 if (!email) {
                     throw Error('No user email found. Please log into the browser with your Google account.');
                 }
                 setUserEmail(email);
-                const resp = await getPaidStatus(email);
+                const resp = await getPaidStatus(email, userData);
                 // console.log(resp)
                 if (resp.success) {
                     // Send to Amplitude
@@ -161,17 +165,21 @@ const ActivationModal = () => {
     }, [tier]);
 
 
-    const getPaidStatus = async (email_in) => {
+    const getPaidStatus = async (email_in, userData) => {
         const email = email_in ? email_in : userEmail;
         const preventAddingUserToDb = false;
-        const subStatusResp = await backendCall(
-            generateDataToServer(
+        const dataToServer = {
+            ...generateDataToServer(
                 email,
                 user.addOnPurchaseTier,
                 CONSTANTS.APP_CODE,
                 CONSTANTS.APP_VARIANT,
                 preventAddingUserToDb),
-            'gworkspace/getSubscriptionPaidStatus');
+            clientId: userData.aud,
+        };
+        const subStatusResp = await backendCall(
+            dataToServer,
+            'gworkspace/getSubscriptionPaidStatus', userData.idToken);
         return subStatusResp;
     }
 
@@ -217,6 +225,9 @@ const ActivationModal = () => {
             return;
         }
 
+        // Get user data
+        const userData = await serverFunctions.getUserData();
+
          // The payment succeeded!
          const dataToServer = {
             email: userEmail,
@@ -224,12 +235,13 @@ const ActivationModal = () => {
             addOnPurchaseTier: overwriteTier ? overwriteTier : tier,
             app: CONSTANTS.APP_CODE,
             subscriptionId: stripeSubId ? stripeSubId : null,
+            clientId: userData.aud,
         };
 
         // Send to Amplitude
         sendToAmplitude(CONSTANTS.AMPLITUDE.PURCHASED, dataToServer, user);
 
-        let updatedUserResp = await backendCall(dataToServer, 'gworkspace/updateSubscriptionUser');
+        let updatedUserResp = await backendCall(dataToServer, 'gworkspace/updateSubscriptionUser', userData.idToken);
         if (!updatedUserResp.success) {
             // Unsuccessfully entered data in to db
             setErrorMsg(updatedUserResp.message);
