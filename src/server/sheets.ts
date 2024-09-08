@@ -11,6 +11,22 @@ export const getUserEmail = () => {
     return Session.getActiveUser().getEmail(); // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)       
 }
 
+export const getUserData = () => {
+    var idToken = ScriptApp.getIdentityToken();
+    var body = idToken.split('.')[1];
+    var decoded = Utilities.newBlob(Utilities.base64Decode(body)).getDataAsString();
+    var payload = JSON.parse(decoded);
+    var sheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    // Logger.log(payload);
+    return {
+        email: payload.email,
+        aud: payload.aud,
+        idToken,
+        sheetId,
+    }; // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
+}
+
+
 export const getInitData = () => {
     const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = activeSpreadsheet.getSheetByName(CONSTANTS.SETTINGS_SHEETNAME);
@@ -35,9 +51,16 @@ export const getInitData = () => {
         }
     }
 
+    var idToken = ScriptApp.getIdentityToken();
+    var body = idToken.split('.')[1];
+    var decoded = Utilities.newBlob(Utilities.base64Decode(body)).getDataAsString();
+    var payload = JSON.parse(decoded);
+
     return {
         email: Session.getActiveUser().getEmail(), // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
         sheetNames,
+        idToken,
+        aud: payload.aud,
     }
 }
 
