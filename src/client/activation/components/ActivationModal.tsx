@@ -33,7 +33,7 @@ const ActivationModal = () => {
         subOneTimeCharge: null,
     });
     const [isTierLoading, setIsTierLoading] = useState(false);
-    const [tier, setTier] = useState('tier1');
+    const [tier, setTier] = useState('tier0');
     const [userEmail, setUserEmail] = useState('');
     const [message, setMessage] = useState('');
     const [functionalityTier, setFunctionalityTier] = useState(NONE); // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
