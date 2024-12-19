@@ -132,7 +132,7 @@ const RentalInput = (props: {
                     </Typography>
                 </Grid>
                 {
-                    userHasPaid ?
+                    userHasPaid || true ?
                         <FormControlLabel control={<Checkbox size="small"
                             onChange={(e) => setUseAmounts({ ...useAmounts, colCRents: e.target.checked })} checked={useAmounts.colCRents} />}
                             style={{ marginTop: "0", marginBottom: "0" }}

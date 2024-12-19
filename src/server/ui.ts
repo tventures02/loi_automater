@@ -8,7 +8,7 @@ export const onOpen = (e) => {
       .addSubMenu(menu.createMenu('Start Here')
           .addItem('Generate Template', 'showGenTemplate'))
       .addItem('Open Calculator', 'openSidebar')
-      .addItem('Upgrade to premium', 'showActivationModal').addToUi();
+      .addItem('Import Data from Zillow', 'showActivationModal').addToUi();
 };
 
 export const showGenTemplate = () => {
@@ -25,8 +25,8 @@ export const showActivationModal = () => {
     let html = HtmlService.createHtmlOutputFromFile("activation")
         .setWidth(1500)
         .setHeight(800)
-        .setTitle("Buy the Premium Features of This Add-on");
-    ui.showModalDialog(html, 'Upgrade to Premium Features');
+        .setTitle(" ");
+    ui.showModalDialog(html, ' ');
 }
 export const openSidebar = () => {
   const html = HtmlService.createHtmlOutputFromFile('sidebar').setTitle("Z Real Estate Calculator");

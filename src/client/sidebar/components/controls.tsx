@@ -45,6 +45,8 @@ const Controls = (props: {
         return sheetsDropdown;
     }
 
+    const btnDisabled = !anaMode || !sheet.selectedSheet || (!filledOutARVs && anaMode === CONSTANTS.ANALYSIS_MODES[3]);
+
     return (
         <>
             {
@@ -90,8 +92,8 @@ const Controls = (props: {
                 </Grid>
             </Grid>
 
-            <Button size="small" variant="contained" color="primary" style={controlButtonStyle}
-                disabled={!anaMode || !sheet.selectedSheet || (!filledOutARVs && anaMode === CONSTANTS.ANALYSIS_MODES[3])}
+            <Button size="small" variant="contained" color="primary" style={{...controlButtonStyle, backgroundColor: btnDisabled ? '' : '#007bff'}}
+                disabled={btnDisabled}
                 onClick={async () => {
                     try {
                         // sendToAmplitude(CONSTANTS.AMPLITUDE.LAUNCHED_QUIZ_EDITOR);

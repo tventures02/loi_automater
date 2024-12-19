@@ -32,13 +32,6 @@ export const amplitudeDataHandler = async (userEmail = false, amplitudeData, use
 export const sendToAmplitude = (eventName, eventProperties = null, user) => {
     // Send to Amplitude
     try {
-        const functionalityTier = determineUserFunctionalityFromUserDoc(user);
-        const {
-            FULL_FUNC,
-            FULL_FUNC_SUB,
-        } = CONSTANTS.FUNC_TIERS;
-
-        const userHasPaid = functionalityTier === FULL_FUNC || functionalityTier === FULL_FUNC_SUB;
         let dataToAmp = {
             eventName,
             eventProperties: null,
@@ -47,7 +40,7 @@ export const sendToAmplitude = (eventName, eventProperties = null, user) => {
             dataToAmp.eventProperties = eventProperties;
         }
 
-        amplitudeDataHandler(user.email, dataToAmp, userHasPaid);
+        amplitudeDataHandler(user.email, dataToAmp, false);
     }
     catch (e) { }
 }

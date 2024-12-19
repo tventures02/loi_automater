@@ -200,9 +200,10 @@ export const doAna = (
         endCol,
     } = CONSTANTS.ANA_OUTPUT_RANGES.LTR;
 
-    const userHasNotPaid = functionalityTier === NONE;
-    const numProperties = userHasNotPaid ? 2 : orderedAddresses.length;
-    if (userHasNotPaid) useAmounts.colCRents = false;
+    // const userHasNotPaid = functionalityTier === NONE;
+    const numProperties = orderedAddresses.length;
+    // const numProperties = userHasNotPaid ? 2 : orderedAddresses.length;
+    // if (userHasNotPaid) useAmounts.colCRents = false;
 
     let slope = 0;
     let intercept = 0;

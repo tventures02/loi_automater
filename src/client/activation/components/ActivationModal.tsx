@@ -1,330 +1,71 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { sendToAmplitude } from "../../utils/amplitude";
-import { Grid } from "@mui/material";
-import { serverFunctions } from '../../utils/serverFunctions';
-import CONSTANTS from '../../utils/constants';
-import SalesView from './SalesView';
-import { backendCall } from '../../utils/server-calls';
-import { serverFunctionErrorHandler } from '../../utils/misc';
-import { Elements } from '@stripe/react-stripe-js';
+// @ts-ignore
+import React, { useState } from 'react';
+import { generatePricingPageUrl } from '../../utils/misc';
 import LoadingAnimation from '../../utils/LoadingAnimation';
-import { loadStripe } from '@stripe/stripe-js';
-import { generateDataToServer, determineUserFunctionalityFromUserDoc } from '../../utils/misc';
-import Contact from './Contact';
+import { serverFunctions } from '../../utils/serverFunctions';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_API_KEY);
-let options = {
-    // passing the client secret obtained from the server
-    clientSecret: null,
+const styles = {
+    container: {
+        textAlign: 'center' as 'center',
+        padding: '50px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+        maxWidth: '500px',
+        margin: 'auto',
+    },
+    header: {
+        color: '#333',
+        marginBottom: '20px',
+    },
+    paragraph: {
+        color: '#555',
+        fontSize: '16px',
+        lineHeight: '1.6',
+        marginBottom: '30px',
+        textAlign: 'start',
+    },
+    button: {
+        backgroundColor: '#007bff',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        padding: '10px 20px',
+        fontSize: '18px',
+        cursor: 'pointer',
+        outline: 'none',
+    }
 };
-const {
-    NONE,
-    FULL_FUNC,
-    FULL_FUNC_SUB,
-} = CONSTANTS.FUNC_TIERS
 
-const ActivationModal = () => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [paymentStatusMsg, setPaymentStatusMsg] = useState('');
-    const [errorMsg, setErrorMsg] = useState('');
-    const [prices, setPrices] = useState({
-        tier0: null,
-        tier1: null,
-        subOneTimeCharge: null,
-    });
-    const [isTierLoading, setIsTierLoading] = useState(false);
-    const [tier, setTier] = useState('tier0');
-    const [userEmail, setUserEmail] = useState('');
-    const [message, setMessage] = useState('');
-    const [functionalityTier, setFunctionalityTier] = useState(NONE); // NONE = has not paid, FULL_FUNC = paid for tier0 (full func) but can upgrade, FULL_FUNC_SUB = full func due to active subscription
-    const [clientSecret, setClientSecret] = useState(null);
-    const [stripeSubId, setSubId] = useState(null);
-    const [billingPeriod, setBillingPeriod] = useState('monthly');
-    const [user, setUser] = useState({
-        email: '',
-        addOnPurchaseTier: 'tier0',
-    });
+const PricingPageModal = ({ title, copy, ctaText }) => {
+    const [loading, setLoading] = useState(false);
 
-    const lastDiv = useRef(null);
-    const firstPass = useRef(true);
-
-    useEffect(() => {
-        const getData = async () => {
-            try {
-                // Get user data
-                const userData = await serverFunctions.getUserData();
-                const {
-                    email,
-                } = userData;
-                if (!email) {
-                    throw Error('No user email found. Please log into the browser with your Google account.');
-                }
-                setUserEmail(email);
-                const resp = await getPaidStatus(email, userData);
-                // console.log(resp)
-                if (resp.success) {
-                    // Send to Amplitude
-                    sendToAmplitude(CONSTANTS.AMPLITUDE.VIEWED_PRICING_MODAL, null, resp.user);
-
-                    setUser(resp.user);
-                    setPrices(resp.prices);
-                    const functionalityTier = determineUserFunctionalityFromUserDoc(resp.user);
-                    setFunctionalityTier(functionalityTier);
-                    if (functionalityTier === NONE) {
-                        setMessage("You're using a free version. See below for pricing.");
-                    }
-                    await getNewPaymentIntent(email, tier);
-                    setIsLoading(false);
-                }
-                else {
-                    setIsLoading(false);
-                    throw Error(`Could not retreive user status from the server. ${resp.message}`)
-                }
-            } catch (e) {
-                // sendToAmplitude(
-                //     CONSTANTS.AMPLITUDE.ERROR,
-                //     { errorMessage: `Activation modal mount: ${e.message}` },
-                //     userEmail, userHasPaid
-                // );
-                setErrorMsg(e.message);
-                setIsLoading(false);
-            }
+    const handleClick = async () => {
+        try {
+            setLoading(true);
+            const url = `https://chromewebstore.google.com/detail/z-real-estate-scraper-for/jdidjlghecfpaedabjinjfpdlcioeklo`;
+            window.open(url, '_blank');
+        } catch (e) {
         }
-        getData();
-    }, []);
-
-    const getNewPaymentIntent = async (email: string = null, tier: string) => {
-        // console.log(tier)
-        const paymentIntentResp = await initPurchaseIntent(email, tier);
-        if (!paymentIntentResp) {
-            // sendToAmplitude(
-            //     CONSTANTS.AMPLITUDE.ERROR,
-            //     { errorMessage: `getNewPaymentIntent stripe error` },
-            //     email ? email : userEmail, userHasPaid
-            // );
-            throw Error('Could not get payment intent from Stripe.');
-        }
-        // console.log('payment intent resp')
-        // console.log(paymentIntentResp)
-        if (paymentIntentResp.success) {
-            const clientSecretTemp = paymentIntentResp.clientSecret ? paymentIntentResp.clientSecret : paymentIntentResp.client_secret;
-            if (!clientSecretTemp) {
-                // sendToAmplitude(
-                //     CONSTANTS.AMPLITUDE.ERROR,
-                //     { errorMessage: `getNewPaymentIntent: No client secret` },
-                //     email ? email : userEmail, userHasPaid
-                //     );
-            }
-            options = {
-                clientSecret: clientSecretTemp,
-            };
-            setClientSecret(clientSecretTemp);
-            setSubId(paymentIntentResp.subscriptionId ? paymentIntentResp.subscriptionId : null);
-            if (paymentIntentResp.prices) setPrices(paymentIntentResp.prices);
-            setIsTierLoading(false);
-        }
-        else {
-            // sendToAmplitude(
-            //     CONSTANTS.AMPLITUDE.ERROR,
-            //     { errorMessage: `getNewPaymentIntent tv server error: ${paymentIntentResp.message}` },
-            //     email ? email : userEmail, userHasPaid
-            // );
-            throw Error('Could not get payment intent from Stripe.');
-        }
-        return paymentIntentResp;
-    };
-
-    useEffect(() => {
-        // Don't run on component did mount
-        if (firstPass.current) {
-            firstPass.current = false;
-            return;
-        }
-        // console.log('updatePaymentIntent')
-        // console.log(tier)
-        const updatePaymentIntent = async () => {
-            try {
-                setIsTierLoading(true);
-                const paymentIntentResp = await getNewPaymentIntent(userEmail, tier);
-                if (paymentIntentResp.success && lastDiv) {
-                    if (lastDiv.current) {
-                        lastDiv.current.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start',
-                            inline: 'start',
-                        });
-                    }
-                }
-            } catch (error) {
-                setErrorMsg(error.message);
-                setIsTierLoading(false);
-                setIsLoading(false);
-            }
-        }
-        updatePaymentIntent();
-    }, [tier]);
-
-
-    const getPaidStatus = async (email_in, userData) => {
-        const email = email_in ? email_in : userEmail;
-        const preventAddingUserToDb = false;
-        const dataToServer = {
-            ...generateDataToServer(
-                email,
-                user.addOnPurchaseTier,
-                CONSTANTS.APP_CODE,
-                CONSTANTS.APP_VARIANT,
-                preventAddingUserToDb),
-            clientId: userData.aud,
-        };
-        const subStatusResp = await backendCall(
-            dataToServer,
-            'gworkspace/getSubscriptionPaidStatus', userData.idToken);
-        return subStatusResp;
+        setLoading(false);
     }
 
-    const initPurchaseIntent = async (email_in: string, tier: string) => {
-        if (tier === 'tier0') {
-            return await backendCall({ app: CONSTANTS.APP_CODE, tier, appVariant: CONSTANTS.APP_VARIANT }, 'gworkspace/createRegularPaymentIntent');
-        }
+    if (loading) return <LoadingAnimation />
 
-        //////////////////////////////////////
-        //        Legacy subscription stuff
-        //////////////////////////////////////
-        const email = email_in ? email_in : userEmail;
-        let subPaymentParams = {
-            email,
-            app: CONSTANTS.APP_CODE,
-            addOnPurchaseTier: 'tier1',
-            add_invoice_items: [],
-            appVariant: CONSTANTS.APP_VARIANT
-        };
-        // if (subOneTimeChargePriceId) {
-        //     subPaymentParams = {
-        //         ...subPaymentParams,
-        //         add_invoice_items: [{price: subOneTimeChargePriceId}],
-        //     };
-        // }
-        return await backendCall(subPaymentParams, 'gworkspace/createSubscriptionPaymentIntent');
-    }
-
-    const handlePurchaseSelect = async (selectedTier: string) => {
-        if (selectedTier !== tier) {
-            try {
-                setTier(selectedTier);
-            } catch (e) {
-                setIsTierLoading(false);
-            }
-        }
-    }
-
-    const processPaymentRespAndSetStates = async (result: any, overwriteTier: string = null) => {
-        if (result.error) {
-            // Show error to your customer (for example, payment details incomplete)
-            setErrorMsg(result.error.message + " Please try again.");
-            return;
-        }
-
-        // Get user data
-        const userData = await serverFunctions.getUserData();
-
-         // The payment succeeded!
-         const dataToServer = {
-            email: userEmail,
-            stripe_payment_method: result.paymentIntent.payment_method,
-            addOnPurchaseTier: overwriteTier ? overwriteTier : tier,
-            app: CONSTANTS.APP_CODE,
-            subscriptionId: stripeSubId ? stripeSubId : null,
-            clientId: userData.aud,
-        };
-
-        // Send to Amplitude
-        sendToAmplitude(CONSTANTS.AMPLITUDE.PURCHASED, dataToServer, user);
-
-        let updatedUserResp = await backendCall(dataToServer, 'gworkspace/updateSubscriptionUser', userData.idToken);
-        if (!updatedUserResp.success) {
-            // Unsuccessfully entered data in to db
-            setErrorMsg(updatedUserResp.message);
-        }
-        else {
-            // Successfully entered data in to db
-            setUser({ ...user, ...updatedUserResp.user });
-            const functionalityTier = determineUserFunctionalityFromUserDoc(updatedUserResp.user);
-            setFunctionalityTier(functionalityTier);
-            setPaymentStatusMsg(updatedUserResp.message);
-        }
-
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth' // Optional smooth scrolling animation
-        });
-        setIsLoading(false);
-    }
-
-    // console.log('activation modal render');
-
-    if (isLoading) return (
-        <LoadingAnimation divHeight={"20vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
-    )
-
-    // Show error message if not empty
-    if (errorMsg !== '') {
-        const msgObj = serverFunctionErrorHandler(errorMsg);
-        return (
-            <div>
-                {msgObj.text} <a href={msgObj.link}>{msgObj.linkText}</a>
-            </div>
-        )
-    }
-
-    if (functionalityTier !== NONE) return (
-        <Grid style={{ marginBottom: '2em', minHeight: '80vh', textAlign: "center" }} item xs={12} >
-            {
-                paymentStatusMsg ?
-                    <>
-                        <b>{paymentStatusMsg}</b>
-                    </> : null
-            }
-            <br /><br />
-            
-            <p>You must be logged into the browser with your Google account associated with</p>
-            <p style={{ fontSize: "1.5em" }}><b>{userEmail}</b></p>
-            <Contact/>
-        </Grid>
-    )
-
-    if (!isLoading && !clientSecret) return <div>Could not communicate with Stripe. Please contact support at tidisventures@gmail.com.</div>
-
-    console.log(prices)
     return (
-        <>
-            <div style={{ width: "50%", textAlign: "center", margin: "auto", paddingTop: "4em" }}>
-                {message}
-            </div>
-            <br />
-            <Elements stripe={stripePromise} options={options} key={clientSecret}>
-                <Grid container direction="column" alignItems="center" style={{ height: "100%", margin: "auto" }}>
-                    <Grid container alignItems="center" style={{ height: "100%", minHeight: "510px" }}>
-                        <SalesView
-                            isLoading={isLoading}
-                            setIsLoading={setIsLoading}
-                            isTierLoading={isTierLoading}
-                            prices={prices}
-                            email={userEmail}
-                            tier={tier}
-                            setIsTierLoading={setIsTierLoading}
-                            handlePurchaseSelect={handlePurchaseSelect}
-                            setErrorMsg={setErrorMsg}
-                            billingPeriod={billingPeriod}
-                            processPaymentRespAndSetStates={processPaymentRespAndSetStates}
-                        />
-                    </Grid>
-                </Grid>
-                <Grid item xs={12} ref={lastDiv}>
-                </Grid>
-            </Elements>
-        </>
-    )
+        <div style={styles.container}>
+            <h1 style={styles.header}>🚀 Import data from Zillow</h1>
+            {/* @ts-ignore */}
+            <p style={styles.paragraph}>
+                Get hundreds of property listings from Zillow to analyze with one click directly to your Google Sheets.
+            </p>
+            <button
+                style={styles.button}
+                onClick={handleClick}>
+                Try it now!
+            </button>
+        </div>
+    );
+};
 
-}
-export default ActivationModal;
+export default PricingPageModal;

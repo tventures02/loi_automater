@@ -4,7 +4,7 @@ const STRToolTipMsg = (props) => {
     return (
         <div style={{ fontSize: '1.2em' }}>
             {
-                props.userHasPaid ?
+                props.userHasPaid || true ?
                     <>
                         <div>Check below to manually input nightly rates for each property in Column C of the sheet.</div>
                         <br /><br />
