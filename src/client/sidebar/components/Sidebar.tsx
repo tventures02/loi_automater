@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 import { backendCall } from '../../utils/server-calls';
-import { Grid, Button, MenuItem, TextField } from '@mui/material';
+import { Grid, MenuItem, TextField } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
-import CTA from '../../utils/CTA';
+import CTAWidget from './CTASideBar';
 import RentalInput from './rentalInput';
 import FNFInput from './fnfInput';
 import Controls from './controls';
@@ -63,7 +63,8 @@ const SidebarContainer = () => {
         email: '',
         subscriptionId: '',
         subscriptionStatusActive: true,
-        addOnPurchaseTier: 'tier0'
+        addOnPurchaseTier: 'tier0',
+        idToken: null,
     });
     const [useAmounts, setUseAmounts] = useState({
         downpayment: false,
@@ -95,6 +96,7 @@ const SidebarContainer = () => {
                         aud,
                     } = data;
                     setUserEmail(data.email);
+                    sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, {email: data.email});
                     setSheet({
                         selectedSheet: data.sheetNames[0] ? data.sheetNames[0] : '',
                         sheetNames: data.sheetNames,
@@ -116,23 +118,16 @@ const SidebarContainer = () => {
                         idToken);
                     // console.log(subStatusResp)
 
-                    const functionalityTier = determineUserFunctionalityFromUserDoc(subStatusResp.user);
-                    setFunctionalityTier(functionalityTier);
+                    // const functionalityTier = determineUserFunctionalityFromUserDoc(subStatusResp.user);
+                    setFunctionalityTier(FULL_FUNC);
                     if (subStatusResp.success) {
                         const localUser = {
                             ...user,
                             ...subStatusResp.user,
+                            idToken,
                             subscriptionStatusActive: subStatusResp.subscriptionStatusActive,
                         };
-                        sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, localUser);
                         setUser(localUser);
-                    }
-                    else {
-                        setIsLoading(false);
-                        setMessages({
-                            ...messages,
-                            errorMessage: 'Could not retreive data from our servers. You can still use the free version of this add-on. Please contact tidisventures@gmail.com or try refreshing the page.',
-                        });
                     }
                     
                     setIsLoading(false);
@@ -207,7 +202,7 @@ const SidebarContainer = () => {
             setUseAmounts={setUseAmounts}
             anaSettings={anaSettings}
             setAnaSettings={setAnaSettings}
-            userHasPaid={functionalityTier !== NONE}
+            userHasPaid={functionalityTier !== NONE || true}
         />;
     }
     else if (anaMode === CONSTANTS.ANALYSIS_MODES[3]) {
@@ -230,14 +225,6 @@ const SidebarContainer = () => {
                         :
                         null
                 }
-                <Grid xs={12} container>
-                    {
-                        functionalityTier === NONE ?
-                            <CTA message={{ msg: messages.trialMessage }} singleLineCTA={true} />
-                            :
-                            null
-                    }
-                </Grid>
                 <Grid xs={12} container style={{ marginBottom: "0.5rem", }}>
                     <TextField
                         className="textfield-day-32px"
@@ -274,6 +261,7 @@ const SidebarContainer = () => {
                                 2. Then, choose analysis from dropdown.
                                 <br /><br />
                                 3. Click 'Calculate'. <a href={config.gwsCalcYTURL} target="_blank" style={{ cursor: 'pointer' }}>Watch a short video.</a>
+                                <CTAWidget/>
                             </div>
                     }
                 </Grid>

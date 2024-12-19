@@ -4,7 +4,7 @@ const LTRToolTipMsg = (props) => {
     return (
         <div style={{ fontSize: '1.2em' }}>
             {
-                props.userHasPaid ?
+                props.userHasPaid || true ?
                     <>
                         <div>Check below to manually input monthly rents for each property in Column C of the sheet.</div>
                         <br /><br />

@@ -1,4 +1,5 @@
 import CONSTANTS from '../utils/constants';
+const isDev = process.env.REACT_APP_TV_BACKEND.includes('localhost');
 
 export function constructHTMLData(data) {
     if (data) {
@@ -88,3 +89,89 @@ export function parseHTMLData() {
     }
 }
 
+
+export const generatePricingPageUrl = async (emailIn = '', token = '', getUserData) => {
+    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://tidisventures.com/';
+    const appSlug = 'z-real-estate-calculator';
+
+    try {
+        const tokenIsExpired = !token || !emailIn ? true : checkTokenExpiration(token);
+        if (isDev) {
+            console.log('generate pricing page link')
+            console.log('token has expired: ' + tokenIsExpired);
+        }
+
+        if (!tokenIsExpired) {
+            return `${baseUrl}purchase/${appSlug}?email=${emailIn}&verType=idToken&token=${token}&appVariant=gwscalc`;
+        }
+
+        const {
+            email,
+            idToken,
+        } = await getUserData();
+
+        if (!email || !idToken) return `${baseUrl}purchase/${appSlug}?appVariant=gwscalc`;
+
+        return `${baseUrl}purchase/${appSlug}?email=${email}&verType=idToken&token=${idToken}&appVariant=gwscalc`        
+    } catch (error) {
+        return `${baseUrl}purchase/${appSlug}?appVariant=gwscalc`;
+    }
+}
+
+export const returnNewIdTokenIfNecessary = async (token, getUserData) => {
+    try {
+        const tokenIsExpired = !token ? true : checkTokenExpiration(token);
+        if (isDev) {
+            console.log('checking idtoken for new generation if needed')
+            console.log('token has expired: ' + tokenIsExpired);
+        }
+
+        if (!tokenIsExpired) {
+            return token;
+        }
+
+        const {
+            idToken,
+        } = await getUserData();
+
+        return idToken;
+    } catch (error) {
+        return token;
+    }
+}
+
+function decodeGoogleIdToken(idToken) {
+    try {
+        // Step 1: Split the token by dots
+        const tokenParts = idToken.split('.');
+
+        if (tokenParts.length !== 3) {
+            return null
+        }
+
+        // Step 2: Decode the payload (the second part)
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+
+        // Step 3: Parse the payload JSON
+        const payloadObject = JSON.parse(decodedPayload);
+        if (isDev) {
+            console.log('decodeGoogleIdToken Func')
+            console.log(payloadObject)
+        }
+        return payloadObject;
+    } catch (error) {
+        return null;
+    }
+}
+
+function checkTokenExpiration(idToken) {
+    const decodedToken = decodeGoogleIdToken(idToken);
+    if (!decodedToken || !decodedToken.exp) return true;
+
+    // The exp value is in seconds since Unix epoch, get the current time in seconds
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    // Check if the token is expired
+    return decodedToken.exp <= currentTime; // Returns true if expired
+}

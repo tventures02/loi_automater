@@ -1,12 +1,31 @@
-import { Grid, Button, Paper } from "@mui/material";
+import { Grid, Button, Paper} from "@mui/material";
 import { serverFunctions } from './serverFunctions';
-let alertStyle = { 'borderRadius': '4px', 'padding': '0.3em', 'border': `0px`, 'backgroundColor': CONSTANTS.LIGHT_RED_BERRY, 'color': `${CONSTANTS.DARK_RED_BERRY}`, 'fontSize': '.75em', 'alignItems': 'center', 'justifyContent': 'center', 'display': 'flex', 'width': '100%', marginBottom: '8px' };
+import { generatePricingPageUrl } from '../utils/misc';
+let alertStyle = { 'marginBottom': '.2em', 'borderRadius': '4px', 'padding': '0.3em 0.3em', 'border': `0px`, 'backgroundColor': '#FFCBCB', 'color': `${CONSTANTS.DARK_RED_BERRY}`, 'fontSize': '.75em', 'alignItems': 'center', 'justifyContent': 'center', 'display': 'flex', 'width': '100%' };
 import CONSTANTS from './constants';
-
-const linkStyle = { "cursor": "pointer", "textDecoration": "underline", "color": "blue", fontWeight: "bold" }
-function CTA({ message, singleLineCTA, styleOverride, ctaText = null }) {
+const isDev = process.env.REACT_APP_TV_BACKEND.includes('localhost');
+function CTA({
+    message,
+    singleLineCTA,
+    styleOverride,
+    email = null,
+    token = null,
+}) {
     const gridStyle = {
         "textAlign": "center", "margin": "auto"
+    }
+    const handlePricingPageClick = async () => {
+        try {
+            const url = await generatePricingPageUrl(email, token, serverFunctions.getUserData);
+            if (isDev) {
+                console.log(url);
+                console.log(email)
+                console.log(token)
+            }
+            window.open(url, '_blank');
+        } catch (error) {
+            if (isDev) console.log(error);
+        }
     }
 
     let msg = message.msg;
@@ -17,16 +36,14 @@ function CTA({ message, singleLineCTA, styleOverride, ctaText = null }) {
             size="small"
             variant="contained"
             color="primary"
-            onClick={() => serverFunctions.showActivationModal()}>See pricing</Button>
+            onClick={handlePricingPageClick}>See pricing</Button>
     );
     if (singleLineCTA) {
         if (styleOverride) alertStyle = { ...alertStyle, ...styleOverride };
         return (
             <Paper style={alertStyle} variant="outlined">
                 <span>
-                    {msg} <b><a onClick={() => serverFunctions.showActivationModal()} style={linkStyle}>
-                        {ctaText ? ctaText : CONSTANTS.VIEW_ACT_CTA}
-                    </a></b>
+                    {msg} <b><a onClick={handlePricingPageClick} style={{ "cursor": "pointer", "textDecoration": "underline", color: "#1456FF" }}>{CONSTANTS.VIEW_ACT_CTA}</a></b>
                 </span>
             </Paper>
         )

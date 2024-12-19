@@ -59,7 +59,7 @@ a {
 
 .helpTextSidebar {
     position: absolute;
-    top: calc(38% - 50px);
+    top: calc(20% - 50px);
     font-size: .75em;
     padding: 10px;
 }
