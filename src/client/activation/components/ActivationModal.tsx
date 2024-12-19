@@ -43,10 +43,9 @@ const PricingPageModal = ({ title, copy, ctaText }) => {
     const handleClick = async () => {
         try {
             setLoading(true);
-            const url = await generatePricingPageUrl(null, null, serverFunctions.getUserData);
-            window.open(url, '_blank')
+            const url = `https://chromewebstore.google.com/detail/z-real-estate-scraper-for/jdidjlghecfpaedabjinjfpdlcioeklo`;
+            window.open(url, '_blank');
         } catch (e) {
-console.log(e)
         }
         setLoading(false);
     }
@@ -55,15 +54,15 @@ console.log(e)
 
     return (
         <div style={styles.container}>
-            <h1 style={styles.header}>Pricing</h1>
+            <h1 style={styles.header}>🚀 Import data from Zillow</h1>
             {/* @ts-ignore */}
             <p style={styles.paragraph}>
-            Navigate to the Z Real Estate Calculator website to upgrade or see the pricing page.
+                Get hundreds of property listings from Zillow to analyze with one click directly to your Google Sheets.
             </p>
             <button
                 style={styles.button}
                 onClick={handleClick}>
-                Upgrade to Premium
+                Try it now!
             </button>
         </div>
     );

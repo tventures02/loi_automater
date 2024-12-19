@@ -8,7 +8,7 @@ export const onOpen = (e) => {
       .addSubMenu(menu.createMenu('Start Here')
           .addItem('Generate Template', 'showGenTemplate'))
       .addItem('Open Calculator', 'openSidebar')
-      .addItem('Upgrade to premium', 'showActivationModal').addToUi();
+      .addItem('Import Data from Zillow', 'showActivationModal').addToUi();
 };
 
 export const showGenTemplate = () => {
