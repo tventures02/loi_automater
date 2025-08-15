@@ -1,0 +1,249 @@
+module.exports = {
+    SERVER_ERROR_MSG: "An error occurred while connecting to the server. Please contact support at tidisventures@gmail.com.",
+    PAYMENT_ERROR_MSG: "An error occurred with your payment. Please try again or contact support at tidisventures@gmail.com.",
+    VIEW_ACT_CTA: 'See pricing.',
+    LIGHT_RED_BERRY: "#FFCBCB",
+    LIGHT_GREEN: "#93c47d",
+    DARK_RED_BERRY: "#5f2120",
+    SETTINGS_SHEETNAME: `Settings`,
+    ANA_RESULTS_SHEETNAME: String.fromCodePoint(0x1F4CB) + 'Analysis results',
+    PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-calc-gsheets-addon-privacy-policy',
+    ANALYSIS_MODES: [
+        '',
+        'Long term rental property',
+        'Short term rental property',
+        'Fix and flip',
+    ],
+    ANA_OUTPUT_RANGES: {
+        LTR: {
+            startCol: "F",
+            endCol: "AB"
+        },
+        STR: {
+            startCol: "F",
+            endCol: "AM"
+        },
+        FNF: {
+            startCol: "C",
+            endCol: "V"
+        },
+    },
+    SETTINGS: {
+        VALUES_RANGE: 'B3:B53',
+        FLAG_RANGES: 'E3:E8',
+        FLAG_LABEL_RANGES: 'D3:D8',
+        VALUES: {
+            PURCHASE: [
+                ['20'],
+                ['0'],
+                ['3000'],
+                ['1000'], // est upfront cost
+                ['0'], // other lender costs
+            ],
+            LOAN: [
+                ['5'],
+                ['0'],
+                ['30'],
+            ],
+            EXPENSES: [
+                ['1'],
+                ['0'],
+                ['1'],
+                ['2000'],
+                ['5'],
+                ['0'],
+                ['5'],
+                ['0'],
+                ['10'],
+                ['0'],
+                ['0'],
+                ['0'],
+            ],
+            LTR: [
+                ['.8'], // monthly rent as percent of home value
+                ['1000'],
+                ['3000'],
+                ['0'],
+                ['3'],
+            ],
+            STR: [
+                ['100'],
+                ['300'],
+                ['300'],
+                ['3'],
+                ['85'],
+                ['95'],
+                ['80'],
+                ['5'], // averaged nights stay per guest
+            ],
+            FNF: [
+                ['0'],
+                ['0'],
+                ['0'],
+                ['0'],
+                ['3'],
+                ['6'], // percent agent commission
+                ['0'],
+            ]
+            // TIME: [
+            //     ['3'],
+            //     ['2'],
+            // ],
+        },
+        PURCHASE: [
+            ['Downpayment (%)'],
+            ['Downpayment ($)'],
+            ['Closing costs ($)'],
+            ['Estimated repair/furnish costs ($)'],
+            ['Other lender costs ($)'],
+        ],
+        LOAN: [
+            ['Loan interest rate (%)'],
+            ['Points charged'],
+            ['Loan term (years)'],
+        ],
+        EXPENSES: [
+            ['Annual property taxes (% of home value)'],
+            ['Annual property taxes ($)'],
+            ['Insurance per year (% of home value)'],
+            ['Insurance per year ($)'],
+            ['Repairs & maintenance (% of monthly rent)'],
+            ['Repairs & maintenance ($/month)'],
+            ['Capital expenditures (% of monthly rent)'],
+            ['Capital expenditures ($/month)'],
+            ['Management fees (% of monthly rent)'],
+            ['Utilities ($/month)'],
+            ['HOA Fees ($/month)'],
+            ['Other expenses ($/month)'],
+        ],
+        LTR: [
+            ['Rental income (% of home value)'],
+            ['Min rent ($/month)'],
+            ['Max rent ($/month)'],
+            ['Other income ($/month)'],
+            ['Vacancy (%)'],
+        ],
+        STR: [
+            ['Min nightly rate income ($)'],
+            ['Max nightly rate income ($)'],
+            ['# of nights available for booking per year'],
+            ['Platform fee (% of gross rent charged)'],
+            ['Cleaning cost ($/booking)'],
+            ['Cleaning charged to guest ($/booking)'],
+            ['Average occupancy rate (%)'],
+            ['Average guest stay duration (days)'],
+        ],
+        FNF: [
+            ['Desired profit ($)'],
+            ['Closing costs ($)'],
+            ['Repair costs ($)'],
+            ['Holding costs ($/month)'],
+            ['Holding time before sale (months)'],
+            ['Agent commission at sale (%)'],
+            ['Sale closing costs ($)'],
+        ],
+        // TIME: [
+        //     ['Annual income growth (%)'],
+        //     ['Annual expense growth (%)'],
+        // ],
+        LABELS: {
+            PURCHASE: 'Purchase values',
+            LOAN: 'Loan values',
+            EXPENSES: 'Expenses',
+            LTR: 'Long term rental values',
+            STR: 'Short term rental values',
+            FNF: 'Fix and flip values',
+            // TIME: 'Time dependent values',
+        },
+        ORDERED_KEYS: [
+            'PURCHASE',
+            'LOAN',
+            'EXPENSES',
+            'LTR',
+            'STR',
+            'FNF',
+            // 'TIME',
+        ], // these must be in the same order as they appear on the setting sheet
+        ANALYSIS_KEYS: {
+            PURCHASE: [
+                'downPaymentP',
+                'downPaymentD',
+                'closingCostsD',
+                'estRepairCostsD',
+                'otherLenderCostsD',
+            ],
+            LOAN: [
+                'loanInterestRateP',
+                'points',
+                'loanTermYears',
+            ],
+            EXPENSES: [
+                'propTaxesP',
+                'propTaxesD',
+                'homeInsuranceP',
+                'homeInsuranceD',
+                'repairsAndMaintP',
+                'repairsAndMaintD',
+                'capExP',
+                'capExD',
+                'managementFeesP',
+                'utilitiesD',
+                'hoaFeesD',
+                'otherExpensesD',
+            ],
+            LTR: [
+                'rentalIncomeP',
+                'minRentD',
+                'maxRentD',
+                'otherIncomeD',
+                'vacancyP',
+            ],
+            STR: [
+                'minNightlyRateD',
+                'maxNightlyRateD',
+                'availableDaysPerYearForBooking',
+                'platformFeeP',
+                'cleaningCostD',
+                'cleaningChargeD',
+                'occupanyRateP',
+                'avgStayDuration'
+            ],
+            FNF: [
+                'desiredProfitD',
+                'purchaseClosingCostD',
+                'repairCostsD',
+                'holdingCostsD',
+                'holdingTimeMonths',
+                'agentCommissionP',
+                'fnfSaleClosingCostsD',
+            ],
+            // TIME: [
+            //     'annualIncomeGrowthP',
+            //     'annualExpenseGrowthP',
+            // ]
+        }
+    },
+    SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations.',
+    ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',
+    STRIPE_BADGE: "https://s3.amazonaws.com/blueplanit.co/stripebadge.png",
+    SUPPORT_PAGE: "https://tidisventures.com/support?app=z-real-estate-calculator-support",
+    TERMS: "https://tidisventures.com/terms-and-conditions?app=z-real-estate-calculator-terms",
+    DEFAULT_LABELS: ['Price', 'Address'],
+    HEADERS_RANGE: 'A1:B1',
+    AMPLITUDE: {
+        OPEN_SIDEBAR: "ZRE_CALC: Opened sidebar",
+        SELECTED_ANA_TYPE: "ZRE_CALC: Selected analysis type",
+        CLICKED_CALC: "ZRE_CALC: Clicked calculate button",
+        VIEWED_PRICING_MODAL: "ZRE_CALC: Viewed pricing modal",
+        PURCHASED: "ZRE_CALC: Purchased add-on",
+    },
+    FREE_VERSION_COPY: 'You are using a free version. ',
+    DISCLAIMER: 'Use of this calculator signifies your agreement to our Terms and Conditions and the terms here. The calculators found in the Z Real Estate Calculator add-on are designed to be used for informational and educational purposes only, and when used alone, do not constitute investment advice. Tidis Ventures LLC and the Z Real Estate Calculator add-on recommends that you seek the advice of a real estate professional before making any type of investment. The results presented may not reflect the actual return of your own investments. Tidis Ventures LLC is not responsible for the consequences of any decisions or actions taken in reliance upon or as a result of the information provided by these tools. Furthermore, Tidis Ventures LLC is not responsible for any human or mechanical errors or omissions. Tidis Ventures LLC is not responsible or liable for the accuracy, completeness, or suitability of the property details. You are responsible for confirming the property details are accurate, complete, and suitable for your use case.',
+    APP_CODE: 'LOI_GWS',
+    APP_VARIANT: '',
+    FUNC_TIERS: {
+        NONE: 0,
+        FULL_FUNC: 1,
+        FULL_FUNC_SUB: 2,
+    }
+}

@@ -1,0 +1,32 @@
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-8 {
+  margin-top: 2rem;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.font-link-blue {
+  color: #1456FF;
+}
+
+.no-underline {
+  text-decoration: none;
+}

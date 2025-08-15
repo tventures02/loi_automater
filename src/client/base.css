@@ -1,0 +1,73 @@
+body {
+    font-family: Helvetica;
+    margin: 0!important;
+}
+
+a {
+    color: #1456FF;
+    text-decoration: none;
+}
+
+.primary-color {
+    color: #1456FF;
+}
+
+.effect-inset-shallow {
+    box-shadow: inset -1px 2px 3px rgba(0, 0, 0, 0.25)
+}
+
+
+.container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.topDiv {
+    /* height: 90%; */
+    padding: 8px;
+    overflow-y: auto;
+    /* makes it vertically scrollable */
+}
+
+.bottomDiv {
+    padding: 8px;
+    min-height: 100px;
+    /* background-color: #F3F3F3; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid #efefef;
+}
+
+.header {
+    background: ghostwhite;
+    padding: 8px;
+    text-align: center;
+    border-radius: 5px;
+}
+
+.sidebarBody {
+    overflow: hidden;
+}
+
+.sidebarSection {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.helpTextSidebar {
+    position: absolute;
+    top: calc(20% - 50px);
+    font-size: .75em;
+    padding: 10px;
+}
+
+.sheetSelectionRefresh {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: .57em;
+    text-align: center;
+}
