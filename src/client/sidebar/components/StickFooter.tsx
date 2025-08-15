@@ -89,7 +89,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                             role="button"
                             tabIndex={0}
                             aria-label={secondaryLabel}
-                            className="select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                            className="cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
                             onClick={handleActivate(onSecondary)}
                             onKeyDown={handleActivate(onSecondary)}
                         >
@@ -103,7 +103,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                         aria-label={primaryLabel}
                         aria-disabled={primaryDisabled}
                         className={cx(
-                            "group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
+                            "cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
                             "bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900",
                             primaryDisabled && "opacity-50 pointer-events-none"
                         )}

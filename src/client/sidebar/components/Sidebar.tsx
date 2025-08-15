@@ -14,6 +14,9 @@ import { User } from '../../utils/types';
 import StickyHeaderStepper, { Step } from './StickyHeaderStepper';
 import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
+import MappingStepScreen from './MappingStepScreen';
+import GenerateStepScreen from './GenerateStepScreen';
+import SendStepScreen from './SendStepScreen';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 
@@ -21,8 +24,8 @@ const SidebarContainer = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [docTitle, setDocTitle] = useState('LOI Template');
     const [newDocInfo, setNewDocInfo] = useState({ url: null, id: null });
-    const controlsRef = useRef(null);
-    const footerRef = useRef(null);
+    const headerRef = useRef(null);
+    const footerRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState({
         trialMessage: 'This free version limits analyzing up to 2 properties at a time.',
         statusMessage: null,
@@ -43,15 +46,10 @@ const SidebarContainer = () => {
         }
     });
     const [selectedTemplate, setSelectedTemplate] = useState('');
-    const [currentStep, setCurrentStep] = useState<string>("template");
+    const [currentStep, setCurrentStep] =
+        useState<"template" | "map" | "pdfs" | "send">("template");
     const [isWorking, setIsWorking] = useState(false);
-    const [canContinue, setCanContinue] = useState(true); // wire to your validation
 
-    // (optional) lock navigation to current & previous only
-    const canGo = (target: string, curr: string) => {
-        const order = ["template", "map", "pdfs", "send"];
-        return order.indexOf(target) <= order.indexOf(curr);
-    };
 
     // (optional) reflect errors/completion (example)
     const steps: Step[] = [
@@ -206,36 +204,32 @@ const SidebarContainer = () => {
     const handleSecondary = () => {
         const order = ["template", "map", "pdfs", "send"];
         const idx = order.indexOf(currentStep);
-        if (idx > 0) setCurrentStep(order[idx - 1]);
+        if (idx > 0) setCurrentStep(order[idx - 1] as "template" | "map" | "pdfs" | "send");
     };
-
 
     if (isLoading) return (
         <LoadingAnimation divHeight={"90vh"} height={40} width={40} color={null} addStyle={{}} subText={null} />
     )
 
-    let topDivHeight = '80vh';
-    if (controlsRef?.current) {
-        topDivHeight = `calc(100vh - ${controlsRef.current.clientHeight}px)`;
+    let middleHeight = "80vh";
+    if (headerRef?.current || footerRef?.current) {
+        const h = headerRef.current?.clientHeight ?? 0;
+        const f = footerRef.current?.clientHeight ?? 0;
+        middleHeight = `calc(100vh - ${h + f}px)`;
     }
-
     return (
         <div className='container'>
-            <div ref={controlsRef}>
+            <div ref={headerRef}>
                 <StickyHeaderStepper
-                    title="LOI Builder"
                     steps={steps}
                     current={currentStep}
-                    onStepChange={setCurrentStep}
-                    canNavigateToStep={canGo}
+                    onStepChange={(key) => setCurrentStep(key as "template" | "map" | "pdfs" | "send")}
                     rightSlot={null}
                 />
             </div>
 
 
-
-
-            <div style={{ height: topDivHeight }}>
+            <div style={{ height: middleHeight }} className='overflow-y-auto p-2'>
                 {
                     messages.errorMessage ?
                         <Grid xs={12} container style={errorMsgStyle}>
@@ -244,15 +238,18 @@ const SidebarContainer = () => {
                         :
                         null
                 }
-                <TemplateStepScreen
-                    user={user}
-                    selectedTemplate={selectedTemplate}
-                    handleTemplateSelection={handleTemplateSelection}
-                    handleCreateDoc={handleCreateDoc}
-                />
+                {currentStep === "template" && (
+                    <TemplateStepScreen
+                        user={user}
+                        selectedTemplate={selectedTemplate}
+                        handleTemplateSelection={handleTemplateSelection}
+                        handleCreateDoc={handleCreateDoc}
+                    />
+                )}
+                {currentStep === "map" && <MappingStepScreen />}
+                {currentStep === "pdfs" && <GenerateStepScreen />}
+                {currentStep === "send" && <SendStepScreen />}
             </div>
-
-
 
 
             {/* Sticky Footer */}
@@ -262,7 +259,7 @@ const SidebarContainer = () => {
                 onPrimary={handlePrimary}
                 secondaryLabel={secondaryLabelByStep[currentStep] || undefined}
                 onSecondary={secondaryLabelByStep[currentStep] ? handleSecondary : undefined}
-                primaryDisabled={!canContinue}
+                primaryDisabled={false}
                 primaryLoading={isWorking}
                 helperText={
                     currentStep === "send"
