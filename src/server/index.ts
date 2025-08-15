@@ -7,29 +7,21 @@ import {
 } from './ui';
 
 import {
-    generateTemplateScript,
-    getInitData,
-    readAndParseSettingsValues,
-    readPricesAndAddresses,
-    doAna,
-    writeToSettings,
+    createGoogleDoc,
     getUserEmail,
     getUserData,
+    getInitData,
 } from './sheets';
 
 // Public functions must be exported as named exports
 export {
     onInstall,
     onOpen,
-    showGenTemplate,
+    showGenTemplate,    
     openSidebar,
-    generateTemplateScript,
-    getInitData,
-    readAndParseSettingsValues,
-    readPricesAndAddresses,
-    doAna,
-    writeToSettings,
+    createGoogleDoc,
     showActivationModal,
     getUserEmail,
     getUserData,
+    getInitData,
 };

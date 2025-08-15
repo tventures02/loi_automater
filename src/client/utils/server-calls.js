@@ -1,10 +1,12 @@
+import * as CONSTANTS from './constants';
+
 export function backendCall(dataToServer, endpoint, idToken = null) {
 
     let headers = {
         'Content-Type': 'application/json',
     };
     if (!dataToServer.verType) dataToServer.verType = 'idToken';
-    if (!dataToServer.source) dataToServer.source = 'sheets_zre';
+    if (!dataToServer.source) dataToServer.source = CONSTANTS.APP_SOURCE;
     if (idToken) {
         headers = {
             ...headers,

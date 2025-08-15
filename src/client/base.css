@@ -33,16 +33,6 @@ a {
     /* makes it vertically scrollable */
 }
 
-.bottomDiv {
-    padding: 8px;
-    min-height: 100px;
-    /* background-color: #F3F3F3; */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-top: 1px solid #efefef;
-}
-
 .header {
     background: ghostwhite;
     padding: 8px;
