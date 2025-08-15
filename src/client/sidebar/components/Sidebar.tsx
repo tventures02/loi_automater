@@ -5,9 +5,6 @@ import { backendCall } from '../../utils/server-calls';
 import { Grid, MenuItem, TextField } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
 import CTAWidget from './CTASideBar';
-import {
-    PlusIcon,
-} from '@heroicons/react/24/outline';
 import { sendToAmplitude } from "../../utils/amplitude";
 import { generateDataToServer } from '../../utils/misc';
 import { User } from '../../utils/types';
@@ -27,7 +24,7 @@ const SidebarContainer = () => {
     const headerRef = useRef(null);
     const footerRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState({
-        trialMessage: 'This free version limits analyzing up to 2 properties at a time.',
+        trialMessage: '',
         statusMessage: null,
         errorMessage: null,
     });
@@ -47,7 +44,7 @@ const SidebarContainer = () => {
     });
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [currentStep, setCurrentStep] =
-        useState<"template" | "map" | "pdfs" | "send">("template");
+        useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
 
 
@@ -190,16 +187,21 @@ const SidebarContainer = () => {
         send: "Back",
     };
 
+    const stepOrder = React.useMemo(() => steps.map(s => s.key), [steps]);
+
     const handlePrimary = async () => {
-        // TODO: implement per-step actions
         setIsWorking(true);
         try {
-            // ...your logic
-            // setCurrentStep(nextStep);
+            setCurrentStep(prev => {
+                const idx = stepOrder.indexOf(prev);
+                const nextIdx = idx >= 0 ? Math.min(idx + 1, stepOrder.length - 1) : 0;
+                return stepOrder[nextIdx];
+            });
         } finally {
             setIsWorking(false);
         }
     };
+
 
     const handleSecondary = () => {
         const order = ["template", "map", "pdfs", "send"];
@@ -224,7 +226,16 @@ const SidebarContainer = () => {
                     steps={steps}
                     current={currentStep}
                     onStepChange={(key) => setCurrentStep(key as "template" | "map" | "pdfs" | "send")}
-                    rightSlot={null}
+                    rightSlot={
+                        <button
+                            type="button"
+                            className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => window.open('https://support.google.com/docs', '_blank')}
+                        >
+                            Help
+                        </button>
+
+                    }
                 />
             </div>
 

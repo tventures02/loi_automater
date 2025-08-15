@@ -39,7 +39,7 @@ const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHea
             aria-label="LOI Builder steps"
         >
             {/* Optional actions row */}
-            <div className="flex items-center justify-end px-3 pt-2 pb-2">
+            <div className="w-full flex items-center justify-end px-3 pt-2 pb-2">
                 {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
             </div>
 

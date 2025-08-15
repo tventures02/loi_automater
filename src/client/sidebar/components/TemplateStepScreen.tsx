@@ -1,5 +1,4 @@
 import React from "react";
-import { Grid } from "@mui/material";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { User } from "../../utils/types";
 
@@ -10,19 +9,28 @@ type Props = {
     handleTemplateSelection: (event: React.ChangeEvent<HTMLSelectElement>) => void;
     handleCreateDoc: () => void;
 }
-const TemplateStepScreen = ({ 
-    user, 
-    selectedTemplate, 
-    handleTemplateSelection, 
+const TemplateStepScreen = ({
+    user,
+    selectedTemplate,
+    handleTemplateSelection,
     handleCreateDoc }: Props) => {
 
+    const templateExists = user?.items?.loi?.docIds?.length > 0;
+
     return (
-        <Grid item xs={12} className='w-full p-1 flex justify-center'>
-            {user?.items?.loi?.docIds?.length > 0 ? (
+        <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-gray-900">Select Google Doc Template</h2>
+            <p className="text-xs text-gray-600">
+                {
+                    templateExists ?
+                        "Select the LOI Google Doc Template to use."
+                        :
+                        "Create a Google Doc LOI template first."
+                }
+            </p>
+
+            {templateExists ? (
                 <div className="mt-4 animate-fadeIn">
-                    <label htmlFor="docTemplateSelect" className="block text-sm font-medium text-gray-700 mb-1">
-                        Select LOI Google Doc Template
-                    </label>
                     <select
                         id="docTemplateSelect"
                         value={selectedTemplate}
@@ -34,7 +42,7 @@ const TemplateStepScreen = ({
                                 {templateName}
                             </option>
                         ))}
-                        <option value="new">New LOI Template</option>
+                        <option value="new">-- Create New Template --</option>
                     </select>
                 </div>
             ) : (
@@ -48,7 +56,8 @@ const TemplateStepScreen = ({
                     <span className="pointer-events-none">New LOI Template</span> {/* Added pointer-events-none to text */}
                 </div>
             )}
-        </Grid>
+
+        </div>
     )
 }
 export default TemplateStepScreen;
