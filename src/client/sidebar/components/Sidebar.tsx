@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 import { backendCall } from '../../utils/server-calls';
-import { Grid, MenuItem, TextField } from '@mui/material';
+import { Grid } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
 import CTAWidget from './CTASideBar';
 import { sendToAmplitude } from "../../utils/amplitude";
@@ -15,11 +15,30 @@ import MappingStepScreen from './MappingStepScreen';
 import GenerateStepScreen from './GenerateStepScreen';
 import SendStepScreen from './SendStepScreen';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { DocInfo } from 'src/server/docs';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
+const isDev = process.env.NODE_ENV.toLowerCase().includes('dev');
 
 const SidebarContainer = () => {
     const [isLoading, setIsLoading] = useState(true);
+
+    // State for template step
+    const [isGettingTemplates, setIsGettingTemplates] = useState(true);
+    const [templates, setTemplates] = useState<DocInfo[]>([]);
+    const [isLoadingContent, setIsLoadingContent] = useState(false);
+    const [draft, setDraft] = useState<string>('');
+    const [templateContent, setTemplateContent] = useState('');
+
+    // States for mapping step
+    const [mapping, setMapping] = useState<Record<string, string>>({});
+    const [canContinue, setCanContinue] = useState({
+        template: false,
+        map: false,
+        pdfs: false,
+        send: false,
+    });
+
     const headerRef = useRef(null);
     const footerRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState({
@@ -41,12 +60,9 @@ const SidebarContainer = () => {
             }
         }
     });
-    const [templateContent, setTemplateContent] = useState('');
     const [selectedTemplate, setSelectedTemplate] = useState('');
-    const [currentStep, setCurrentStep] =
-        useState<string>("template");
+    const [currentStep, setCurrentStep] = useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
-
 
     // (optional) reflect errors/completion (example)
     const steps: Step[] = [
@@ -101,10 +117,10 @@ const SidebarContainer = () => {
                         userHasPaid,
                     };
                     setUser(localUser);
-                    console.log(localUser)
+                    if (isDev) console.log(localUser)
 
-                    if (user?.items?.loi?.docIds?.length > 0) {
-                        setSelectedTemplate(user?.items?.loi?.docIds[0]);
+                    if (localUser?.items?.loi?.docIds?.length > 0) {
+                        setSelectedTemplate(localUser?.items?.loi?.docIds[0]);
                     }
 
                     let configObj = await getConfigFromBackend(); // set the html search strings for scraping the page
@@ -114,6 +130,8 @@ const SidebarContainer = () => {
                             ...configObj,
                         });
                     }
+
+                    await getTemplates(localUser);
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
@@ -123,12 +141,87 @@ const SidebarContainer = () => {
                 }
             };
 
+            const getTemplates = async (user: User) => {
+                try {
+                setIsGettingTemplates(true);
+                const docInfos = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
+                if (isDev) console.log("docInfos", docInfos);
+    
+                const validDocs = docInfos.filter(doc => doc.name).map(doc => ({ id: doc.id, name: doc.name }));
+                const invalidDocIds = docInfos.filter(doc => doc.error).map(doc => doc.id);
+    
+                if (isDev) console.log("validDocs", validDocs);
+                if (isDev) console.log("invalidDocIds", invalidDocIds);
+    
+                setTemplates(validDocs); // Show valid docs immediately
+                // If nothing selected yet, default to first
+                if (!selectedTemplate && validDocs.length > 0) {
+                    setSelectedTemplate(validDocs[0].id);
+                    fetchTemplateContent(validDocs[0].id);
+                }
+    
+                // 3. If any are invalid, tell the backend to remove them
+                if (invalidDocIds.length > 0) {
+                    if (isDev) console.log("Syncing: removing invalid IDs:", invalidDocIds);
+                    const dataToServer = {
+                        email: user.email,
+                        user,
+                        invalidDocIds,
+                        verType: 'idToken',
+                        source: CONSTANTS.APP_SOURCE,
+                        app: CONSTANTS.APP_CODE,
+                    }
+                    await backendCall(dataToServer, 'loiApi/syncDocTemplates', user.idToken);
+                }
+                } catch (err: any) {
+                    handleError(err?.message || 'Error loading templates.');
+                } finally {
+                    setIsGettingTemplates(false);
+                }
+            }
+
             getData();
         }
         catch (e) {
             handleError(e.message);
         }
     }, []);
+
+    const fetchTemplateContent = async (docId: string) => {
+        if (!docId) {
+            setTemplateContent('');
+            setDraft('');
+            return;
+        }
+
+        setIsLoadingContent(true);
+        try {
+            let text = await serverFunctions.getGoogleDocPlainText(docId);
+            if (!text) {
+                handleError('Error: Problem fetching template content. Please try again.');
+                return;
+            }
+            text = text.trim().replace(/\n/, '');
+            const templateContent_   = text || '';
+            setTemplateContent(templateContent_);
+            setDraft(templateContent_);
+            if (templateContent_) {
+                setCanContinue({ ...canContinue, template: true });
+            }
+        } catch (err: any) {
+            handleError(err?.message || 'Error fetching template content.');
+            setTemplateContent('');
+            setDraft('');
+        } finally {
+            setIsLoadingContent(false);
+        }
+    };
+
+    useEffect(() => {
+        if (templateContent) {
+            setCanContinue({ ...canContinue, template: true });
+        }
+    }, [templateContent]);
 
     const getConfigFromBackend = async () => {
         const resp = await backendCall({ app: CONSTANTS.APP_CODE }, 'config/getConfig');
@@ -147,7 +240,7 @@ const SidebarContainer = () => {
     // Example CTA labels by step
     const primaryLabelByStep: Record<string, string> = {
         template: "Continue to mapping",
-        map: "Generate PDFs",
+        map: "Continue to PDFs",
         pdfs: "Continue to send",
         send: "Send emails",
     };
@@ -190,6 +283,9 @@ const SidebarContainer = () => {
         const f = footerRef.current?.clientHeight ?? 0;
         middleHeight = `calc(100vh - ${h + f}px)`;
     }
+
+    console.log('sidebar render')
+    console.log('content', templateContent)
     return (
         <div className='container'>
             <div ref={headerRef}>
@@ -229,9 +325,21 @@ const SidebarContainer = () => {
                         setSelectedTemplate={setSelectedTemplate}
                         templateContent={templateContent}
                         setTemplateContent={setTemplateContent}
+                        templates={templates}
+                        setTemplates={setTemplates}
+                        isGettingTemplates={isGettingTemplates}
+                        isLoadingContent={isLoadingContent}
+                        fetchTemplateContent={fetchTemplateContent}
+                        draft={draft}
+                        setDraft={setDraft}
                     />
                 )}
-                {currentStep === "map" && <MappingStepScreen />}
+                {currentStep === "map" &&
+                    <MappingStepScreen
+                        templateContent={templateContent} initialMapping={mapping}
+                        onMappingChange={setMapping}
+                        onValidChange={(key, ok) => setCanContinue({ ...canContinue, [key]: ok })}
+                    />}
                 {currentStep === "pdfs" && <GenerateStepScreen />}
                 {currentStep === "send" && <SendStepScreen />}
             </div>
@@ -244,7 +352,7 @@ const SidebarContainer = () => {
                 onPrimary={handlePrimary}
                 secondaryLabel={secondaryLabelByStep[currentStep] || undefined}
                 onSecondary={secondaryLabelByStep[currentStep] ? handleSecondary : undefined}
-                primaryDisabled={false}
+                primaryDisabled={!canContinue[currentStep]}
                 primaryLoading={isWorking}
                 helperText={
                     currentStep === "send"
@@ -254,10 +362,9 @@ const SidebarContainer = () => {
                 leftSlot={
                     currentStep === "pdfs"
                         ? <span>Output: /Drive/LOI Outputs/Today</span>
-                        : currentStep === "map"
-                            ? <span>4 placeholders · 4 mapped</span>
-                            : null
+                        : null
                 }
+                currentStep={currentStep}
             />
         </div>
     )

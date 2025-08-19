@@ -5,81 +5,52 @@ import InlineSpinner from "../../utils/components/InlineSpinner";
 import { DocInfo } from "../../../server/docs";
 import { backendCall } from "../../utils/server-calls";
 import CONSTANTS from '../../utils/constants';
-import { ArrowTopRightOnSquareIcon, TrashIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
 
 type Props = {
     user: User;
     selectedTemplate: string;
+    templates: DocInfo[];
+    setTemplates: (templates: DocInfo[]) => void;
     handleError: (error: string) => void;
     setUser: (user: User) => void;
     setSelectedTemplate: (selectedTemplate: string) => void;
     templateContent: string;
     setTemplateContent: (templateContent: string) => void;
+    isGettingTemplates: boolean;
+    isLoadingContent: boolean;
+    fetchTemplateContent: (docId: string) => void;
+    draft: string;
+    setDraft: (draft: string) => void;
 }
 const TemplateStepScreen = ({
     user,
     selectedTemplate,
+    templates,
+    setTemplates,
     handleError,
     setUser,
     setSelectedTemplate,
     templateContent,
-    setTemplateContent }: Props) => {
+    setTemplateContent,
+    isGettingTemplates,
+    isLoadingContent,
+    fetchTemplateContent,
+    draft,
+    setDraft }: Props) => {
 
-    const [isGettingTemplates, setIsGettingTemplates] = useState(true);
-    const [templates, setTemplates] = useState<DocInfo[]>([]);
     const [docTitle, setDocTitle] = useState('New LOI Template');
     const [isCreatingDoc, setIsCreatingDoc] = useState(false);
-    const [isLoadingContent, setIsLoadingContent] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
-    const [draft, setDraft] = useState<string>(templateContent || "");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const hasUnsaved = isEditing && draft !== templateContent;
 
+    const firstPassRef = useRef(true);
+
     const templateUrl =
         selectedTemplate ? `https://docs.google.com/document/d/${selectedTemplate}/edit` : null;
-
-    useEffect(() => {
-        const getTemplates = async () => {
-            try {
-            setIsGettingTemplates(true);
-            const docInfos = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
-            console.log("docInfos", docInfos);
-
-            const validDocs = docInfos.filter(doc => doc.name).map(doc => ({ id: doc.id, name: doc.name }));
-            const invalidDocIds = docInfos.filter(doc => doc.error).map(doc => doc.id);
-
-            console.log("validDocs", validDocs);
-            console.log("invalidDocIds", invalidDocIds);
-
-            setTemplates(validDocs); // Show valid docs immediately
-            // If nothing selected yet, default to first
-            if (!selectedTemplate && validDocs.length > 0) {
-                setSelectedTemplate(validDocs[0].id);
-            }
-
-            // 3. If any are invalid, tell the backend to remove them
-            if (invalidDocIds.length > 0) {
-                console.log("Syncing: removing invalid IDs:", invalidDocIds);
-                const dataToServer = {
-                    email: user.email,
-                    user,
-                    invalidDocIds,
-                    verType: 'idToken',
-                    source: CONSTANTS.APP_SOURCE,
-                    app: CONSTANTS.APP_CODE,
-                }
-                await backendCall(dataToServer, 'loiApi/syncDocTemplates', user.idToken);
-            }
-            } catch (err: any) {
-                handleError(err?.message || 'Error loading templates.');
-            } finally {
-                setIsGettingTemplates(false);
-            }
-        }
-        getTemplates();
-    }, []);
 
     const handleCreateDoc = async () => {
         if (!docTitle.trim()) {
@@ -126,32 +97,12 @@ const TemplateStepScreen = ({
         }
     };
 
-    const fetchTemplateContent = useCallback(async (docId: string) => {
-        if (!docId) {
-            setTemplateContent('');
-            setDraft('');
+    useEffect(() => {
+        // Don't load content on first render as it's already loaded in Sidebar
+        if (firstPassRef.current) {
+            firstPassRef.current = false;
             return;
         }
-        setIsLoadingContent(true);
-        try {
-            let text = await serverFunctions.getGoogleDocPlainText(docId);
-            if (!text) {
-                handleError('Error: Problem fetching template content. Please try again.');
-                return;
-            }
-            text = text.trim().replace(/\n/, '');
-            setTemplateContent(text || '');
-            setDraft(text || '');
-        } catch (err: any) {
-            handleError(err?.message || 'Error fetching template content.');
-            setTemplateContent('');
-            setDraft('');
-        } finally {
-            setIsLoadingContent(false);
-        }
-    }, [handleError]);
-
-    useEffect(() => {
         // Load content when selection changes; exit edit mode
         if (selectedTemplate) {
             setIsEditing(false);
@@ -284,7 +235,7 @@ const TemplateStepScreen = ({
                                         tabIndex={0}
                                         onClick={handleRefresh}
                                         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleRefresh()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
                                     >
                                         Refresh
                                     </div>
@@ -293,7 +244,7 @@ const TemplateStepScreen = ({
                                         tabIndex={0}
                                         onClick={handleEdit}
                                         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleEdit()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
                                     >
                                         Edit
                                     </div>
@@ -314,7 +265,7 @@ const TemplateStepScreen = ({
                                         tabIndex={0}
                                         onClick={handleCancel}
                                         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleCancel()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
                                     >
                                         Cancel
                                     </div>
