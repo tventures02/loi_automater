@@ -17,6 +17,8 @@ import {
     getGoogleDocNamesByIds,
     getGoogleDocPlainText,
     getPreviewRowValues,
+    preflightGenerateLOIs,
+    generateLOIsAndWriteSheet,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -33,4 +35,6 @@ export {
     getGoogleDocNamesByIds,
     getGoogleDocPlainText,
     getPreviewRowValues,
+    preflightGenerateLOIs,
+    generateLOIsAndWriteSheet,
 };

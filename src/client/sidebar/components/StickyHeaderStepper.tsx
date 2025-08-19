@@ -16,7 +16,7 @@ type Props = {
 const DEFAULT_STEPS: Step[] = [
     { key: "template", label: "Template" },
     { key: "map", label: "Map" },
-    { key: "pdfs", label: "PDFs" },
+    { key: "lois", label: "LOIs" },
     { key: "send", label: "Send" },
 ];
 

@@ -12,7 +12,7 @@ import StickyHeaderStepper, { Step } from './StickyHeaderStepper';
 import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
 import MappingStepScreen from './MappingStepScreen';
-import GenerateStepScreen from './GenerateStepScreen';
+import GenerateLOIsStepScreen from './GenerateLOIsStepScreen';
 import SendStepScreen from './SendStepScreen';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
@@ -35,7 +35,7 @@ const SidebarContainer = () => {
     const [canContinue, setCanContinue] = useState({
         template: false,
         map: false,
-        pdfs: false,
+        lois: false,
         send: false,
     });
 
@@ -68,7 +68,7 @@ const SidebarContainer = () => {
     const steps: Step[] = [
         { key: "template", label: "Template" },
         { key: "map", label: "Map" },
-        { key: "pdfs", label: "PDFs" },
+        { key: "lois", label: "LOIs" },
         { key: "send", label: "Send" },
     ];
     const [config, setConfig] = useState({
@@ -240,14 +240,14 @@ const SidebarContainer = () => {
     // Example CTA labels by step
     const primaryLabelByStep: Record<string, string> = {
         template: "Continue to mapping",
-        map: "Continue to PDFs",
-        pdfs: "Continue to send",
+        map: "Continue to LOIs",
+        lois: "Continue to send",
         send: "Send emails",
     };
     const secondaryLabelByStep: Record<string, string> = {
         template: "",
         map: "Back",
-        pdfs: "Back",
+        lois: "Back",
         send: "Back",
     };
 
@@ -268,9 +268,9 @@ const SidebarContainer = () => {
 
 
     const handleSecondary = () => {
-        const order = ["template", "map", "pdfs", "send"];
+        const order = ["template", "map", "lois", "send"];
         const idx = order.indexOf(currentStep);
-        if (idx > 0) setCurrentStep(order[idx - 1] as "template" | "map" | "pdfs" | "send");
+        if (idx > 0) setCurrentStep(order[idx - 1] as "template" | "map" | "lois" | "send");
     };
 
     if (isLoading) return (
@@ -292,7 +292,7 @@ const SidebarContainer = () => {
                 <StickyHeaderStepper
                     steps={steps}
                     current={currentStep}
-                    onStepChange={(key) => setCurrentStep(key as "template" | "map" | "pdfs" | "send")}
+                    onStepChange={(key) => setCurrentStep(key as "template" | "map" | "lois" | "send")}
                     rightSlot={
                         <button
                             type="button"
@@ -340,7 +340,12 @@ const SidebarContainer = () => {
                         onMappingChange={setMapping}
                         onValidChange={(key, ok) => setCanContinue({ ...canContinue, [key]: ok })}
                     />}
-                {currentStep === "pdfs" && <GenerateStepScreen />}
+                {currentStep === "lois" && 
+                <GenerateLOIsStepScreen 
+                    mapping={mapping}
+                    templateDocId={selectedTemplate}
+                    templateContent={templateContent}
+                />}
                 {currentStep === "send" && <SendStepScreen />}
             </div>
 
@@ -359,11 +364,7 @@ const SidebarContainer = () => {
                         ? "We’ll skip rows without valid emails."
                         : undefined
                 }
-                leftSlot={
-                    currentStep === "pdfs"
-                        ? <span>Output: /Drive/LOI Outputs/Today</span>
-                        : null
-                }
+                leftSlot={null}
                 currentStep={currentStep}
             />
         </div>
