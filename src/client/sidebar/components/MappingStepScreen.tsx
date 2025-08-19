@@ -75,13 +75,16 @@ export default function MappingStepScreen({
 
     // Mapping state: { "Address": "A", "AgentName": "B", ... }
     const [mapping, setMapping] = useState<Record<string, string>>({});
+    const [emailColumn, setEmailColumn] = useState<string>(initialMapping?.__email || "");
     const [previewText, setPreviewText] = useState<string>("");
     const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
     const [previewError, setPreviewError] = useState<string | null>(null);
+    const [firstRowEmail, setFirstRowEmail] = useState<string | null>(null);
 
     useEffect(() => {
         setMapping({});
-        onMappingChange?.({});
+        setEmailColumn(initialMapping?.__email || "");
+        onMappingChange?.({ __email: initialMapping?.__email || "" });
     }, [templateContent]);
 
     // Initialize / reconcile mapping whenever placeholders list changes
@@ -99,14 +102,18 @@ export default function MappingStepScreen({
 
     // Report changes upward + validity
     useEffect(() => {
-        onMappingChange?.(mapping);
-        const allMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
-        onValidChange?.("map", allMapped);
+        onMappingChange?.({ ...mapping, __email: emailColumn });
+        const allMapped =
+            placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
+        const valid = allMapped && !!emailColumn;
+
+        onValidChange?.("map", valid);
 
         if (!allMapped || !templateContent) {
             setPreviewState("idle");
             setPreviewText("");
             setPreviewError(null);
+            setFirstRowEmail(null);
             return;
         }
         let cancelled = false;
@@ -117,18 +124,25 @@ export default function MappingStepScreen({
 
                 // Ask Apps Script for first data row values (by column)
                 // Expected return shape: { A: "123 Main St", B: "Jane Lee", ... }
-                const cols = placeholders.map((ph) => mapping[ph]);
+                const colsRequested = Array.from(
+                    new Set([
+                        ...placeholders.map((ph) => mapping[ph]),
+                        ...(emailColumn ? [emailColumn] : []),
+                    ].filter(Boolean))
+                );
                 const valuesByColumn: Record<string, any> =
                     await serverFunctions.getPreviewRowValues({
-                        columns: cols,
-                        sheetName: sheetName || null, // parent can pass if needed
+                        columns: colsRequested,
+                        sheetName: sheetName || null,
                     });
 
                 if (cancelled) return;
 
                 const rendered = renderPreview(templateContent, mapping, valuesByColumn);
                 setPreviewText(normalizeNewlines(rendered));
+                setFirstRowEmail(emailColumn ? (valuesByColumn[emailColumn] ?? null) : null);
                 setPreviewState("ready");
+                setFirstRowEmail(null);
             } catch (err: any) {
                 if (cancelled) return;
                 setPreviewError(err?.message || "Failed to build preview.");
@@ -140,7 +154,7 @@ export default function MappingStepScreen({
             cancelled = true;
         };
 
-    }, [mapping, placeholders, templateContent]);
+    }, [mapping, placeholders, templateContent, emailColumn, sheetName]);
 
     // Columns that are already taken by some other placeholder
     const taken = useMemo(() => {
@@ -148,8 +162,9 @@ export default function MappingStepScreen({
         for (const [ph, col] of Object.entries(mapping)) {
             if (col) s.add(col);
         }
+        if (emailColumn) s.add(emailColumn);
         return s;
-    }, [mapping]);
+    }, [mapping, emailColumn]);
 
     const updateMapping = (ph: string, col: string) => {
         setMapping((prev) => {
@@ -158,11 +173,16 @@ export default function MappingStepScreen({
         });
     };
 
+    const updateEmailColumn = (col: string) => {
+        setEmailColumn(col);
+    };
+
+
     return (
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Map placeholders</h2>
             <p className="text-xs text-gray-600">
-                Select a unique sheet column (A–H) for each template placeholder found in your LOI.
+                Select a spreadsheet column (A–H) for placeholders in your LOI template.
             </p>
 
             {/* Empty-state if no placeholders */}
@@ -172,7 +192,7 @@ export default function MappingStepScreen({
                     then refresh in the previous step.
                 </div>
             ) : (
-                <div className="rounded-xl border border-gray-200 p-3">
+                <div className="rounded-xl border border-gray-200 p-3" id="mapping-parameters">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="text-gray-500">Placeholder</div>
                         <div className="text-gray-500">Mapped column</div>
@@ -215,19 +235,54 @@ export default function MappingStepScreen({
                         <div className="text-[11px] text-gray-600">
                             {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
                         </div>
-                        <div className="text-[11px] text-gray-500">
-                            Each column can be used once.
-                        </div>
                     </div>
                 </div>
             )}
+
+            {/* Delivery email column (separate card for clarity) */}
+            <div className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-medium text-gray-900">Delivery email column</div>
+                        <div className="mt-0.5 text-[11px] text-gray-600">
+                            Select email column (where LOIs will be sent)
+                        </div>
+                    </div>
+                    {firstRowEmail ? (
+                        <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
+                            First row: {firstRowEmail}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div className="mt-2">
+                    <select
+                        value={emailColumn}
+                        onChange={(e) => updateEmailColumn(e.target.value)}
+                        className={`
+              w-full rounded-md border px-2 py-1 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900
+              ${emailColumn ? "border-gray-200" : "border-amber-300"}
+            `}
+                    >
+                        <option value="">{`— Select (A–H) —`}</option>
+                        {COLUMN_OPTIONS.map((col) => {
+                            const disabled = taken.has(col) && emailColumn !== col;
+                            return (
+                                <option key={col} value={col} disabled={disabled}>
+                                    {`Column ${col}`}{disabled ? " (in use)" : ""}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+            </div>
 
             {/* Preview */}
             {placeholders.length > 0 && (
                 <div className="rounded-lg border border-gray-200 bg-gray-50">
                     {previewState === "idle" && (
                         <div className="p-3 text-xs text-gray-700">
-                            Preview will appear after all placeholders are mapped.
+                            A preview of an LOI will appear after all columns are mapped.
                         </div>
                     )}
                     {previewState === "loading" && (
@@ -242,12 +297,12 @@ export default function MappingStepScreen({
                     )}
                     {previewState === "ready" && (
                         <>
-                        <div className="p-3 pb-1 text-xs font-semibold text-gray-500">
-                            LOI Preview
-                        </div>
-                        <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                            {previewText}
-                        </div>
+                            <div className="p-3 pb-1 text-xs font-semibold text-gray-500">
+                                👀 LOI Preview (Row 1)
+                            </div>
+                            <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                {previewText}
+                            </div>
                         </>
                     )}
                 </div>

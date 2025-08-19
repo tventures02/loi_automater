@@ -88,8 +88,7 @@ export const getPreviewRowValues = (payload) => {
         ? ss.getSheetByName(payload.sheetName)
         : ss.getActiveSheet();
 
-    // Assume row 1 is headers; preview uses row 2 (first data row)
-    const rowIndex = 2;
+    const rowIndex = 1;
     const valuesByColumn = {};
 
     (payload.columns || []).forEach(function (col) {
