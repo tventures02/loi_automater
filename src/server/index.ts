@@ -7,14 +7,15 @@ import {
 } from './ui';
 
 import {
-    createGoogleDoc,
     getUserEmail,
     getUserData,
     getInitData,
 } from './sheets';
 
 import {
+    createGoogleDoc,
     getGoogleDocNamesByIds,
+    getGoogleDocPlainText,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -29,4 +30,5 @@ export {
     getUserData,
     getInitData,
     getGoogleDocNamesByIds,
+    getGoogleDocPlainText,
 };

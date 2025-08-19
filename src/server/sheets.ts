@@ -51,26 +51,3 @@ export const getInitData = () => {
         aud: payload.aud,
     }
 }
-
-
-/**
- * Creates a new Google Doc with the given title.
- * @param {string} docTitle - The title for the new Google Document.
- * @returns {{url: string, id: string}} An object containing the URL and the ID of the new document.
- */
-export const createGoogleDoc = (docTitle) => {
-    try {
-        // Create the document
-        const doc = DocumentApp.create(docTitle);
-
-        // Get the URL and the ID
-        const url = doc.getUrl();
-        const id = doc.getId();
-
-        // Return an object with both properties
-        return { url, id };
-    } catch (error) {
-        console.error(`Error creating document: ${error.toString()}`);
-        throw new Error('There was an error creating the Google Doc.');
-    }
-};

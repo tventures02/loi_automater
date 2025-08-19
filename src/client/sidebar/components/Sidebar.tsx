@@ -14,12 +14,12 @@ import TemplateStepScreen from './TemplateStepScreen';
 import MappingStepScreen from './MappingStepScreen';
 import GenerateStepScreen from './GenerateStepScreen';
 import SendStepScreen from './SendStepScreen';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 
 const SidebarContainer = () => {
     const [isLoading, setIsLoading] = useState(true);
-    const [docTitle, setDocTitle] = useState('LOI Template');
     const headerRef = useRef(null);
     const footerRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState({
@@ -41,6 +41,7 @@ const SidebarContainer = () => {
             }
         }
     });
+    const [templateContent, setTemplateContent] = useState('');
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [currentStep, setCurrentStep] =
         useState<string>("template");
@@ -214,7 +215,7 @@ const SidebarContainer = () => {
                 {
                     messages.errorMessage ?
                         <Grid xs={12} container style={errorMsgStyle}>
-                            {messages.errorMessage}
+                            {messages.errorMessage} <button onClick={() => setMessages({ ...messages, errorMessage: null })}><XMarkIcon className="h-4 w-4" /></button>
                         </Grid>
                         :
                         null
@@ -225,7 +226,9 @@ const SidebarContainer = () => {
                         selectedTemplate={selectedTemplate}
                         handleError={handleError}
                         setUser={setUser}
-                        setSelectedTemplate={setSelectedTemplate}   
+                        setSelectedTemplate={setSelectedTemplate}
+                        templateContent={templateContent}
+                        setTemplateContent={setTemplateContent}
                     />
                 )}
                 {currentStep === "map" && <MappingStepScreen />}

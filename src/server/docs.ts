@@ -46,3 +46,36 @@ export const getGoogleDocNamesByIds = (docIds: string[]): DocInfo[] => {
 
     return results;
 };
+
+export const getGoogleDocPlainText = (docId: string): string => {
+    const file = DocumentApp.openById(docId);
+    const content = file.getBody().getText();
+    return content;
+};
+
+/**
+ * Creates a new Google Doc with the given title.
+ * @param {string} docTitle - The title for the new Google Document.
+ * @returns {{url: string, id: string}} An object containing the URL and the ID of the new document.
+ */
+export const createGoogleDoc = (docTitle: string) => {
+    try {
+        // Create the document
+        const doc = DocumentApp.create(docTitle);
+        const body = doc.getBody();
+
+        // Fill in the LOI template with provided data
+        const content = `Sample Letter of Intent\n\nHi {{name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
+
+        body.appendParagraph(content);
+
+        // Get the URL and ID
+        const url = doc.getUrl();
+        const id = doc.getId();
+
+        return { url, id };
+    } catch (error) {
+        console.error(`Error creating document: ${error.toString()}`);
+        throw new Error('There was an error creating the Google Doc.');
+    }
+};
