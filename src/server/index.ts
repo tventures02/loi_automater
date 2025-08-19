@@ -13,6 +13,10 @@ import {
     getInitData,
 } from './sheets';
 
+import {
+    getGoogleDocNamesByIds,
+} from './docs';
+
 // Public functions must be exported as named exports
 export {
     onInstall,
@@ -24,4 +28,5 @@ export {
     getUserEmail,
     getUserData,
     getInitData,
+    getGoogleDocNamesByIds,
 };

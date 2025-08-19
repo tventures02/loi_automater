@@ -20,7 +20,6 @@ const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" 
 const SidebarContainer = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [docTitle, setDocTitle] = useState('LOI Template');
-    const [newDocInfo, setNewDocInfo] = useState({ url: null, id: null });
     const headerRef = useRef(null);
     const footerRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState({
@@ -144,35 +143,6 @@ const SidebarContainer = () => {
         });
     }
 
-    const handleCreateDoc = async () => {
-        if (!docTitle.trim()) {
-            handleError('Please enter a title for the document.');
-            return;
-        }
-        setIsLoading(true);
-        setNewDocInfo({ url: null, id: null }); // Reset previous info
-        try {
-            // The server function now returns an object { url, id }
-            const docData = await serverFunctions.createGoogleDoc(docTitle);
-            setNewDocInfo(docData); // Store the entire object in state
-        } catch (error) {
-            handleError(error.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleTemplateSelection = (event) => {
-        if (event.target.value === 'new') {
-            handleCreateDoc();
-            return;
-        }
-        setSelectedTemplate(event.target.value);
-        // You can add logic here to act on the selection,
-        // for example, load the template's content.
-        console.log("Selected Template:", event.target.value);
-    };
-
     // Example CTA labels by step
     const primaryLabelByStep: Record<string, string> = {
         template: "Continue to mapping",
@@ -253,8 +223,9 @@ const SidebarContainer = () => {
                     <TemplateStepScreen
                         user={user}
                         selectedTemplate={selectedTemplate}
-                        handleTemplateSelection={handleTemplateSelection}
-                        handleCreateDoc={handleCreateDoc}
+                        handleError={handleError}
+                        setUser={setUser}
+                        setSelectedTemplate={setSelectedTemplate}   
                     />
                 )}
                 {currentStep === "map" && <MappingStepScreen />}
