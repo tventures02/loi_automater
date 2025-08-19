@@ -16,6 +16,7 @@ import {
     createGoogleDoc,
     getGoogleDocNamesByIds,
     getGoogleDocPlainText,
+    getPreviewRowValues,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -31,4 +32,5 @@ export {
     getInitData,
     getGoogleDocNamesByIds,
     getGoogleDocPlainText,
+    getPreviewRowValues,
 };

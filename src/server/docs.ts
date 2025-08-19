@@ -79,3 +79,34 @@ export const createGoogleDoc = (docTitle: string) => {
         throw new Error('There was an error creating the Google Doc.');
     }
 };
+
+
+export const getPreviewRowValues = (payload) => {
+    // payload = { columns: ["A","C","F"], sheetName: "Optional" }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = payload.sheetName
+        ? ss.getSheetByName(payload.sheetName)
+        : ss.getActiveSheet();
+
+    // Assume row 1 is headers; preview uses row 2 (first data row)
+    const rowIndex = 2;
+    const valuesByColumn = {};
+
+    (payload.columns || []).forEach(function (col) {
+        if (!col) return;
+        const colIndex = colToNumber(col); // A->1, B->2, ...
+        const val = sheet.getRange(rowIndex, colIndex).getDisplayValue();
+        valuesByColumn[col] = val;
+    });
+
+    return valuesByColumn;
+}
+
+// Helper: convert 'A'..'Z'..'AA' -> number
+const colToNumber = (col) => {
+    var n = 0;
+    for (var i = 0; i < col.length; i++) {
+        n = n * 26 + (col.charCodeAt(i) - 64);
+    }
+    return n;
+}

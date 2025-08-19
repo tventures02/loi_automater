@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { serverFunctions } from '../../utils/serverFunctions';
+import InlineSpinner from "../../utils/components/InlineSpinner";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -12,7 +14,22 @@ type Props = {
 
     /** Let parent know if all placeholders are mapped (to enable Next) */
     onValidChange?: (key: string, ok: boolean) => void;
+
+    /** Sheet name to use for preview */
+    sheetName?: string;
 };
+
+function normalizeNewlines(s: string) {
+    if (!s) return s;
+    // CRLF/CR -> LF
+    let out = s.replace(/\r\n?/g, "\n");
+    // Literal "\n" -> LF (in case the string was double-escaped)
+    out = out.replace(/\\n/g, "\n");
+    // Unicode separators from Docs just in case
+    out = out.replace(/\u2028|\u2029/g, "\n");
+    return out;
+}
+
 
 /** Extract {{ Placeholder }} names; trims whitespace; returns unique, sorted */
 function extractPlaceholders(text: string): string[] {
@@ -29,16 +46,38 @@ function extractPlaceholders(text: string): string[] {
 
 const COLUMN_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+function escapeRegExp(s: string) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderPreview(
+    tmpl: string,
+    mapping: Record<string, string>,
+    valuesByColumn: Record<string, any>
+) {
+    let out = tmpl;
+    for (const [ph, col] of Object.entries(mapping)) {
+        const val = valuesByColumn?.[col] ?? "";
+        const re = new RegExp(`{{\\s*${escapeRegExp(ph)}\\s*}}`, "g");
+        out = out.replace(re, String(val));
+    }
+    return out;
+}
+
 export default function MappingStepScreen({
     templateContent,
     initialMapping,
     onMappingChange,
     onValidChange,
+    sheetName,
 }: Props) {
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
 
     // Mapping state: { "Address": "A", "AgentName": "B", ... }
     const [mapping, setMapping] = useState<Record<string, string>>({});
+    const [previewText, setPreviewText] = useState<string>("");
+    const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+    const [previewError, setPreviewError] = useState<string | null>(null);
 
     useEffect(() => {
         setMapping({});
@@ -63,7 +102,45 @@ export default function MappingStepScreen({
         onMappingChange?.(mapping);
         const allMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
         onValidChange?.("map", allMapped);
-    }, [mapping, placeholders]);
+
+        if (!allMapped || !templateContent) {
+            setPreviewState("idle");
+            setPreviewText("");
+            setPreviewError(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                setPreviewState("loading");
+                setPreviewError(null);
+
+                // Ask Apps Script for first data row values (by column)
+                // Expected return shape: { A: "123 Main St", B: "Jane Lee", ... }
+                const cols = placeholders.map((ph) => mapping[ph]);
+                const valuesByColumn: Record<string, any> =
+                    await serverFunctions.getPreviewRowValues({
+                        columns: cols,
+                        sheetName: sheetName || null, // parent can pass if needed
+                    });
+
+                if (cancelled) return;
+
+                const rendered = renderPreview(templateContent, mapping, valuesByColumn);
+                setPreviewText(normalizeNewlines(rendered));
+                setPreviewState("ready");
+            } catch (err: any) {
+                if (cancelled) return;
+                setPreviewError(err?.message || "Failed to build preview.");
+                setPreviewState("error");
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+
+    }, [mapping, placeholders, templateContent]);
 
     // Columns that are already taken by some other placeholder
     const taken = useMemo(() => {
@@ -145,10 +222,34 @@ export default function MappingStepScreen({
                 </div>
             )}
 
-            {/* Preview line (optional) */}
+            {/* Preview */}
             {placeholders.length > 0 && (
-                <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
-                    Preview will pull values from the selected columns for each placeholder.
+                <div className="rounded-lg border border-gray-200 bg-gray-50">
+                    {previewState === "idle" && (
+                        <div className="p-3 text-xs text-gray-700">
+                            Preview will appear after all placeholders are mapped.
+                        </div>
+                    )}
+                    {previewState === "loading" && (
+                        <div className="p-3 text-xs text-gray-500 flex items-center gap-2">
+                            <InlineSpinner /> Building preview…
+                        </div>
+                    )}
+                    {previewState === "error" && (
+                        <div className="p-3 text-xs text-red-600">
+                            {previewError || "Preview failed."}
+                        </div>
+                    )}
+                    {previewState === "ready" && (
+                        <>
+                        <div className="p-3 pb-1 text-xs font-semibold text-gray-500">
+                            LOI Preview
+                        </div>
+                        <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                            {previewText}
+                        </div>
+                        </>
+                    )}
                 </div>
             )}
         </div>
