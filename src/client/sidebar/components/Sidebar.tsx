@@ -142,6 +142,10 @@ const SidebarContainer = () => {
                     }
 
                     await getTemplates(localUser);
+                    const queueExists = await serverFunctions.queueExists();
+                    if (queueExists) {
+                        setQueueReady(true);
+                    }
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
@@ -241,7 +245,9 @@ const SidebarContainer = () => {
     useEffect(() => {
         if (mode !== "send") return;
         serverFunctions.queueExists?.()
-            .then((exists: boolean) => setQueueReady(!!exists))
+            .then((exists: boolean) => {
+                setQueueReady(!!exists);
+            })
             .catch(() => setQueueReady(false));
     }, [mode]);
 
@@ -423,7 +429,13 @@ const SidebarContainer = () => {
                                 mapping={mapping}
                                 templateDocId={selectedTemplate}
                                 templateContent={templateContent}
+                                setCanContinue={setCanContinue}
+                                canContinue={canContinue}
                             />
+                        )}
+
+                        {currentStep === "send" && (
+                            <SendCenterScreen />
                         )}
                     </>
                 )}

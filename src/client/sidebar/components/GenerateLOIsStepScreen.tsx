@@ -13,6 +13,10 @@ type Props = {
     sheetName?: string | null;
     /** Signal parent whether this step is valid/complete */
     onValidChange?: (key: string, ok: boolean) => void;
+    /** Signal parent whether this step is valid/complete */
+    setCanContinue: React.Dispatch<React.SetStateAction<{ [key: string]: boolean }>>;
+    /** Current canContinue state */
+    canContinue: { [key: string]: boolean };
 };
 
 type PreflightResult = {
@@ -22,15 +26,15 @@ type PreflightResult = {
     invalidEmails: number;
     missingValuesRows: number; // optional heuristic
     sampleFileName: string;
+    queueExists: boolean;   // true if LOI_Queue exists
 };
 
 type GenerateSummary = {
     created: number;
     skippedInvalid: number;
     failed: number;
-    runSheetName: string;
-    statuses: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; pdfUrl?: string }>;
-};
+    statuses: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
+  };
 
 const DEFAULT_PATTERN = "LOI - {{address}}";
 
@@ -49,6 +53,8 @@ export default function GenerateLOIsStepScreen({
     templateContent,
     sheetName,
     onValidChange,
+    setCanContinue,
+    canContinue,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -85,6 +91,7 @@ export default function GenerateLOIsStepScreen({
                 if (!cancelled) {
                     setPreflight(res);
                     onValidChange?.("lois", !!res.ok);
+                    setCanContinue({ ...canContinue, lois: res.queueExists });
                 }
             } catch {
                 if (!cancelled) {
@@ -95,6 +102,7 @@ export default function GenerateLOIsStepScreen({
                         invalidEmails: 0,
                         missingValuesRows: 0,
                         sampleFileName: "",
+                        queueExists: false,
                     });
                     onValidChange?.("lois", false);
                 }
@@ -318,29 +326,10 @@ export default function GenerateLOIsStepScreen({
 
                 {summary && (
                     <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-800">
-                        <div className="font-medium text-gray-900 mb-1">Run summary</div>
+                        <div className="font-medium text-gray-900 mb-1">Generation summary</div>
                         <div>Created: {summary.created}</div>
                         <div>Skipped (invalid email): {summary.skippedInvalid}</div>
                         <div>Failed: {summary.failed}</div>
-                        <div className="mt-2">
-                            New tab: <span className="font-mono">{summary.runSheetName}</span>
-                        </div>
-                        {/* Show up to 3 links to created PDFs */}
-                        <div className="mt-2">
-                            {summary.statuses.slice(0, 3).filter(s => s.status === "ok" && s.pdfUrl).length > 0 && (
-                                <>
-                                    <div className="text-gray-600 mb-1">Recent PDFs:</div>
-                                    <ul className="list-disc pl-5 space-y-1">
-                                        {summary.statuses
-                                            .filter(s => s.status === "ok" && s.pdfUrl)
-                                            .slice(0, 3)
-                                            .map((s, i) => (
-                                                <li key={i}><a className="underline underline-offset-2" href={s.pdfUrl!} target="_blank" rel="noopener noreferrer">{s.pdfUrl}</a></li>
-                                            ))}
-                                    </ul>
-                                </>
-                            )}
-                        </div>
                     </div>
                 )}
             </div>
