@@ -6,7 +6,7 @@ import StickyFooter from "./StickFooter";
 
 type Props = { mode: "build" | "send" };
 
-type QueueItem = {
+export type QueueItem = {
     id: string;
     recipient: string;
     address?: string;
@@ -14,6 +14,7 @@ type QueueItem = {
     scheduled?: string | null;
     status: "queued" | "scheduled" | "sending" | "sent" | "failed";
     lastError?: string | null;
+    createdAt?: Date | null;
 };
 
 type SendSummary = {
@@ -23,11 +24,7 @@ type SendSummary = {
     sentToday: number;
 };
 
-const placeholderQueue: QueueItem[] = [
-    { id: "1", recipient: "agent1@example.com", address: "123 Main St", docUrl: "#", status: "queued", scheduled: null },
-    { id: "2", recipient: "agent2@example.com", address: "456 Oak Ave", docUrl: "#", status: "queued", scheduled: null },
-    { id: "3", recipient: "agent3@example.com", address: "789 Pine Rd", docUrl: "#", status: "failed", lastError: "Bounce", scheduled: null },
-];
+const placeholderQueue: QueueItem[] = [];
 
 export default function SendCenterScreen({ mode }: Props) {
     const [isLoading, setIsLoading] = useState(true);

@@ -1,10 +1,12 @@
+import { QueueItem } from "src/client/sidebar/components/SendCenterScreen";
+
+const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
+
 var LOI_QUEUE_NAME = 'LOI_Queue';
 var LOI_QUEUE_HEADERS = [
-    'ID', 'Source Sheet', 'Source Row', 'Email', 'Doc ID', 'Doc URL', 'Template ID', 'Mapping Version',
-    'Status', 'Sent At', 'Attempts', 'Last Error', 'Created At'
+    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
+    'status', 'sentAt', 'attempts', 'lastError', 'createdAt'
 ];
-
-
 
 // Define a type for the return object for better type safety
 export type DocInfo = {
@@ -55,11 +57,19 @@ export const getGoogleDocNamesByIds = (docIds: string[]): DocInfo[] => {
     return results;
 };
 
+
+/** Normalize any cell value to a stable string for hashing */
+function normValForKey(v) {
+    if (v == null) return '';
+    if (v instanceof Date) return v.toISOString();
+    return String(v).replace(/\r\n?/g, '\n').trim(); // normalize newlines + trim
+}
+
 function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
     var parts = ['v1', String(templateId || ''), String(mapVersion || '')];
 
     // normalize email
-    var email = (row[emailIndex] || '').toString().trim().toLowerCase();
+    const email = normValForKey(row[emailIndex]).toLowerCase();
     parts.push(email);
 
     // include every placeholder value in a stable order
@@ -67,10 +77,12 @@ function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
     for (var i = 0; i < names.length; i++) {
         var name = names[i];
         var idx = tokenCols[name];
-        var val = (row[idx] || '').toString().trim();
+        const val = normValForKey(row[idx]);
         // name=value keeps semantic clarity before hashing
         parts.push(name + '=' + val);
     }
+
+    if (isDev) console.log('KEY_RAW:', JSON.stringify(parts));
 
     var raw = parts.join('\u241F'); // unit separator to avoid collisions
     var bytes = Utilities.newBlob(raw).getBytes();
@@ -203,13 +215,17 @@ export const preflightGenerateLOIs = (payload) => {
     };
 };
 
+function normHeader(s) {
+    return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 /** Find header -> index map for a sheet's first row. */
 function headerIndexMap(sh) {
     var lastCol = sh.getLastColumn();
-    if (lastCol === 0) return {};
+    if (!lastCol) return {};
     var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
     var map = {};
-    for (var i = 0; i < headers.length; i++) map[headers[i]] = i;
+    headers.forEach((h, i) => { map[normHeader(h)] = i; });
     return map;
 }
 
@@ -218,15 +234,15 @@ export const generateLOIsAndWriteSheet = (payload) => {
         const ss = SpreadsheetApp.getActive();
         const source = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
         if (!source) throw new Error('Sheet not found');
-    
+
         const lastRow = source.getLastRow();
         const lastCol = source.getLastColumn();
         if (lastRow < 1) {
             return { created: 0, skippedInvalid: 0, failed: 0, statuses: [] };
         }
-    
+
         // Ensure central queue exists (source of truth for sending)
-        const qSheetRes = queueEnsureSheet();  
+        const qSheetRes = queueEnsureSheet();
         const qSheet = qSheetRes.sh;
         const qHead = headerIndexMap(qSheet);
         const idColIdx = qHead['id']; // 0-based index of 'id' header
@@ -242,7 +258,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
 
         const width = Math.min(lastCol, 8); // A..H only
         const data = source.getRange(1, 1, lastRow, width).getDisplayValues();
-    
+
         const mapping = payload.mapping || {};
         // Build token -> column index map
         const tokenCols = {};
@@ -253,23 +269,23 @@ export const generateLOIsAndWriteSheet = (payload) => {
             const idx = colToNumber(letter) - 1;
             if (idx >= 0 && idx < width) tokenCols[ph] = idx;
         });
-    
+
         // Email column index
         const emailColLetter = payload.emailColumn || mapping.__email;
         if (!emailColLetter) {
             return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })) };
         }
         const eIdx = colToNumber(emailColLetter) - 1;
-    
+
         const statuses = [];
         const queueBatch = [];
         let created = 0, skippedInvalid = 0, failed = 0;
-    
+
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const sourceSheetName = source.getName();
         const mapVersion = mappingVersion(mapping);
         const templateId = payload.templateDocId;
-    
+
         for (let r = 0; r < data.length; r++) {
             const row = data[r];
             const email = (row[eIdx] || '').toString().trim();
@@ -290,21 +306,21 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 statuses.push({ row: r + 1, status: 'skipped', message: 'Invalid or empty email' });
                 continue;
             }
-    
+
             try {
                 // Build placeholder values from row
                 const placeholders = {};
                 for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
-    
+
                 // Compute Doc name from pattern
                 const fileName = renderName(payload.pattern || "LOI", row, tokenCols);
-    
+
                 // Create a Doc from template and replace tokens
                 const docInfo = generateLOIDocFromTemplate(templateId, {
                     fileName,
                     placeholders
                 });
-    
+
                 // Queue row in LOI_Queue
                 const now = new Date();
                 queueBatch.push({
@@ -321,7 +337,6 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     attempts: 0,
                     lastError: '',
                     createdAt: now,
-                    updatedAt: now
                 });
 
                 // Mark key as now existing (to avoid collisions within same run)
@@ -334,16 +349,16 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 statuses.push({ row: r + 1, status: 'failed', message: String(e) });
             }
         }
-    
+
         // Bulk append to LOI_Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
-    
+
         return {
             created,
             skippedInvalid,
             failed,
             statuses
-        };        
+        };
     } catch (error) {
         console.error(`Error generating LOIs: ${error.toString()}`);
         throw new Error('There was an error generating LOIs.');
@@ -507,14 +522,215 @@ export const queueAppendItems = (items) => {
     return rows.length;
 }
 
-/** Small, stable hash of mapping for versioning (base64 web-safe). */
-export const mappingVersion = (mapping) => {
-    var json = JSON.stringify(mapping || {});
-    var bytes = Utilities.newBlob(json).getBytes();
-    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);
-    return Utilities.base64EncodeWebSafe(digest).slice(0, 16); // short label
+/** Stable, short fingerprint of the mapping (incl. __email) */
+function mappingVersion(mapping) {
+    const parts = [];
+    const keys = Object.keys(mapping).sort((a, b) => a.localeCompare(b));
+    for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const v = String(mapping[k] || '').trim().toUpperCase(); // normalize letter
+        parts.push(k + '=' + v);
+    }
+    const raw = parts.join('|');
+    const bytes = Utilities.newBlob(raw, 'text/plain').getBytes(); // lock encoding
+    const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);
+    return Utilities.base64EncodeWebSafe(digest).slice(0, 10); // short & stable
 }
+
 
 export const queueExists = () => {
     return !!SpreadsheetApp.getActive().getSheetByName(LOI_QUEUE_NAME);
 }
+
+/** Return basic counters for Send Center from LOI_Queue. */
+export const getSendSummary = () => {
+    const qSheetRes = queueEnsureSheet();
+    const sh = qSheetRes.sh;
+    const head = headerIndexMap(sh);
+    const lastRow = sh.getLastRow();
+    const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    let queued = 0, scheduled = 0, sentToday = 0;
+    if (lastRow > 1) {
+        const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+        const iStatus = head['status'], iSentAt = head['sentAt'];
+
+        for (let r = 0; r < vals.length; r++) {
+            const row = vals[r];
+            const status = String(row[iStatus] || '').toLowerCase();
+            if (status === 'queued') queued++;
+            else if (status === 'scheduled') scheduled++;
+            else if (status === 'sent') {
+                const sentAt = row[iSentAt];
+                if (sentAt) {
+                    const d = (sentAt instanceof Date) ? sentAt : new Date(sentAt);
+                    const key = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+                    if (key === today) sentToday++;
+                }
+            }
+        }
+    }
+
+    const remaining = MailApp.getRemainingDailyQuota();
+    return { remaining, queued, scheduled, sentToday };
+};
+
+
+/**
+ * Return queue items from LOI_Queue.
+ * @param {{status?: 'all'|'queued'|'scheduled'|'failed'|'sent', limit?: number}} payload
+ * @return {{items: Array<{id:string, recipient:string, address?:string, docUrl?:string, scheduled?:string|null, status:string, lastError?:string|null}>}}
+ */
+export const queueList = (payload) => {
+    const statusFilter = String(payload?.status || 'all').toLowerCase();
+    const limit = Math.max(1, Math.min(500, Number(payload?.limit || 50)));
+
+    const qSheetRes = queueEnsureSheet();
+    const sh = qSheetRes.sh;
+    const head = headerIndexMap(sh);
+    const lastRow = sh.getLastRow();
+    const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+
+    if (lastRow <= 1) return { items: [] };
+
+    const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+    const iId = head['id'], iEmail = head['email'], iDocUrl = head['docUrl'], iStatus = head['status'],
+        iScheduledAt = head['scheduledAt'], iLastError = head['lastError'], iCreatedAt = head['createdAt'];
+
+    // Build objects; sort by createdAt desc, then id
+    const items = vals.map((row) => {
+        const sched = row[iScheduledAt] ? formatIso_(row[iScheduledAt], tz) : null;
+        const queueItem: QueueItem = {
+            id: String(row[iId] || ''),
+            recipient: String(row[iEmail] || ''),
+            address: undefined, // optional if you later add a column
+            docUrl: String(row[iDocUrl] || ''),
+            scheduled: sched,
+            status: String(row[iStatus] || '').toLowerCase() as "queued" | "scheduled" | "sending" | "sent" | "failed",
+            lastError: row[iLastError] || null,
+            createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
+        }
+        return queueItem;
+        //@ts-ignore
+    }).sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
+
+    const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
+    return { items: filtered.slice(0, limit).map(({ createdAt, ...rest }) => rest) };
+
+    function formatIso_(d, tz) {
+        const dt = (d instanceof Date) ? d : new Date(d);
+        return Utilities.formatDate(dt, tz, "yyyy-MM-dd'T'HH:mm:ssXXX");
+    }
+};
+
+
+/**
+ * Send up to `max` queued items (oldest first) from LOI_Queue using MailApp.
+ * - Respects daily quota
+ * - Updates status, attempts, sentAt/updatedAt, lastError
+ * @param {{max?: number, subject?: string, bodyTemplate?: string}} payload
+ * @return {{sent:number, failed:number, attempted:number}}
+ */
+export const sendNextBatch = (payload) => {
+    const qSheetRes = queueEnsureSheet();
+    const sh = qSheetRes.sh;
+    const head = headerIndexMap(sh);
+    const lastRow = sh.getLastRow();
+    if (lastRow <= 1) return { sent: 0, failed: 0, attempted: 0 };
+
+    const lock = LockService.getDocumentLock();
+    if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
+
+    try {
+        const remaining = MailApp.getRemainingDailyQuota();
+        const maxRequested = Math.max(1, Math.min(1000, Number(payload?.max || 100)));
+        const maxToSend = Math.min(remaining, maxRequested);
+        if (maxToSend <= 0) return { sent: 0, failed: 0, attempted: 0 };
+
+        const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+
+        // Read all rows
+        const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+        const iId = head['id'], iEmail = head['email'], iDocUrl = head['docUrl'], iStatus = head['status'],
+            iScheduledAt = head['scheduledAt'], iSentAt = head['sentAt'], iAttempts = head['attempts'],
+            iLastError = head['lastError'], iCreatedAt = head['createdAt'], iUpdatedAt = head['updatedAt'];
+
+        // Pick oldest queued (by createdAt asc, then row order)
+        const queued = [];
+        for (let r = 0; r < vals.length; r++) {
+            const row = vals[r];
+            const status = String(row[iStatus] || '').toLowerCase();
+            if (status !== 'queued') continue;
+            // Optional: respect scheduledAt if present and in the future
+            const sched = row[iScheduledAt] ? new Date(row[iScheduledAt]) : null;
+            if (sched && sched.getTime() > Date.now()) continue;
+
+            queued.push({
+                r,                                 // zero-based index in vals
+                rowIndex: r + 2,                   // 1-based in sheet
+                id: String(row[iId] || ''),
+                email: String(row[iEmail] || ''),
+                docUrl: String(row[iDocUrl] || ''),
+                attempts: Number(row[iAttempts] || 0),
+                createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
+                scheduledAt: row[iScheduledAt] || '',
+                lastError: row[iLastError] || '',
+            });
+        }
+
+        queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
+        const batch = queued.slice(0, maxToSend);
+
+        let sent = 0, failed = 0;
+
+        const subject = String(payload?.subject || 'Letter of Intent');
+        const makeBody = (docUrl) =>
+            String(payload?.bodyTemplate ||
+                `Hello,\n\nPlease review the Letter of Intent at the link below:\n${docUrl}\n\nBest regards`);
+
+        // Send + update each row
+        batch.forEach(item => {
+            const now = new Date();
+            const newAttempts = (item.attempts || 0) + 1;
+
+            try {
+                // send
+                MailApp.sendEmail({
+                    to: item.email,
+                    subject: subject,
+                    body: makeBody(item.docUrl || '')
+                });
+
+                // write status block (cols 9..15): status, scheduledAt(keep), sentAt, attempts, lastError, createdAt(keep), updatedAt
+                const values = [
+                    'sent',
+                    item.scheduledAt || '',
+                    now,
+                    newAttempts,
+                    '',
+                    vals[item.r][iCreatedAt] || now,
+                    now
+                ];
+                sh.getRange(item.rowIndex, 9, 1, 7).setValues([values]);
+                sent++;
+            } catch (err) {
+                const values = [
+                    'failed',
+                    item.scheduledAt || '',
+                    '',                 // sentAt
+                    newAttempts,
+                    String(err),
+                    vals[item.r][iCreatedAt] || now,
+                    now
+                ];
+                sh.getRange(item.rowIndex, 9, 1, 7).setValues([values]);
+                failed++;
+            }
+        });
+
+        return { sent, failed, attempted: batch.length };
+    } finally {
+        lock.releaseLock();
+    }
+};

@@ -21,6 +21,9 @@ import {
     generateLOIsAndWriteSheet,
     queueEnsureSheet,
     queueExists,
+    getSendSummary,
+    sendNextBatch,
+    queueList,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -41,4 +44,7 @@ export {
     generateLOIsAndWriteSheet,
     queueEnsureSheet,
     queueExists,
+    getSendSummary,
+    sendNextBatch,
+    queueList,
 };

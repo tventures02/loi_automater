@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 
+const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
     /** Placeholder -> column letter map. Must include __email for recipient column */
     mapping: Record<string, string>; // e.g., { Address: "A", AgentName: "B", Offer: "C", __email: "H" }
@@ -140,6 +141,7 @@ export default function GenerateLOIsStepScreen({
                 templateDocId,
                 sheetName: sheetName || null,
             });
+            if (isDev)console.log('result', result)
             clearInterval(t);
             setProgressText("Finalizing…");
             setSummary(result);
