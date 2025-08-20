@@ -117,31 +117,35 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                         </div>
                     ) : null}
 
-                    <Tooltip title={primaryDisabled ? tooltipTitle : ""} arrow>
-                        <span className="inline-block">
-                            <div
-                                role="button"
-                                tabIndex={primaryDisabled ? -1 : 0}
-                                aria-label={primaryLabel}
-                                aria-disabled={primaryDisabled}
-                                className={cx(
-                                    "!cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
-                                    "bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900",
-                                    primaryDisabled && "opacity-50 pointer-events-none"
-                                )}
-                                onClick={handleActivate(onPrimary, primaryDisabled)}
-                                onKeyDown={handleActivate(onPrimary, primaryDisabled)}
-                            >
+                    {
+                        onPrimary && (
+                            <Tooltip title={primaryDisabled ? tooltipTitle : ""} arrow>
+                                <span className="inline-block">
+                                    <div
+                                        role="button"
+                                        tabIndex={primaryDisabled ? -1 : 0}
+                                        aria-label={primaryLabel}
+                                        aria-disabled={primaryDisabled}
+                                        className={cx(
+                                            "!cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
+                                            "bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900",
+                                            primaryDisabled && "opacity-50 pointer-events-none"
+                                        )}
+                                        onClick={handleActivate(onPrimary, primaryDisabled)}
+                                        onKeyDown={handleActivate(onPrimary, primaryDisabled)}
+                                    >
 
-                                <div className="flex items-center gap-2">
-                                    {primaryLoading ? (
-                                        <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden="true" />
-                                    ) : null}
-                                    <span className="truncate">{primaryLabel}</span>
-                                </div>
-                            </div>
-                        </span>
-                    </Tooltip>
+                                        <div className="flex items-center gap-2">
+                                            {primaryLoading ? (
+                                                <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden="true" />
+                                            ) : null}
+                                            <span className="truncate">{primaryLabel}</span>
+                                        </div>
+                                    </div>
+                                </span>
+                            </Tooltip>
+                        )
+                    }
                 </div>
             </div>
         </div>

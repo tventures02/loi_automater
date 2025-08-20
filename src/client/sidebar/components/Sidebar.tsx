@@ -154,7 +154,7 @@ const SidebarContainer = () => {
                         if (queueExists) {
                             setQueueReady(true);
                         }
-                    } catch (error) {}
+                    } catch (error) { }
                 }
             };
 
@@ -242,7 +242,7 @@ const SidebarContainer = () => {
 
     useEffect(() => {
         setHeaderHeight(headerRef.current?.clientHeight ?? 0);
-        setFooterHeight(footerRef.current?.clientHeight ?? 0);
+        setFooterHeight(mode === "build" ? footerRef.current?.clientHeight ?? 0 : 0);
     }, [mode, headerRef?.current, footerRef?.current, currentStep]);
 
     useEffect(() => {
@@ -315,7 +315,6 @@ const SidebarContainer = () => {
         }
     };
 
-
     const handleSecondary = () => {
         const order = ["template", "map", "lois", "send"];
         const idx = order.indexOf(currentStep);
@@ -327,6 +326,18 @@ const SidebarContainer = () => {
     )
 
     const middleHeight = `calc(100vh - ${headerHeight + footerHeight}px)`;
+    const footer = <StickyFooter
+        ref={footerRef}
+        primaryLabel={primaryLabelByStep[currentStep]}
+        onPrimary={currentStep === "send" ? undefined : handlePrimary}
+        secondaryLabel={secondaryLabelByStep[currentStep] || undefined}
+        onSecondary={secondaryLabelByStep[currentStep] ? handleSecondary : undefined}
+        primaryDisabled={!canContinue[currentStep]}
+        primaryLoading={isWorking}
+        helperText={undefined}
+        leftSlot={null}
+        currentStep={currentStep}
+    />;
 
     console.log('sidebar render')
     console.log('mode', mode)
@@ -445,26 +456,10 @@ const SidebarContainer = () => {
                         )}
                     </>
                 )}
-
             </div >
 
-            {/* Footer only in Build mode */}
-            {
-                mode === "build" && (
-                    <StickyFooter
-                        ref={footerRef}
-                        primaryLabel={primaryLabelByStep[currentStep]}
-                        onPrimary={handlePrimary}
-                        secondaryLabel={secondaryLabelByStep[currentStep] || undefined}
-                        onSecondary={secondaryLabelByStep[currentStep] ? handleSecondary : undefined}
-                        primaryDisabled={!canContinue[currentStep]}
-                        primaryLoading={isWorking}
-                        helperText={undefined}
-                        leftSlot={null}
-                        currentStep={currentStep}
-                    />
-                )
-            }
+            {mode === "build" && footer}
+
         </div >
     )
 }

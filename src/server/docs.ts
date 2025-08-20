@@ -1,7 +1,7 @@
 var LOI_QUEUE_NAME = 'LOI_Queue';
 var LOI_QUEUE_HEADERS = [
-    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
-    'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'updatedAt'
+    'ID', 'Source Sheet', 'Source Row', 'Email', 'Doc ID', 'Doc URL', 'Template ID', 'Mapping Version',
+    'Status', 'Sent At', 'Attempts', 'Last Error', 'Created At'
 ];
 
 

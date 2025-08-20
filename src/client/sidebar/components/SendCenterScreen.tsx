@@ -2,12 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
+import StickyFooter from "./StickFooter";
 
-
-type Props = {
-    mode: "build" | "send";
-};
-
+type Props = { mode: "build" | "send" };
 
 type QueueItem = {
     id: string;
@@ -39,18 +36,15 @@ export default function SendCenterScreen({ mode }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "scheduled" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<string>("");
+    const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
 
-    // Load summary + queue (fallback to placeholders if server functions not ready)
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
                 setIsLoading(true);
-
-                // These server calls are optional placeholders — catch errors silently and show demo data
                 const s = await safeCall(async () => serverFunctions.getSendSummary());
                 const q = await safeCall(async () => serverFunctions.queueList({ status: "all", limit: 50 }));
-
                 if (!cancelled) {
                     if (s?.remaining != null) {
                         setSummary({
@@ -60,9 +54,7 @@ export default function SendCenterScreen({ mode }: Props) {
                             sentToday: s.sentToday ?? 0,
                         });
                     }
-                    if (Array.isArray(q?.items)) {
-                        setItems(q.items);
-                    }
+                    if (Array.isArray(q?.items)) setItems(q.items);
                 }
             } finally {
                 if (!cancelled) setIsLoading(false);
@@ -84,12 +76,11 @@ export default function SendCenterScreen({ mode }: Props) {
         if (!canSend) return;
         setSending(true);
         try {
-            // Placeholder server call; if not available, just fake success
             const n = Math.min(summary.remaining, queuedCount, 100);
             const res = await safeCall(async () => serverFunctions.sendNextBatch({ max: n }));
             const created = res?.sent ?? n;
 
-            // Reflect locally
+            // Update local UI
             let updated = 0;
             const nextItems = items.map(i => {
                 if (updated < created && i.status === "queued") {
@@ -99,7 +90,12 @@ export default function SendCenterScreen({ mode }: Props) {
                 return i;
             });
             setItems(nextItems);
-            setSummary(s => ({ ...s, remaining: Math.max(0, s.remaining - created), sentToday: s.sentToday + created, queued: Math.max(0, s.queued - created) }));
+            setSummary(s => ({
+                ...s,
+                remaining: Math.max(0, s.remaining - created),
+                sentToday: s.sentToday + created,
+                queued: Math.max(0, s.queued - created),
+            }));
             setToast(`Sent ${created} LOIs`);
         } catch {
             setToast("Send failed. Please try again.");
@@ -110,13 +106,11 @@ export default function SendCenterScreen({ mode }: Props) {
     };
 
     const scanForNewRows = async () => {
-        // Placeholder UX: show a tiny toast to confirm
         setToast("Scanned sheet: 42 new rows found (demo)");
         setTimeout(() => setToast(""), 2500);
     };
 
     const addNewLoisToQueue = async () => {
-        // Placeholder UX: append some queued items
         const demo = [
             { id: cryptoId(), recipient: "new1@example.com", address: "11 Birch Ln", docUrl: "#", status: "queued" as const, scheduled: null },
             { id: cryptoId(), recipient: "new2@example.com", address: "22 Cedar Dr", docUrl: "#", status: "queued" as const, scheduled: null },
@@ -127,74 +121,87 @@ export default function SendCenterScreen({ mode }: Props) {
         setTimeout(() => setToast(""), 2500);
     };
 
+    // Main content height: allow space for sticky footer
     return (
-        <div className="space-y-3">
-            {/* Summary strip */}
+        <div className="space-y-3 pb-16">
+            {/* Summary strip (no button here; action moved to sticky footer) */}
             <div className="rounded-xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge label={`Remaining today: ${summary.remaining}`} />
-                        <Badge label={`Queued: ${summary.queued}`} />
-                        <Badge label={`Sent today: ${summary.sentToday}`} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={canSend && !sending ? sendNext : undefined}
-                            className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${canSend && !sending ? "bg-gray-900 hover:bg-gray-800 cursor-pointer" : "bg-gray-300 cursor-not-allowed"}`}
-                        >
-                            {sending ? "Sending…" : `Send next ${Math.min(summary.remaining, queuedCount) || 0}`}
-                        </div>
-                    </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Badge label={`Remaining today: ${summary.remaining}`} />
+                    <Badge label={`Queued: ${summary.queued}`} />
+                    <Badge label={`Sent today: ${summary.sentToday}`} />
                 </div>
             </div>
 
-            {/* Queue list */}
+            {/* Queue (collapsible) */}
             <div className="rounded-xl border border-gray-200">
-                <div className="flex items-center justify-between px-3 py-2">
+                {/* Summary row (click to toggle) */}
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setQueueOpen(v => !v)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setQueueOpen(v => !v)}
+                    className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                >
                     <div className="text-sm font-semibold text-gray-900">Queue</div>
-                    <div className="flex items-center gap-2">
-                        <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
-                        <FilterPill active={filter === "queued"} onClick={() => setFilter("queued")} label="Queued" />
-                        <FilterPill active={filter === "scheduled"} onClick={() => setFilter("scheduled")} label="Scheduled" />
-                        <FilterPill active={filter === "failed"} onClick={() => setFilter("failed")} label="Failed" />
-                        <FilterPill active={filter === "sent"} onClick={() => setFilter("sent")} label="Sent" />
-                    </div>
+                    <svg
+                        className={`h-4 w-4 text-gray-500 transition-transform ${queueOpen ? "rotate-180" : ""}`}
+                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                    >
+                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.093l3.71-3.86a.75.75 0 111.08 1.04l-4.24 4.41a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
+                    </svg>
                 </div>
 
-                {isLoading ? (
-                    <div className="px-3 pb-3 text-xs text-gray-500 flex items-center gap-2">
-                        <InlineSpinner /> Loading…
-                    </div>
-                ) : filtered.length === 0 ? (
-                    <div className="px-3 pb-3 text-xs text-gray-600">No items.</div>
-                ) : (
-                    <div className="px-3 pb-3">
-                        <ul className="divide-y divide-gray-100">
-                            {filtered.map((item) => (
-                                <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-gray-900 truncate">{item.recipient}</div>
-                                        <div className="text-[11px] text-gray-600 truncate">
-                                            {item.address || "(no address)"} ·{" "}
-                                            {item.docUrl ? (
-                                                <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                    open doc
-                                                </a>
-                                            ) : (
-                                                "no doc"
-                                            )}
-                                        </div>
-                                        {item.status === "failed" && item.lastError ? (
-                                            <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
-                                        ) : null}
-                                    </div>
-                                    <StatusPill status={item.status} />
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                {/* Details (collapsible) */}
+                {queueOpen && (
+                    <>
+                        <div className="flex items-center justify-between px-3 py-2">
+                            <div className="text-xs text-gray-600">
+                                {isLoading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
+                                <FilterPill active={filter === "queued"} onClick={() => setFilter("queued")} label="Queued" />
+                                <FilterPill active={filter === "scheduled"} onClick={() => setFilter("scheduled")} label="Scheduled" />
+                                <FilterPill active={filter === "failed"} onClick={() => setFilter("failed")} label="Failed" />
+                                <FilterPill active={filter === "sent"} onClick={() => setFilter("sent")} label="Sent" />
+                            </div>
+                        </div>
+
+                        {isLoading ? (
+                            <div className="px-3 pb-3 text-xs text-gray-500 flex items-center gap-2">
+                                <InlineSpinner /> Loading…
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="px-3 pb-3 text-xs text-gray-600">No items.</div>
+                        ) : (
+                            <div className="px-3 pb-3">
+                                <ul className="divide-y divide-gray-100">
+                                    {filtered.map((item) => (
+                                        <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="text-gray-900 truncate">{item.recipient}</div>
+                                                <div className="text-[11px] text-gray-600 truncate">
+                                                    {item.address || "(no address)"} ·{" "}
+                                                    {item.docUrl ? (
+                                                        <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
+                                                            open doc
+                                                        </a>
+                                                    ) : (
+                                                        "no doc"
+                                                    )}
+                                                </div>
+                                                {item.status === "failed" && item.lastError ? (
+                                                    <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
+                                                ) : null}
+                                            </div>
+                                            <StatusPill status={item.status} />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -230,6 +237,17 @@ export default function SendCenterScreen({ mode }: Props) {
                     {toast}
                 </div>
             )}
+
+            {/* Sticky Footer (primary action: Send next) */}
+            <StickyFooter
+                primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary.remaining, queuedCount) || 0}`}
+                onPrimary={canSend && !sending ? sendNext : undefined}
+                primaryDisabled={!canSend || sending}
+                primaryLoading={sending}
+                leftSlot={<span>Remaining today: {summary.remaining}</span>}
+                helperText={queuedCount === 0 ? "No queued items to send." : undefined}
+                currentStep="send"
+            />
         </div>
     );
 }

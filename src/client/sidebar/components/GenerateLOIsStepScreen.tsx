@@ -73,8 +73,7 @@ export default function GenerateLOIsStepScreen({
 
     // Auto-preflight when pre-conditions are met
     useEffect(() => {
-        const haveAllTokens =
-            placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
+        const haveAllTokens = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
         if (!templateDocId || !emailColumn || !haveAllTokens) {
             setPreflight(null);
             onValidChange?.("lois", false);
