@@ -16,7 +16,7 @@ export default function SendCenterSetup({
             <div className="rounded-xl border border-gray-200 p-4">
                 <div className="text-sm font-semibold text-gray-900">Send Center Setup</div>
                 <p className="mt-1 text-xs text-gray-600">
-                    Create a sheet tab (<span className="font-mono">LOI_Queue</span>) used to track and send LOIs. This won’t modify your original data.
+                    Create a sheet tab (<span className="font-mono">LOI_Queue</span>) to track and send LOIs. This won’t modify your original data.
                 </p>
 
                 {error ? (

@@ -13,7 +13,6 @@ import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
 import MappingStepScreen from './MappingStepScreen';
 import GenerateLOIsStepScreen from './GenerateLOIsStepScreen';
-import SendStepScreen from './SendStepScreen';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
 import SendCenterScreen from './SendCenterScreen';
@@ -142,16 +141,18 @@ const SidebarContainer = () => {
                     }
 
                     await getTemplates(localUser);
-                    const queueExists = await serverFunctions.queueExists();
-                    if (queueExists) {
-                        setQueueReady(true);
-                    }
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
                 }
                 finally {
                     setIsLoading(false);
+                    try {
+                        const queueExists = await serverFunctions.queueExists();
+                        if (queueExists) {
+                            setQueueReady(true);
+                        }
+                    } catch (error) {}
                 }
             };
 
@@ -431,6 +432,7 @@ const SidebarContainer = () => {
                                 templateContent={templateContent}
                                 setCanContinue={setCanContinue}
                                 canContinue={canContinue}
+                                setQueueReady={setQueueReady}
                             />
                         )}
 

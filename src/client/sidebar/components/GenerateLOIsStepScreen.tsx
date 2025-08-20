@@ -17,6 +17,8 @@ type Props = {
     setCanContinue: React.Dispatch<React.SetStateAction<{ [key: string]: boolean }>>;
     /** Current canContinue state */
     canContinue: { [key: string]: boolean };
+    /** Signal parent whether the queue exists */
+    setQueueReady: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 type PreflightResult = {
@@ -55,6 +57,7 @@ export default function GenerateLOIsStepScreen({
     onValidChange,
     setCanContinue,
     canContinue,
+    setQueueReady,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -88,12 +91,15 @@ export default function GenerateLOIsStepScreen({
                     pattern,
                     sheetName: sheetName || null,
                 });
+                console.log('res', res)
                 if (!cancelled) {
                     setPreflight(res);
                     onValidChange?.("lois", !!res.ok);
                     setCanContinue({ ...canContinue, lois: res.queueExists });
+                    setQueueReady(res.queueExists);
                 }
-            } catch {
+            } catch(error: any) {
+                console.log('error', error)
                 if (!cancelled) {
                     setPreflight({
                         ok: false,
@@ -138,8 +144,10 @@ export default function GenerateLOIsStepScreen({
             clearInterval(t);
             setProgressText("Finalizing…");
             setSummary(result);
-            setToast(`Created ${result.created}, skipped ${result.skippedInvalid}, failed ${result.failed}.`);
             onValidChange?.("lois", true);
+
+            setCanContinue({ ...canContinue, lois: true });
+            setQueueReady(true);
         } catch (e) {
             clearInterval(t);
             setToast("Generation failed. Please try again.");

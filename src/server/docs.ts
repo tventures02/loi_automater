@@ -110,6 +110,7 @@ export const preflightGenerateLOIs = (payload) => {
     const ss = SpreadsheetApp.getActive();
     const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
     if (!sheet) throw new Error('Sheet not found');
+    if (sheet.getName().startsWith('LOI_Queue')) throw new Error('LOI_Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
 
     const lastRow = sheet.getLastRow();
@@ -173,110 +174,115 @@ export const preflightGenerateLOIs = (payload) => {
 
 
 export const generateLOIsAndWriteSheet = (payload) => {
-    const ss = SpreadsheetApp.getActive();
-    const source = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
-    if (!source) throw new Error('Sheet not found');
-
-    const lastRow = source.getLastRow();
-    const lastCol = source.getLastColumn();
-    if (lastRow < 1) {
-        return { created: 0, skippedInvalid: 0, failed: 0, statuses: [] };
-    }
-
-    // Ensure central queue exists (source of truth for sending)
-    queueEnsureSheet();
-
-    const width = Math.min(lastCol, 8); // A..H only
-    const data = source.getRange(1, 1, lastRow, width).getDisplayValues();
-
-    const mapping = payload.mapping || {};
-    // Build token -> column index map
-    const tokenCols = {};
-    Object.keys(mapping).forEach(ph => {
-        if (ph === '__email') return;
-        const letter = mapping[ph];
-        if (!letter) return;
-        const idx = colToNumber(letter) - 1;
-        if (idx >= 0 && idx < width) tokenCols[ph] = idx;
-    });
-
-    // Email column index
-    const emailColLetter = payload.emailColumn || mapping.__email;
-    if (!emailColLetter) {
-        return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })) };
-    }
-    const eIdx = colToNumber(emailColLetter) - 1;
-
-    const statuses = [];
-    const queueBatch = [];
-    let created = 0, skippedInvalid = 0, failed = 0;
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const sourceSheetName = source.getName();
-    const mapVersion = mappingVersion(mapping);
-    const templateId = payload.templateDocId;
-
-    for (let r = 0; r < data.length; r++) {
-        const row = data[r];
-        const email = (row[eIdx] || '').toString().trim();
-
-        if (!email || !emailRegex.test(email)) {
-            skippedInvalid++;
-            statuses.push({ row: r + 1, status: 'skipped', message: 'Invalid or empty email' });
-            continue;
+    try {
+        const ss = SpreadsheetApp.getActive();
+        const source = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
+        if (!source) throw new Error('Sheet not found');
+    
+        const lastRow = source.getLastRow();
+        const lastCol = source.getLastColumn();
+        if (lastRow < 1) {
+            return { created: 0, skippedInvalid: 0, failed: 0, statuses: [] };
         }
-
-        try {
-            // Build placeholder values from row
-            const placeholders = {};
-            for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
-
-            // Compute Doc name from pattern
-            const fileName = renderName(payload.pattern || "LOI", row, tokenCols);
-
-            // Create a Doc from template and replace tokens
-            const docInfo = generateLOIDocFromTemplate(templateId, {
-                fileName,
-                placeholders
-            });
-
-            // Queue row in LOI_Queue
-            const now = new Date();
-            queueBatch.push({
-                id: Utilities.getUuid(),
-                sourceSheet: sourceSheetName,
-                sourceRow: r + 1,                // 1-based position in source sheet (no headers)
-                email: email,
-                docId: docInfo.fileId || '',
-                docUrl: docInfo.fileUrl || '',
-                templateId: templateId || '',
-                mappingVersion: mapVersion,
-                status: 'queued',
-                scheduledAt: '',
-                sentAt: '',
-                attempts: 0,
-                lastError: '',
-                createdAt: now,
-                updatedAt: now
-            });
-
-            created++;
-            statuses.push({ row: r + 1, status: 'ok', docUrl: docInfo.fileUrl });
-        } catch (e) {
-            failed++;
-            statuses.push({ row: r + 1, status: 'failed', message: String(e) });
+    
+        // Ensure central queue exists (source of truth for sending)
+        queueEnsureSheet();
+    
+        const width = Math.min(lastCol, 8); // A..H only
+        const data = source.getRange(1, 1, lastRow, width).getDisplayValues();
+    
+        const mapping = payload.mapping || {};
+        // Build token -> column index map
+        const tokenCols = {};
+        Object.keys(mapping).forEach(ph => {
+            if (ph === '__email') return;
+            const letter = mapping[ph];
+            if (!letter) return;
+            const idx = colToNumber(letter) - 1;
+            if (idx >= 0 && idx < width) tokenCols[ph] = idx;
+        });
+    
+        // Email column index
+        const emailColLetter = payload.emailColumn || mapping.__email;
+        if (!emailColLetter) {
+            return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })) };
         }
+        const eIdx = colToNumber(emailColLetter) - 1;
+    
+        const statuses = [];
+        const queueBatch = [];
+        let created = 0, skippedInvalid = 0, failed = 0;
+    
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const sourceSheetName = source.getName();
+        const mapVersion = mappingVersion(mapping);
+        const templateId = payload.templateDocId;
+    
+        for (let r = 0; r < data.length; r++) {
+            const row = data[r];
+            const email = (row[eIdx] || '').toString().trim();
+    
+            if (!email || !emailRegex.test(email)) {
+                skippedInvalid++;
+                statuses.push({ row: r + 1, status: 'skipped', message: 'Invalid or empty email' });
+                continue;
+            }
+    
+            try {
+                // Build placeholder values from row
+                const placeholders = {};
+                for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
+    
+                // Compute Doc name from pattern
+                const fileName = renderName(payload.pattern || "LOI", row, tokenCols);
+    
+                // Create a Doc from template and replace tokens
+                const docInfo = generateLOIDocFromTemplate(templateId, {
+                    fileName,
+                    placeholders
+                });
+    
+                // Queue row in LOI_Queue
+                const now = new Date();
+                queueBatch.push({
+                    id: Utilities.getUuid(),
+                    sourceSheet: sourceSheetName,
+                    sourceRow: r + 1,                // 1-based position in source sheet (no headers)
+                    email: email,
+                    docId: docInfo.fileId || '',
+                    docUrl: docInfo.fileUrl || '',
+                    templateId: templateId || '',
+                    mappingVersion: mapVersion,
+                    status: 'queued',
+                    scheduledAt: '',
+                    sentAt: '',
+                    attempts: 0,
+                    lastError: '',
+                    createdAt: now,
+                    updatedAt: now
+                });
+    
+                created++;
+                statuses.push({ row: r + 1, status: 'ok', docUrl: docInfo.fileUrl });
+            } catch (e) {
+                failed++;
+                statuses.push({ row: r + 1, status: 'failed', message: String(e) });
+            }
+        }
+    
+        // Bulk append to LOI_Queue
+        if (queueBatch.length) queueAppendItems(queueBatch);
+    
+        return {
+            created,
+            skippedInvalid,
+            failed,
+            statuses
+        };        
+    } catch (error) {
+        console.error(`Error generating LOIs: ${error.toString()}`);
+        throw new Error('There was an error generating LOIs.');
     }
-
-    // Bulk append to LOI_Queue
-    if (queueBatch.length) queueAppendItems(queueBatch);
-
-    return {
-        created,
-        skippedInvalid,
-        failed,
-        statuses
-    };
 }
 
 function copyTextAttributes(sourceElement, targetElement) {

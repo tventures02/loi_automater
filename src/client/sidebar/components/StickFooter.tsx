@@ -71,6 +71,9 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
         case "map":
             tooltipTitle = "Please map all placeholders";
             break;
+        case "lois":
+            tooltipTitle = "Please generate LOIs";
+            break;
         default:
             tooltipTitle = "Please fill in all fields";
     }
