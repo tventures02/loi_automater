@@ -1,3 +1,11 @@
+var LOI_QUEUE_NAME = 'LOI_Queue';
+var LOI_QUEUE_HEADERS = [
+    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
+    'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'updatedAt'
+];
+
+
+
 // Define a type for the return object for better type safety
 export type DocInfo = {
     id: string;
@@ -46,6 +54,30 @@ export const getGoogleDocNamesByIds = (docIds: string[]): DocInfo[] => {
 
     return results;
 };
+
+function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
+    var parts = ['v1', String(templateId || ''), String(mapVersion || '')];
+
+    // normalize email
+    var email = (row[emailIndex] || '').toString().trim().toLowerCase();
+    parts.push(email);
+
+    // include every placeholder value in a stable order
+    var names = Object.keys(tokenCols).sort();
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        var idx = tokenCols[name];
+        var val = (row[idx] || '').toString().trim();
+        // name=value keeps semantic clarity before hashing
+        parts.push(name + '=' + val);
+    }
+
+    var raw = parts.join('\u241F'); // unit separator to avoid collisions
+    var bytes = Utilities.newBlob(raw).getBytes();
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);
+    return 'k_' + Utilities.base64EncodeWebSafe(digest).slice(0, 22); // short, stable
+}
+
 
 export const getGoogleDocPlainText = (docId: string): string => {
     const file = DocumentApp.openById(docId);
@@ -171,7 +203,15 @@ export const preflightGenerateLOIs = (payload) => {
     };
 };
 
-
+/** Find header -> index map for a sheet's first row. */
+function headerIndexMap(sh) {
+    var lastCol = sh.getLastColumn();
+    if (lastCol === 0) return {};
+    var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    var map = {};
+    for (var i = 0; i < headers.length; i++) map[headers[i]] = i;
+    return map;
+}
 
 export const generateLOIsAndWriteSheet = (payload) => {
     try {
@@ -186,8 +226,20 @@ export const generateLOIsAndWriteSheet = (payload) => {
         }
     
         // Ensure central queue exists (source of truth for sending)
-        queueEnsureSheet();
-    
+        const qSheetRes = queueEnsureSheet();  
+        const qSheet = qSheetRes.sh;
+        const qHead = headerIndexMap(qSheet);
+        const idColIdx = qHead['id']; // 0-based index of 'id' header
+        const qLastRow = qSheet.getLastRow();
+        const existingIds = new Set();
+        if (qLastRow > 1 && idColIdx != null) {
+            const idVals = qSheet.getRange(2, idColIdx + 1, qLastRow - 1, 1).getValues();
+            for (var i = 0; i < idVals.length; i++) {
+                var v = idVals[i][0];
+                if (v) existingIds.add(String(v));
+            }
+        }
+
         const width = Math.min(lastCol, 8); // A..H only
         const data = source.getRange(1, 1, lastRow, width).getDisplayValues();
     
@@ -221,7 +273,18 @@ export const generateLOIsAndWriteSheet = (payload) => {
         for (let r = 0; r < data.length; r++) {
             const row = data[r];
             const email = (row[eIdx] || '').toString().trim();
-    
+
+            // Build deterministic content key as the queue ID
+            const id = makeContentKey(row, tokenCols, eIdx, templateId, mapVersion);
+
+            // Skip duplicates already present in LOI_Queue
+            if (existingIds.has(id)) {
+                skippedInvalid++;
+                statuses.push({ row: r + 1, status: 'skipped', message: 'Duplicate (already queued/sent with same content)' });
+                continue;
+            }
+
+            // Validate email
             if (!email || !emailRegex.test(email)) {
                 skippedInvalid++;
                 statuses.push({ row: r + 1, status: 'skipped', message: 'Invalid or empty email' });
@@ -245,7 +308,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 // Queue row in LOI_Queue
                 const now = new Date();
                 queueBatch.push({
-                    id: Utilities.getUuid(),
+                    id: id,
                     sourceSheet: sourceSheetName,
                     sourceRow: r + 1,                // 1-based position in source sheet (no headers)
                     email: email,
@@ -254,14 +317,16 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     templateId: templateId || '',
                     mappingVersion: mapVersion,
                     status: 'queued',
-                    scheduledAt: '',
                     sentAt: '',
                     attempts: 0,
                     lastError: '',
                     createdAt: now,
                     updatedAt: now
                 });
-    
+
+                // Mark key as now existing (to avoid collisions within same run)
+                existingIds.add(id);
+
                 created++;
                 statuses.push({ row: r + 1, status: 'ok', docUrl: docInfo.fileUrl });
             } catch (e) {
@@ -404,13 +469,6 @@ function renderName(pattern, row, tokenCols) {
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';
 }
-
-var LOI_QUEUE_NAME = 'LOI_Queue';
-var LOI_QUEUE_HEADERS = [
-    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
-    'status', 'scheduledAt', 'sentAt', 'attempts', 'lastError', 'createdAt', 'updatedAt'
-];
-
 /** Ensure LOI_Queue exists with headers; returns sheet. */
 export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();

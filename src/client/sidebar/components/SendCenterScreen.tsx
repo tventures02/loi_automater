@@ -3,6 +3,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 
+
+type Props = {
+    mode: "build" | "send";
+};
+
+
 type QueueItem = {
     id: string;
     recipient: string;
@@ -26,7 +32,7 @@ const placeholderQueue: QueueItem[] = [
     { id: "3", recipient: "agent3@example.com", address: "789 Pine Rd", docUrl: "#", status: "failed", lastError: "Bounce", scheduled: null },
 ];
 
-export default function SendCenterScreen() {
+export default function SendCenterScreen({ mode }: Props) {
     const [isLoading, setIsLoading] = useState(true);
     const [summary, setSummary] = useState<SendSummary>({ remaining: 100, queued: 2, scheduled: 0, sentToday: 0 });
     const [items, setItems] = useState<QueueItem[]>(placeholderQueue);
@@ -139,14 +145,6 @@ export default function SendCenterScreen() {
                             className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${canSend && !sending ? "bg-gray-900 hover:bg-gray-800 cursor-pointer" : "bg-gray-300 cursor-not-allowed"}`}
                         >
                             {sending ? "Sending…" : `Send next ${Math.min(summary.remaining, queuedCount) || 0}`}
-                        </div>
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            className="select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => setToast("Scheduler not set up (demo)")}
-                        >
-                            Schedule daily sends
                         </div>
                     </div>
                 </div>

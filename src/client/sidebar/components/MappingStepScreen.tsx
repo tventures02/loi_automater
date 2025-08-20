@@ -297,7 +297,7 @@ export default function MappingStepScreen({
                     )}
                     {previewState === "ready" && (
                         <>
-                            <div className="p-3 pb-1 text-xs font-semibold text-gray-500">
+                            <div className="p-3 pb-1 text-xs font-semibold text-gray-500 underline">
                                 👀 LOI Preview
                             </div>
                             <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">

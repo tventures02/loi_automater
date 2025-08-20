@@ -19,7 +19,7 @@ import SendCenterScreen from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
-const isDev = process.env.NODE_ENV.toLowerCase().includes('dev');
+const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
 const SidebarContainer = () => {
     const [mode, setMode] = useState<"build" | "send">("build");
@@ -147,8 +147,10 @@ const SidebarContainer = () => {
                 }
                 finally {
                     setIsLoading(false);
+                    if (isDev) console.log('done loading')
                     try {
                         const queueExists = await serverFunctions.queueExists();
+                        if (isDev) console.log('queueExists', queueExists)
                         if (queueExists) {
                             setQueueReady(true);
                         }
@@ -241,7 +243,7 @@ const SidebarContainer = () => {
     useEffect(() => {
         setHeaderHeight(headerRef.current?.clientHeight ?? 0);
         setFooterHeight(footerRef.current?.clientHeight ?? 0);
-    }, [mode, headerRef?.current, footerRef?.current]);
+    }, [mode, headerRef?.current, footerRef?.current, currentStep]);
 
     useEffect(() => {
         if (mode !== "send") return;
@@ -327,6 +329,8 @@ const SidebarContainer = () => {
     const middleHeight = `calc(100vh - ${headerHeight + footerHeight}px)`;
 
     console.log('sidebar render')
+    console.log('mode', mode)
+    console.log('currentStep', currentStep)
 
     return (
         < div className='container' >
@@ -394,7 +398,7 @@ const SidebarContainer = () => {
                 {mode === "send" && !queueReady ? (
                     <SendCenterSetup creating={creatingQueue} error={queueError} onCreate={ensureQueue} />
                 ) : mode === "send" ? (
-                    <SendCenterScreen />
+                    <SendCenterScreen mode={mode} />
                 ) : (
                     <>
                         {currentStep === "template" && (
@@ -437,7 +441,7 @@ const SidebarContainer = () => {
                         )}
 
                         {currentStep === "send" && (
-                            <SendCenterScreen />
+                            <SendCenterScreen mode={mode} />
                         )}
                     </>
                 )}
@@ -455,7 +459,7 @@ const SidebarContainer = () => {
                         onSecondary={secondaryLabelByStep[currentStep] ? handleSecondary : undefined}
                         primaryDisabled={!canContinue[currentStep]}
                         primaryLoading={isWorking}
-                        helperText={currentStep === "send" ? "We’ll skip rows without valid emails." : undefined}
+                        helperText={undefined}
                         leftSlot={null}
                         currentStep={currentStep}
                     />

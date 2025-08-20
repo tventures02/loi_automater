@@ -281,6 +281,8 @@ export default function GenerateLOIsStepScreen({
                                         });
                                         setPreflight(res);
                                         onValidChange?.("lois", !!res.ok);
+                                        setCanContinue({ ...canContinue, lois: res.queueExists });
+                                        setQueueReady(res.queueExists);
                                     } finally {
                                         setIsPreflighting(false);
                                     }
@@ -336,7 +338,7 @@ export default function GenerateLOIsStepScreen({
                     <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-800">
                         <div className="font-medium text-gray-900 mb-1">Generation summary</div>
                         <div>Created: {summary.created}</div>
-                        <div>Skipped (invalid email): {summary.skippedInvalid}</div>
+                        <div>Skipped: {summary.skippedInvalid}</div>
                         <div>Failed: {summary.failed}</div>
                     </div>
                 )}
