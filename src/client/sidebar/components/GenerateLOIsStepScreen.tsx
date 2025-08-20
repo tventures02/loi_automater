@@ -273,7 +273,7 @@ export default function GenerateLOIsStepScreen({
                             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.currentTarget as any).click()}
                             className="mt-3 inline-block select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
                         >
-                            {isPreflighting ? "Checking…" : "Re-run preflight"}
+                            {isPreflighting ? "Checking…" : "Re-run checks"}
                         </div>
                     </div>
                 )}

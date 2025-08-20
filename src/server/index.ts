@@ -19,6 +19,8 @@ import {
     getPreviewRowValues,
     preflightGenerateLOIs,
     generateLOIsAndWriteSheet,
+    queueEnsureSheet,
+    queueExists,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -37,4 +39,6 @@ export {
     getPreviewRowValues,
     preflightGenerateLOIs,
     generateLOIsAndWriteSheet,
+    queueEnsureSheet,
+    queueExists,
 };

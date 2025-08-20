@@ -199,11 +199,10 @@ export const generateLOIsAndWriteSheet = (payload) => {
     }
 
     // Build run sheet (copy A..H only)
-    const runName = 'LOI Automater Run - ' +
-        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const runName = 'LOI Automater Run';
     const runSheet = ss.insertSheet(runName);
     var width = Math.min(lastCol, 8); // A..H only
-    var data = source.getRange(1, 1, lastRow, width).getDisplayValues(); 
+    var data = source.getRange(1, 1, lastRow, width).getDisplayValues();
 
     // Build header names for A..H from mapping; fallback "Col A" etc.
     var headers = [];
@@ -414,4 +413,55 @@ function renderName_(pattern, row, tokenCols) {
     }
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';
+}
+
+
+/**
+ * Ensure the central queue sheet exists with headers; return metadata.
+ * Name: _LOI_Queue
+ * Schema v1 (minimal):
+ * id • sourceSheet • sourceRow • email • docId • docUrl • templateId • mappingVersion
+ * status • scheduledAt • sentAt • attempts • lastError • createdAt • updatedAt
+ */
+export const queueEnsureSheet = () => {
+    var ss = SpreadsheetApp.getActive();
+    var name = 'LOI_Queue';
+    var HEADERS = [
+        'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
+        'status', 'scheduledAt', 'sentAt', 'attempts', 'lastError', 'createdAt', 'updatedAt'
+    ];
+
+    var sh = ss.getSheetByName(name);
+    if (!sh) {
+        sh = ss.insertSheet(name);
+    }
+
+    // If empty or no headers, set them
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow === 0 || lastCol === 0) {
+        sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+        sh.setFrozenRows(1);
+        sh.autoResizeColumns(1, HEADERS.length);
+    } else {
+        // Light sanity: ensure all required headers exist (append missing to the right)
+        var existing = sh.getRange(1, 1, 1, Math.max(lastCol, HEADERS.length)).getValues()[0];
+        var missing = HEADERS.filter(function (h) { return existing.indexOf(h) === -1; });
+        if (missing.length) {
+            sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
+        }
+    }
+
+    // mark schema version (for future migrations)
+    PropertiesService.getDocumentProperties().setProperty('LOI_QUEUE_SCHEMA_VERSION', '1');
+
+    return {
+        name: name,
+        sheetId: sh.getSheetId(),
+        headers: HEADERS
+    };
+}
+
+export const queueExists = () => {
+    return !!SpreadsheetApp.getActive().getSheetByName('LOI_Queue');
 }
