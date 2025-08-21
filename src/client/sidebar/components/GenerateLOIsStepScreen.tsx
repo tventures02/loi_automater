@@ -4,6 +4,7 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import { Switch } from "@mui/material";
+import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -95,17 +96,16 @@ export default function GenerateLOIsStepScreen({
     const [checksOpen, setChecksOpen] = useState(false);
 
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
-    const [showAvailableTokens, setShowAvailableTokens] = useState<boolean>(true);
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const emailColumn = mapping?.__email || "";
 
     /* -------- Email settings state -------- */
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
-    const [emailBodyTpl, setEmailBodyTpl] = useState<string>(
-        "Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{your_name}}"
-    );
+    const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{your_name}}");
     const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
     const [attachPdf, setAttachPdf] = useState<boolean>(true);
     const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
+    const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
     /* -------- /Email settings state -------- */
 
     // Auto-preflight when pre-conditions are met
@@ -248,6 +248,18 @@ export default function GenerateLOIsStepScreen({
 
     return (
         <div className="space-y-3">
+
+            <ConfirmGenerateDialog
+                open={confirmOpen}
+                onCancel={() => setConfirmOpen(false)}
+                onConfirm={async () => { setConfirmOpen(false); await runGenerate(); }}
+                eligibleCount={preflight?.eligibleRows}
+                sheetName={sheetName}
+                templateDocId={templateDocId}
+                fileNamePattern={pattern}
+                isSubmitting={isGenerating}
+            />
+
             <h2 className="text-sm font-semibold text-gray-900">Create the LOIs</h2>
 
             <div className="mt-0 text-[11px] text-gray-500">
@@ -320,19 +332,24 @@ export default function GenerateLOIsStepScreen({
                 </div>
 
                 {/* Email preview */}
-                {emailPreview && (
-                    <div className="mt-2 rounded-lg bg-gray-50 p-3">
-                        <div className="text-[11px] font-semibold text-gray-500 mb-1 underline">👀 Email preview 👀</div>
-                        <div className="text-xs text-gray-900 mt-3">
-                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed"><b>Subject:</b> {emailPreview.subject}</div>
+                {emailPreview && showEmailPreview ? (
+                    <>
+                        <div className="mt-2 rounded-lg bg-gray-50 p-3">
+                            <div className="text-[11px] font-semibold text-gray-500 mb-1 underline">👀 Email preview 👀</div>
+                            <div className="text-xs text-gray-900 mt-3">
+                                <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed"><b>Subject:</b> {emailPreview.subject}</div>
+                            </div>
+                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3"><b>Body:</b></div>
+                            {useLOIAsBody ? (
+                                <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
+                            ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                <div>{emailPreview.body}</div>
+                            </div>}
                         </div>
-                        <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3"><b>Body:</b></div>
-                        {useLOIAsBody ? (
-                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
-                        ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                            <div>{emailPreview.body}</div>
-                        </div>}
-                    </div>
+                        <div className="text-[11px] text-gray-500 cursor-pointer" onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
+                    </>
+                ) : (
+                    <span className="text-[11px] text-gray-500 cursor-pointer" onClick={() => setShowEmailPreview(true)}>Show email preview</span>
                 )}
             </div>
 
@@ -458,8 +475,8 @@ export default function GenerateLOIsStepScreen({
                     role="button"
                     tabIndex={0}
                     aria-disabled={!canGenerate || isGenerating}
-                    onClick={canGenerate && !isGenerating ? runGenerate : undefined}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && runGenerate()}
+                    onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
                     className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
             ${!canGenerate || isGenerating
                             ? "bg-gray-300 text-white cursor-not-allowed"
