@@ -3,6 +3,7 @@ import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
+import { Switch } from "@mui/material";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -45,6 +46,7 @@ type GenerateSummary = {
 
 const DEFAULT_PATTERN = "LOI - {{address}}";
 
+/* ---------- helpers ---------- */
 function extractPlaceholders(text: string): string[] {
     if (!text) return [];
     const re = /{{\s*([^{}]+?)\s*}}/g;
@@ -53,6 +55,24 @@ function extractPlaceholders(text: string): string[] {
     while ((m = re.exec(text)) !== null) set.add((m[1] || "").trim());
     return Array.from(set);
 }
+function escapeRegExp(s: string) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function renderPreviewTemplate(
+    tmpl: string,
+    mapping: Record<string, string>,
+    valuesByColumn: Record<string, any>
+) {
+    let out = tmpl || "";
+    for (const [ph, col] of Object.entries(mapping)) {
+        if (!ph || ph === "__email" || !col) continue;
+        const val = valuesByColumn?.[col] ?? "";
+        const re = new RegExp(`{{\\s*${escapeRegExp(ph)}\\s*}}`, "g");
+        out = out.replace(re, String(val));
+    }
+    return out;
+}
+/* ---------- /helpers ---------- */
 
 export default function GenerateLOIsStepScreen({
     mapping,
@@ -75,7 +95,18 @@ export default function GenerateLOIsStepScreen({
     const [checksOpen, setChecksOpen] = useState(false);
 
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
+    const [showAvailableTokens, setShowAvailableTokens] = useState<boolean>(true);
     const emailColumn = mapping?.__email || "";
+
+    /* -------- Email settings state -------- */
+    const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
+    const [emailBodyTpl, setEmailBodyTpl] = useState<string>(
+        "Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{your_name}}"
+    );
+    const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
+    const [attachPdf, setAttachPdf] = useState<boolean>(true);
+    const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
+    /* -------- /Email settings state -------- */
 
     // Auto-preflight when pre-conditions are met
     useEffect(() => {
@@ -124,7 +155,41 @@ export default function GenerateLOIsStepScreen({
         })();
 
         return () => { cancelled = true; };
-    }, [templateDocId, emailColumn, JSON.stringify(mapping), pattern, sheetName, placeholders, onValidChange]);
+    }, [templateDocId, emailColumn, JSON.stringify(mapping), sheetName, placeholders, onValidChange, pattern]);
+
+    /* Build email preview from first row values (same approach as LOI preview) */
+    useEffect(() => {
+        const haveAllTokens = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
+        if (!haveAllTokens) { setEmailPreview(null); return; }
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const colsRequested = Array.from(
+                    new Set(
+                        Object.entries(mapping)
+                            .filter(([k, v]) => k !== "__email" && !!v)
+                            .map(([_, v]) => v as string)
+                    )
+                );
+                if (emailColumn) colsRequested.push(emailColumn);
+
+                const valuesByColumn: Record<string, any> = await serverFunctions.getPreviewRowValues({
+                    columns: colsRequested, sheetName: sheetName || null
+                });
+
+                if (cancelled) return;
+
+                const subject = renderPreviewTemplate(emailSubjectTpl, mapping, valuesByColumn);
+                const body = renderPreviewTemplate(emailBodyTpl, mapping, valuesByColumn);
+                setEmailPreview({ subject, body });
+            } catch {
+                if (!cancelled) setEmailPreview(null);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders]);
 
     const runGenerate = async () => {
         if (!preflight?.ok) return;
@@ -146,8 +211,13 @@ export default function GenerateLOIsStepScreen({
                 pattern,
                 templateDocId,
                 sheetName: sheetName || null,
+
+                emailSubjectTpl,
+                emailBodyTpl,
+                useLOIAsBody,
+                attachPdf,
             });
-            if (isDev)console.log('result', result)
+            if (isDev) console.log('result', result)
             clearInterval(t);
             setProgressText("Finalizing…");
             setSummary(result);
@@ -162,13 +232,11 @@ export default function GenerateLOIsStepScreen({
         } finally {
             setIsGenerating(false);
             setProgressText("");
-            setTimeout(() => setToast(""), 10000);
+            setTimeout(() => setToast(""), 8000);
         }
     };
 
-    const allTokensMapped =
-        placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
-
+    const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
     const templateOk = !!templateDocId;
     const tokensOk = allTokensMapped;
     const emailOk = !!mapping.__email;
@@ -182,23 +250,89 @@ export default function GenerateLOIsStepScreen({
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Create the LOIs</h2>
 
+            <div className="mt-0 text-[11px] text-gray-500">
+                Placeholders you can use:{" "}
+                {placeholders.length
+                    ? placeholders.map((t, i) => (
+                        <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholders.length - 1 ? "," : ""}</code>
+                    ))
+                    : <span className="italic">none</span>}
+            </div>
+
             {/* File naming pattern */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-2">
                 <div className="text-xs text-gray-500">File name pattern</div>
                 <input
                     value={pattern}
                     onChange={(e) => setPattern(e.target.value)}
-                    className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                    className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
                     placeholder={DEFAULT_PATTERN}
                 />
-                {/* <div className="text-[11px] text-gray-500">
-                    Available tokens from your template:{" "}
-                    {placeholders.length ? placeholders.map((t, i) => (
-                        <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholders.length - 1 ? "," : ""}</code>
-                    )) : <span className="italic">none detected</span>}
-                </div> */}
                 {preflight?.sampleFileName && (
                     <div className="text-[11px] text-gray-600">Example: {preflight.sampleFileName}</div>
+                )}
+            </div>
+
+
+            {/* Email settings */}
+            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-gray-900">Email settings</div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                    <div>
+                        <div className="text-[11px] text-gray-600 mb-1">Subject</div>
+                        <input
+                            value={emailSubjectTpl}
+                            onChange={(e) => setEmailSubjectTpl(e.target.value)}
+                            className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                            placeholder="Letter of Intent – {{Address}}"
+                        />
+                    </div>
+                    {/* Body label + toggle (right-aligned) */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="text-[11px] text-gray-600">Body (plain text)</div>
+
+                            {/* Toggle */}
+                            <div className={`relative inline-flex items-center gap-1`}>
+                            <span className="text-[11px] text-gray-700 select-none">Use LOI as body</span>
+                                <Switch color="primary" checked={useLOIAsBody} onChange={(e) => setUseLOIAsBody(e.target.checked)} size="small" />
+                            </div>
+                        </div>
+
+                        {!useLOIAsBody ? (
+                            <>
+                                <textarea
+                                    value={emailBodyTpl}
+                                    onChange={(e) => setEmailBodyTpl(e.target.value)}
+                                    className="w-full h-28 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 whitespace-pre-wrap"
+                                    placeholder="Hi {{AgentName}}, …"
+                                />
+                            </>
+                        ) : (
+                            <div className="rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-[11px] text-gray-700">
+                                Using your LOI document text as the email body.
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Email preview */}
+                {emailPreview && (
+                    <div className="mt-2 rounded-lg bg-gray-50 p-3">
+                        <div className="text-[11px] font-semibold text-gray-500 mb-1 underline">👀 Email preview 👀</div>
+                        <div className="text-xs text-gray-900 mt-3">
+                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed"><b>Subject:</b> {emailPreview.subject}</div>
+                        </div>
+                        <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3"><b>Body:</b></div>
+                        {useLOIAsBody ? (
+                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
+                        ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                            <div>{emailPreview.body}</div>
+                        </div>}
+                    </div>
                 )}
             </div>
 

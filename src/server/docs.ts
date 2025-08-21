@@ -1,11 +1,6 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
 var LOI_QUEUE_NAME = 'LOI_Queue';
-var LOI_QUEUE_HEADERS = [
-    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
-    'status', 'sentAt', 'attempts', 'lastError', 'createdAt'
-];
-
 // Define a type for the return object for better type safety
 export type DocInfo = {
     id: string;
@@ -227,6 +222,26 @@ function headerIndexMap(sh) {
     return map;
 }
 
+var LOI_QUEUE_HEADERS = [
+    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
+    'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'subject', 'body', 'useLOIAsBody', 'attachPdf'
+];
+
+function renderStringTpl_(tpl, row, tokenCols) {
+    if (!tpl) return '';
+    var out = String(tpl);
+    var names = Object.keys(tokenCols);
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        var idx = tokenCols[name];
+        var val = (row[idx] || '').toString();
+        var re = new RegExp('{{\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*}}', 'g');
+        out = out.replace(re, val);
+    }
+    return out;
+}
+
+  
 export const generateLOIsAndWriteSheet = (payload) => {
     try {
         const ss = SpreadsheetApp.getActive();
@@ -245,6 +260,8 @@ export const generateLOIsAndWriteSheet = (payload) => {
         const qHead = headerIndexMap(qSheet);
         const idColIdx = qHead['id']; // 0-based index of 'id' header
         const qLastRow = qSheet.getLastRow();
+
+        // Seed existing IDs
         const existingIds = new Set();
         if (qLastRow > 1 && idColIdx != null) {
             const idVals = qSheet.getRange(2, idColIdx + 1, qLastRow - 1, 1).getValues();
@@ -274,6 +291,12 @@ export const generateLOIsAndWriteSheet = (payload) => {
             return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })) };
         }
         const eIdx = colToNumber(emailColLetter) - 1;
+
+        // Email settings
+        const emailSubjectTpl = payload.emailSubjectTpl || 'Letter of Intent';
+        const emailBodyTpl = payload.emailBodyTpl || '';
+        const useLOIAsBody = !!payload.useLOIAsBody;
+        const attachPdf = !!payload.attachPdf; // stored for later send step
 
         const statuses = [];
         const queueBatch = [];
@@ -319,6 +342,24 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     placeholders
                 });
 
+                // Compute SUBJECT and BODY now (so future sends don’t depend on changed templates)
+                const subjectResolved = renderStringTpl_(emailSubjectTpl, row, tokenCols);
+
+                let bodyResolved = '';
+                if (useLOIAsBody) {
+                    // Use the final generated Doc text (already token-replaced)
+                    try {
+                        const body = DocumentApp.openById(docInfo.fileId).getBody().getText() || '';
+                        bodyResolved = body;
+                    } catch (e) {
+                        // Fallback: render from placeholders (plain text)
+                        bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
+                    }
+                } else {
+                    // Use the plain text template the user provided
+                    bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
+                }
+
                 // Queue row in LOI_Queue
                 const now = new Date();
                 queueBatch.push({
@@ -335,6 +376,12 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     attempts: 0,
                     lastError: '',
                     createdAt: now,
+
+                    // NEW email fields
+                    subject: subjectResolved,
+                    body: bodyResolved,
+                    useLOIAsBody: useLOIAsBody ? 'TRUE' : 'FALSE', // store as strings for Sheets
+                    attachPdf: attachPdf ? 'TRUE' : 'FALSE'
                 });
 
                 // Mark key as now existing (to avoid collisions within same run)
