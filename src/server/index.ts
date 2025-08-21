@@ -25,6 +25,8 @@ import {
     sendNextBatch,
     queueList,
     queueStatus,
+    getSheetNames,
+    getActiveSheetName,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -49,4 +51,6 @@ export {
     sendNextBatch,
     queueList,
     queueStatus,
+    getSheetNames,
+    getActiveSheetName,
 };

@@ -45,6 +45,7 @@ function extractPlaceholders(text: string): string[] {
 }
 
 const COLUMN_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+export const MAX_SHEET_NAME_LENGTH = 20;
 
 function escapeRegExp(s: string) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -177,12 +178,13 @@ export default function MappingStepScreen({
         setEmailColumn(col);
     };
 
+    const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
 
     return (
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Map placeholders</h2>
             <p className="text-xs text-gray-600">
-                Select a spreadsheet column (A–H) for placeholders in your LOI template.
+                Select columns (A–H) from {sheetName ? <b>{sheetNameShort}</b> : "your spreadsheet"} for placeholders in your LOI template.
             </p>
 
             {/* Empty-state if no placeholders */}
@@ -243,7 +245,7 @@ export default function MappingStepScreen({
             <div className="rounded-xl border border-gray-200 p-3">
                 <div className="flex items-center justify-between">
                     <div>
-                        <div className="text-xs font-medium text-gray-900">Delivery email column</div>
+                        <div className="text-xs font-medium text-gray-900">Delivery email column {sheetName ? <>in {sheetNameShort}</> : null}</div>
                         <div className="mt-0.5 text-[11px] text-gray-600">
                             Select email column (where LOIs will be sent)
                         </div>
@@ -298,7 +300,7 @@ export default function MappingStepScreen({
                     {previewState === "ready" && (
                         <>
                             <div className="p-3 pb-1 text-xs font-semibold text-gray-500 underline">
-                                👀 LOI Preview
+                                👀 LOI Preview 👀
                             </div>
                             <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
                                 {previewText}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
+import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -175,6 +176,7 @@ export default function GenerateLOIsStepScreen({
     const checksOk = templateOk && tokensOk && emailOk && eligibleOk;
 
     const canGenerate = checksOk && !!preflight?.ok;
+    const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
 
     return (
         <div className="space-y-3">
@@ -189,12 +191,12 @@ export default function GenerateLOIsStepScreen({
                     className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
                     placeholder={DEFAULT_PATTERN}
                 />
-                <div className="text-[11px] text-gray-500">
+                {/* <div className="text-[11px] text-gray-500">
                     Available tokens from your template:{" "}
                     {placeholders.length ? placeholders.map((t, i) => (
                         <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholders.length - 1 ? "," : ""}</code>
                     )) : <span className="italic">none detected</span>}
-                </div>
+                </div> */}
                 {preflight?.sampleFileName && (
                     <div className="text-[11px] text-gray-600">Example: {preflight.sampleFileName}</div>
                 )}
@@ -248,10 +250,10 @@ export default function GenerateLOIsStepScreen({
                                 {tokensOk ? "✓" : `${placeholders.filter((p) => !mapping[p]).length} missing`}
                             </div>
 
-                            <div className="text-gray-600">Email column mapped</div>
+                            <div className="text-gray-600">Email column mapped {sheetName ? <>({sheetNameShort})</> : ""}</div>
                             <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` : "—"}</div>
 
-                            <div className="text-gray-600">Eligible rows</div>
+                            <div className="text-gray-600">Eligible rows {sheetName ? <>({sheetNameShort})</> : ""}</div>
                             <div className="text-gray-900">
                                 {isPreflighting ? (
                                     <span className="inline-flex items-center gap-1">
@@ -264,7 +266,7 @@ export default function GenerateLOIsStepScreen({
                                 )}
                             </div>
 
-                            <div className="text-gray-600">Invalid emails</div>
+                            <div className="text-gray-600">Invalid emails {sheetName ? <>({sheetNameShort})</> : ""}</div>
                             <div className="text-gray-900">
                                 {isPreflighting ? "…" : preflight ? preflight.invalidEmails : "—"}
                             </div>
@@ -306,7 +308,7 @@ export default function GenerateLOIsStepScreen({
             {/* Generate action + progress */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-3">
                 <div className="text-xs text-gray-600">
-                    Generate the LOIs in your Drive.
+                    Generate the LOIs in your Drive {sheetName ? <>from <b>{sheetNameShort}</b></> : ""}.
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px]">

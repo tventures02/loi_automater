@@ -17,6 +17,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
 import SendCenterScreen from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
+import DataSourcePicker from './DataSourcePicker';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
@@ -47,7 +48,9 @@ export type QueueStatus = {
 const SEND_TTL_MS = 60_000; // 1 minute
 
 const SidebarContainer = () => {
-    const [mode, setMode] = useState<"build" | "send">("send");
+    const [mode, setMode] = useState<"build" | "send">("build");
+    const [sheetNames, setSheetNames] = useState<string[]>([]);
+    const [dataSheet, setDataSheet] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     // State for template step
@@ -56,6 +59,7 @@ const SidebarContainer = () => {
     const [isLoadingContent, setIsLoadingContent] = useState(false);
     const [draft, setDraft] = useState<string>('');
     const [templateContent, setTemplateContent] = useState('');
+    const [isLoadingSheets, setIsLoadingSheets] = useState(true);
 
     // States for mapping step
     const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -108,7 +112,7 @@ const SidebarContainer = () => {
 
     // (optional) reflect errors/completion (example)
     const steps: Step[] = [
-        { key: "template", label: "Template" },
+        { key: "template", label: "Inputs" },
         { key: "map", label: "Map" },
         { key: "lois", label: "LOIs" },
         { key: "send", label: "Send" },
@@ -188,6 +192,7 @@ const SidebarContainer = () => {
                             setQueueStatus(status);
                         }
                     } catch (error) { }
+                    loadSheets(true);
                 }
             };
 
@@ -255,7 +260,7 @@ const SidebarContainer = () => {
             const templateContent_ = text || '';
             setTemplateContent(templateContent_);
             setDraft(templateContent_);
-            if (templateContent_) {
+            if (templateContent_ && dataSheet) {
                 setCanContinue({ ...canContinue, template: true });
             }
         } catch (err: any) {
@@ -268,19 +273,63 @@ const SidebarContainer = () => {
     };
 
     useEffect(() => {
-        if (templateContent) {
+        if (templateContent && dataSheet) {
             setCanContinue({ ...canContinue, template: true });
         }
-    }, [templateContent]);
+        else if (!dataSheet) {
+            setCanContinue({ ...canContinue, template: false });
+        }
+    }, [templateContent, dataSheet]);
 
     useEffect(() => {
         setHeaderHeight(headerRef.current?.clientHeight ?? 0);
         setFooterHeight(mode === "build" ? footerRef.current?.clientHeight ?? 0 : 0);
     }, [mode, headerRef?.current, footerRef?.current, currentStep]);
 
+    const loadSheets = async (forceActiveDefault = false) => {
+        setIsLoadingSheets(true);
+        try {
+            const names = await serverFunctions.getSheetNames();
+            setSheetNames(names);
+    
+            // pick default only if none selected yet
+            if (!dataSheet) {
+                const saved = localStorage.getItem("loi:dataSheet");
+                if (saved && names.includes(saved)) {
+                    setDataSheet(saved);
+                } else {
+                    const active = await serverFunctions.getActiveSheetName();
+                    const def = forceActiveDefault && active ? active : (names[0] || null);
+                    setDataSheet(def);
+                    if (def) localStorage.setItem("loi:dataSheet", def);
+                }
+            }
+        } catch (error) {
+            handleError('Error: Problem loading sheets. Please try again.');
+        } finally {
+            setIsLoadingSheets(false);
+        }
+    };
+
+    const handleChangeDataSheet = (name: string) => {
+        setDataSheet(name);
+        localStorage.setItem("loi:dataSheet", name);
+    };
+
+    const refreshSheets = async () => {
+        try {
+            setIsLoadingSheets(true);
+            await loadSheets(false);
+        } catch (error) {
+            handleError('Error: Problem refreshing sheets. Please try again.');
+        } finally {
+            setIsLoadingSheets(false);
+        }
+    };
+
     useEffect(() => {
         if (mode !== "send") return;
-        serverFunctions.queueStatus()   
+        serverFunctions.queueStatus()
             .then((status: QueueStatus) => {
                 setQueueStatus(status);
             })
@@ -404,7 +453,7 @@ const SidebarContainer = () => {
 
     console.log('sidebar render-------------------')
     console.log('mode', mode)
-    console.log('queueStatus', queueStatus)
+    console.log('dataSheet', dataSheet)
 
     return (
         < div className='container' >
@@ -420,7 +469,7 @@ const SidebarContainer = () => {
                                 <div
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => { 
+                                    onClick={() => {
                                         setMode("send");
                                     }}
                                     className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
@@ -472,39 +521,48 @@ const SidebarContainer = () => {
 
                 {/* Main content */}
                 {mode === "send" && (!queueStatus.exists || queueStatus.empty) ? (
-                    <SendCenterSetup 
-                        creating={creatingQueue} 
-                        error={queueError} 
-                        onCreate={ensureQueue} 
+                    <SendCenterSetup
+                        creating={creatingQueue}
+                        error={queueError}
+                        onCreate={ensureQueue}
                         queueStatus={queueStatus}
                         setMode={setMode}
                     />
                 ) : mode === "send" ? (
-                        <SendCenterScreen
-                            mode={mode}
-                            sendData={sendData}
-                            setSendData={setSendData}
-                            onRefresh={() => refreshSendData(true)} // force refresh 
-                        />
-                    ) : (
-                        <>
+                    <SendCenterScreen
+                        mode={mode}
+                        sendData={sendData}
+                        setSendData={setSendData}
+                        onRefresh={() => refreshSendData(true)} // force refresh 
+                    />
+                ) : (
+                    <>
                         {currentStep === "template" && (
-                            <TemplateStepScreen
-                                user={user}
-                                selectedTemplate={selectedTemplate}
-                                handleError={handleError}
-                                setUser={setUser}
-                                setSelectedTemplate={setSelectedTemplate}
-                                templateContent={templateContent}
-                                setTemplateContent={setTemplateContent}
-                                templates={templates}
-                                setTemplates={setTemplates}
-                                isGettingTemplates={isGettingTemplates}
-                                isLoadingContent={isLoadingContent}
-                                fetchTemplateContent={fetchTemplateContent}
-                                draft={draft}
-                                setDraft={setDraft}
-                            />
+                            <>
+                                <TemplateStepScreen
+                                    user={user}
+                                    selectedTemplate={selectedTemplate}
+                                    handleError={handleError}
+                                    setUser={setUser}
+                                    setSelectedTemplate={setSelectedTemplate}
+                                    templateContent={templateContent}
+                                    setTemplateContent={setTemplateContent}
+                                    templates={templates}
+                                    setTemplates={setTemplates}
+                                    isGettingTemplates={isGettingTemplates}
+                                    isLoadingContent={isLoadingContent}
+                                    fetchTemplateContent={fetchTemplateContent}
+                                    draft={draft}
+                                    setDraft={setDraft}
+                                />
+                                <DataSourcePicker
+                                    sheets={sheetNames}
+                                    value={dataSheet}
+                                    onChange={handleChangeDataSheet}
+                                    onRefresh={refreshSheets}
+                                    isLoading={isLoadingSheets}
+                                />
+                            </>
                         )}
 
                         {currentStep === "map" && (
@@ -513,6 +571,7 @@ const SidebarContainer = () => {
                                 initialMapping={mapping}
                                 onMappingChange={setMapping}
                                 onValidChange={(key, ok) => setCanContinue({ ...canContinue, [key]: ok })}
+                                sheetName={dataSheet || undefined}
                             />
                         )}
 
@@ -525,6 +584,7 @@ const SidebarContainer = () => {
                                 canContinue={canContinue}
                                 queueStatus={queueStatus}
                                 setQueueStatus={setQueueStatus}
+                                sheetName={dataSheet || undefined}
                             />
                         )}
 

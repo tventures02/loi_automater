@@ -743,3 +743,13 @@ export const sendNextBatch = (payload) => {
         lock.releaseLock();
     }
 };
+
+
+export const getSheetNames = () => {
+    const ss = SpreadsheetApp.getActive();
+    return ss.getSheets().map(s => s.getName()).filter(s => s !== LOI_QUEUE_NAME);
+};
+
+export const getActiveSheetName = () => {
+    return SpreadsheetApp.getActive().getActiveSheet().getName();
+};

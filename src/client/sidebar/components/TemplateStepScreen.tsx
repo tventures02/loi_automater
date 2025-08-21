@@ -38,7 +38,8 @@ const TemplateStepScreen = ({
     isLoadingContent,
     fetchTemplateContent,
     draft,
-    setDraft }: Props) => {
+    setDraft
+}: Props) => {
 
     const [docTitle, setDocTitle] = useState('New LOI Template');
     const [isCreatingDoc, setIsCreatingDoc] = useState(false);
@@ -49,8 +50,7 @@ const TemplateStepScreen = ({
 
     const firstPassRef = useRef(true);
 
-    const templateUrl =
-        selectedTemplate ? `https://docs.google.com/document/d/${selectedTemplate}/edit` : null;
+    const templateUrl = selectedTemplate ? `https://docs.google.com/document/d/${selectedTemplate}/edit` : null;
 
     const handleCreateDoc = async () => {
         if (!docTitle.trim()) {
@@ -151,7 +151,6 @@ const TemplateStepScreen = ({
     };
 
     const handleRefresh = () => {
-        
         if (isEditing && hasUnsaved) {
             const ok = window.confirm("You have unsaved changes. Refresh anyway?");
             if (!ok) return;
@@ -164,7 +163,7 @@ const TemplateStepScreen = ({
     return (
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Select Template</h2>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 mb-[3px]">
                 {
                     templateExists ?
                         "Select the LOI Google Doc Template to use."
@@ -174,16 +173,16 @@ const TemplateStepScreen = ({
             </p>
 
             {isGettingTemplates || isCreatingDoc ? (
-                <div className="mt-4 animate-fadeIn flex items-center gap-2 justify-center text-sm text-gray-500">
+                <div className="mt-1 animate-fadeIn flex items-center gap-2 justify-center text-sm text-gray-500">
                     <InlineSpinner />{isGettingTemplates ? "Loading templates..." : "Creating template..."}
                 </div>
             ) : templateExists ? (
-                <div className="mt-4 animate-fadeIn">
+                <div className="mt-1 !mb-2 animate-fadeIn">
                     <select
                         id="docTemplateSelect"
                         value={selectedTemplate}
                         onChange={handleTemplateSelection}
-                        className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className={`w-full rounded-md border border-gray-200 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 px-2 py-1 text-xs `}
                     >
                         {templates.map((template) => (
                             <option key={template.id} value={template.id}>
@@ -198,7 +197,7 @@ const TemplateStepScreen = ({
                     role="button"
                     tabIndex={0} // Makes it focusable
                     onClick={handleCreateDoc} // Your existing function
-                    className={`w-full inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors cursor-pointer select-none ${isCreatingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`w-full inline-flex items-center justify-center px-6 py-3 !mb-2 mt-[2px] text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors cursor-pointer select-none ${isCreatingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <PlusIcon className="h-5 w-5 pointer-events-none" /> {/* Added pointer-events-none to icon */}
                     <span className="pointer-events-none">New Template</span> {/* Added pointer-events-none to text */}
@@ -207,73 +206,8 @@ const TemplateStepScreen = ({
 
 
             {/* Template content preview / editor */}
-            {selectedTemplate && !isCreatingDoc && (
-                <div className="mt-3">
-                    <div className="mb-1 flex items-center justify-between">
-                        <div className="text-[11px] font-medium text-gray-700 flex items-center gap-2">
-                            Template contents
-                            {hasUnsaved && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" title="Unsaved changes" />}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {templateUrl && (
-                                <a
-                                    href={templateUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[11px] text-gray-600 hover:text-gray-900 underline underline-offset-2"
-                                >
-                                    <Tooltip title="Open in Docs">
-                                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                                    </Tooltip>
-                                </a>
-                            )}
-
-                            {!isEditing ? (
-                                <>
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleRefresh}
-                                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleRefresh()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        Refresh
-                                    </div>
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleEdit}
-                                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleEdit()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        Edit
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleSave}
-                                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleSave()}
-                                        className="select-none rounded-md bg-gray-900 px-2 py-1 text-[11px] text-white hover:bg-gray-800"
-                                    >
-                                        Save
-                                    </div>
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleCancel}
-                                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleCancel()}
-                                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        Cancel
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
+            {selectedTemplate && !isCreatingDoc && templateExists && (
+                <div className="mt-1 !mb-1">
                     <div className={`
             rounded-lg border ${isEditing ? 'border-gray-300' : 'border-gray-200'}
             ${isEditing ? 'bg-white' : 'bg-gray-50'}
@@ -291,7 +225,7 @@ const TemplateStepScreen = ({
                                 onChange={isEditing ? (e) => setDraft(e.target.value) : undefined}
                                 onKeyDown={isEditing ? handleKeyDown : undefined}
                                 className={`
-                  w-full h-48 resize-none p-3 text-xs leading-relaxed outline-none
+                  w-full h-32 resize-none p-3 text-xs leading-relaxed outline-none
                   ${isEditing ? 'bg-white text-gray-900' : 'bg-transparent text-gray-800'}
                 `}
                                 spellCheck={false}
@@ -299,12 +233,78 @@ const TemplateStepScreen = ({
                         )}
                     </div>
                     {isEditing && (
-                        <div className="mt-1 text-[11px] text-gray-500">
-                            Tip: Press <span className="font-medium">⌘/Ctrl + S</span> to save.
+                        <div className="mt-1 text-[10px] text-gray-500">
+                            Press <span className="font-medium">⌘/Ctrl + S</span> to save.
+                            {hasUnsaved && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 mr-[3px] ml-[3px]" title="Unsaved changes" />}
                         </div>
                     )}
                 </div>
             )}
+
+
+            {/* Template controls */}
+            {templateExists && (
+                <div className="flex items-center justify-end gap-2">
+                    {templateUrl && (
+                        <a
+                            href={templateUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                        >
+                            <Tooltip title="Open in Docs">
+                                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                            </Tooltip>
+                        </a>
+                    )}
+
+                    {!isEditing ? (
+                        <>
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={handleRefresh}
+                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleRefresh()}
+                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                                Refresh
+                            </div>
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={handleEdit}
+                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleEdit()}
+                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                                Edit
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={handleSave}
+                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleSave()}
+                                className="select-none rounded-md bg-gray-900 px-2 py-1 text-[11px] text-white hover:bg-gray-800 cursor-pointer"
+                            >
+                                Save
+                            </div>
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={handleCancel}
+                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleCancel()}
+                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                                Cancel
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+
+
 
         </div>
     )
