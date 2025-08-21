@@ -31,6 +31,7 @@ export type QueueItem = {
     status: "queued" | "scheduled" | "sending" | "sent" | "failed";
     lastError?: string | null;
     createdAt?: Date | null;
+    subject?: string;
 };
 
 export type SendSummary = {
@@ -48,7 +49,7 @@ export type QueueStatus = {
 const SEND_TTL_MS = 60_000; // 1 minute
 
 const SidebarContainer = () => {
-    const [mode, setMode] = useState<"build" | "send">("build");
+    const [mode, setMode] = useState<"build" | "send">("send");
     const [sheetNames, setSheetNames] = useState<string[]>([]);
     const [dataSheet, setDataSheet] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -235,6 +236,7 @@ const SidebarContainer = () => {
                 }
             }
 
+            refreshSendData(true);
             getData();
         }
         catch (e) {
@@ -386,15 +388,26 @@ const SidebarContainer = () => {
                 serverFunctions.queueList({ status: "all", limit: 50 })
             ]);
 
-            setSendData({
-                summary: s ?? null,
-                items: Array.isArray(q?.items) ? q.items : [],
-                lastFetched: Date.now(),
-                loading: false,
-                error: null
-            });
+            if (s?.remaining) {
+                setSendData(prev => ({...prev,
+                    summary: {
+                        remaining: s.remaining,
+                        queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
+                        scheduled: s.scheduled ?? 0,
+                        sentToday: s.sentToday ?? 0,
+                    },
+                    items: Array.isArray(q?.items) ? q.items : [],
+                    lastFetched: Date.now(),
+                    loading: false,
+                    error: null
+                }));
+            }
         } catch (e: any) {
+            console.log('e', e)
             setSendData(s => ({ ...s, loading: false, error: e?.message || "Failed to load queue" }));
+        }
+        finally {
+            setSendData(s => ({ ...s, loading: false }));
         }
     };
 
@@ -530,7 +543,6 @@ const SidebarContainer = () => {
                     />
                 ) : mode === "send" ? (
                     <SendCenterScreen
-                        mode={mode}
                         sendData={sendData}
                         setSendData={setSendData}
                         onRefresh={() => refreshSendData(true)} // force refresh 
@@ -590,7 +602,6 @@ const SidebarContainer = () => {
 
                         {currentStep === "send" && (
                             <SendCenterScreen
-                                mode={mode}
                                 sendData={sendData}
                                 onRefresh={() => refreshSendData(true)} // force refresh
                                 setSendData={setSendData}

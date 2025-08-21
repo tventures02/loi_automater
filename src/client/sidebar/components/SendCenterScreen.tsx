@@ -8,7 +8,6 @@ import { SendSummary } from "./Sidebar";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 type Props = {
-    mode: "build" | "send";
     sendData: {
         summary: SendSummary | null;
         items: QueueItem[];
@@ -26,10 +25,7 @@ type Props = {
     }>>;
 };
 
-const placeholderQueue: QueueItem[] = [];
-
 export default function SendCenterScreen({ 
-    mode,
     sendData,
     onRefresh,
     setSendData
@@ -40,32 +36,6 @@ export default function SendCenterScreen({
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
 
     const { summary, items, loading, error } = sendData;
-
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                setSendData(s => ({ ...s, loading: true }));
-                const summaryRes = await safeCall(async () => serverFunctions.getSendSummary());
-                const q = await safeCall(async () => serverFunctions.queueList({ status: "all", limit: 50 }));
-                if (!cancelled) {
-                    if (summaryRes?.remaining) {
-                        setSendData(s => ({ ...s, summary: {
-                            remaining: summaryRes.remaining,
-                            queued: summaryRes.queued ?? items.filter(i => i.status === "queued").length,
-                            scheduled: summaryRes.scheduled ?? 0,
-                            sentToday: summaryRes.sentToday ?? 0,
-                        }}));
-                    }
-                    if (Array.isArray(q?.items)) setSendData(s => ({ ...s, items: q.items }));
-                }
-            } finally {
-                if (!cancelled) setSendData(s => ({ ...s, loading: false }));
-            }
-        })();
-        return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const filtered = useMemo(() => {
         if (filter === "all") return items;
@@ -127,9 +97,13 @@ export default function SendCenterScreen({
         setTimeout(() => setToast(""), 2500);
     };
 
+    console.log('filtered', filtered)
+
     // Main content height: allow space for sticky footer
     return (
         <div className="space-y-3 pb-16">
+            <h2 className="text-sm font-semibold text-gray-900">Send Center</h2>
+
             {/* Summary strip with a Refresh control */}
             <div className="rounded-xl border border-gray-200 p-3">
                 {loading ? <div className="text-xs text-gray-500 flex items-center gap-2"><InlineSpinner /> Loading...</div> :
@@ -139,19 +113,19 @@ export default function SendCenterScreen({
                             <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
                             <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
                         </div>
-                        <div className="flex items-start justify-end gap-2">
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={onRefresh}
-                                className="select-none rounded-xl ring-1 ring-gray-200 px-1 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-1"
-                            >
-                                <ArrowPathIcon className="w-4 h-4" />
-                            </div>
-                        </div>
                     </div>
                 }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
+                <div className="w-full flex items-center justify-end gap-2">
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={onRefresh}
+                        className="cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                    >
+                        Refresh
+                    </div>
+                </div>
             </div>
 
 
@@ -177,14 +151,13 @@ export default function SendCenterScreen({
                 {/* Details (collapsible) */}
                 {queueOpen && (
                     <>
+                        <div className="text-xs text-gray-600 px-3">
+                            {loading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                        </div>
                         <div className="flex items-center justify-between px-3 py-2">
-                            <div className="text-xs text-gray-600">
-                                {loading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
-                            </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
                                 <FilterPill active={filter === "queued"} onClick={() => setFilter("queued")} label="Queued" />
-                                <FilterPill active={filter === "scheduled"} onClick={() => setFilter("scheduled")} label="Scheduled" />
                                 <FilterPill active={filter === "failed"} onClick={() => setFilter("failed")} label="Failed" />
                                 <FilterPill active={filter === "sent"} onClick={() => setFilter("sent")} label="Sent" />
                             </div>
@@ -197,14 +170,16 @@ export default function SendCenterScreen({
                         ) : filtered.length === 0 ? (
                             <div className="px-3 pb-3 text-xs text-gray-600">No items.</div>
                         ) : (
-                            <div className="px-3 pb-3">
+                            <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
                                     {filtered.map((item) => (
                                         <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="text-gray-900 truncate">{item.recipient}</div>
                                                 <div className="text-[11px] text-gray-600 truncate">
-                                                    {item.address || "(no address)"} ·{" "}
+                                                    {item.subject || "(no subject)"}
+                                                </div>
+                                                <div className="text-[11px] text-gray-600 truncate">
                                                     {item.docUrl ? (
                                                         <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
                                                             open doc
@@ -228,7 +203,7 @@ export default function SendCenterScreen({
             </div>
 
             {/* New data panel */}
-            {!loading && <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+            {/* {!loading && <div className="rounded-xl border border-gray-200 p-3 space-y-2">
                 <div className="text-sm font-semibold text-gray-900">New data?</div>
                 <div className="text-xs text-gray-600">
                     Scan your sheet for rows without an LOI and add them to the queue.
@@ -251,7 +226,7 @@ export default function SendCenterScreen({
                         Create LOIs for new rows
                     </div>
                 </div>
-            </div>}
+            </div>} */}
 
             {/* Toast */}
             {toast && (

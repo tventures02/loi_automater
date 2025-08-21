@@ -63,3 +63,16 @@ a {
     font-size: .57em;
     text-align: center;
 }
+
+/* globals.css */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none!important;
+    /* Chrome, Safari */
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none!important;
+    /* IE + Edge */
+    scrollbar-width: none!important;
+    /* Firefox */
+}

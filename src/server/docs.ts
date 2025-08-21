@@ -1,7 +1,11 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
 var LOI_QUEUE_NAME = 'LOI_Queue';
-// Define a type for the return object for better type safety
+
+var LOI_QUEUE_HEADERS = [
+    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
+    'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'subject', 'body', 'useLOIAsBody', 'attachPdf'
+];
 export type DocInfo = {
     id: string;
     name?: string; // Optional because it might not be found
@@ -221,11 +225,6 @@ function headerIndexMap(sh) {
     headers.forEach((h, i) => { map[normHeader(h)] = i; });
     return map;
 }
-
-var LOI_QUEUE_HEADERS = [
-    'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
-    'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'subject', 'body', 'useLOIAsBody', 'attachPdf'
-];
 
 function renderStringTpl_(tpl, row, tokenCols) {
     if (!tpl) return '';
@@ -633,50 +632,45 @@ export const getSendSummary = () => {
 };
 
 
-/**
- * Return queue items from LOI_Queue.
- * @param {{status?: 'all'|'queued'|'scheduled'|'failed'|'sent', limit?: number}} payload
- * @return {{items: Array<{id:string, recipient:string, address?:string, docUrl?:string, scheduled?:string|null, status:string, lastError?:string|null}>}}
- */
+
 export const queueList = (payload) => {
-    const statusFilter = String(payload?.status || 'all').toLowerCase();
-    const limit = Math.max(1, Math.min(500, Number(payload?.limit || 50)));
+    try {
+        const statusFilter = String(payload?.status || 'all').toLowerCase();
+        const limit = Math.max(1, Math.min(500, Number(payload?.limit || 50)));
+    
+        const qSheetRes = queueEnsureSheet();
+        const sh = qSheetRes.sh;
+        const head = headerIndexMap(sh);
+        const lastRow = sh.getLastRow();
+    
+        if (lastRow <= 1) return { items: [] };
+    
+        const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+        const iId = head['id'], iEmail = head['email'], iDocUrl = head[normHeader('docUrl')], iStatus = head['status'],
+            iLastError = head[normHeader('lastError')], iCreatedAt = head[normHeader('createdAt')], iSubject = head[normHeader('subject')];
+    
+        // Build objects; sort by createdAt desc, then id
+        const items = vals.map((row) => {
+            const queueItem: QueueItem = {
+                id: String(row[iId] || ''),
+                recipient: String(row[iEmail] || ''),
+                address: '', // optional if you later add a column
+                docUrl: String(row[iDocUrl] || ''),
+                status: String(row[iStatus] || '').toLowerCase() as "queued" | "sent" | "failed",
+                lastError: row[iLastError] || '',
+                createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
+                subject: row[iSubject] || '',
+            }
+            return queueItem;
+            //@ts-ignore
+        }).sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
+    
+        const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
 
-    const qSheetRes = queueEnsureSheet();
-    const sh = qSheetRes.sh;
-    const head = headerIndexMap(sh);
-    const lastRow = sh.getLastRow();
-    const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
-
-    if (lastRow <= 1) return { items: [] };
-
-    const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-    const iId = head['id'], iEmail = head['email'], iDocUrl = head['docUrl'], iStatus = head['status'],
-        iScheduledAt = head['scheduledAt'], iLastError = head['lastError'], iCreatedAt = head['createdAt'];
-
-    // Build objects; sort by createdAt desc, then id
-    const items = vals.map((row) => {
-        const sched = row[iScheduledAt] ? formatIso_(row[iScheduledAt], tz) : null;
-        const queueItem: QueueItem = {
-            id: String(row[iId] || ''),
-            recipient: String(row[iEmail] || ''),
-            address: undefined, // optional if you later add a column
-            docUrl: String(row[iDocUrl] || ''),
-            scheduled: sched,
-            status: String(row[iStatus] || '').toLowerCase() as "queued" | "scheduled" | "sending" | "sent" | "failed",
-            lastError: row[iLastError] || null,
-            createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
-        }
-        return queueItem;
-        //@ts-ignore
-    }).sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
-
-    const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
-    return { items: filtered.slice(0, limit).map(({ createdAt, ...rest }) => rest) };
-
-    function formatIso_(d, tz) {
-        const dt = (d instanceof Date) ? d : new Date(d);
-        return Utilities.formatDate(dt, tz, "yyyy-MM-dd'T'HH:mm:ssXXX");
+        return { items: filtered.slice(0, limit).map(({ createdAt, ...rest }) => rest)};
+    } catch (error) {
+        console.log('error', error)
+        throw error;
     }
 };
 
@@ -709,8 +703,8 @@ export const sendNextBatch = (payload) => {
         // Read all rows
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
         const iId = head['id'], iEmail = head['email'], iDocUrl = head['docUrl'], iStatus = head['status'],
-            iScheduledAt = head['scheduledAt'], iSentAt = head['sentAt'], iAttempts = head['attempts'],
-            iLastError = head['lastError'], iCreatedAt = head['createdAt'], iUpdatedAt = head['updatedAt'];
+            iSentAt = head['sentAt'], iAttempts = head['attempts'],
+            iLastError = head['lastError'], iCreatedAt = head['createdAt'];
 
         // Pick oldest queued (by createdAt asc, then row order)
         const queued = [];
@@ -718,9 +712,6 @@ export const sendNextBatch = (payload) => {
             const row = vals[r];
             const status = String(row[iStatus] || '').toLowerCase();
             if (status !== 'queued') continue;
-            // Optional: respect scheduledAt if present and in the future
-            const sched = row[iScheduledAt] ? new Date(row[iScheduledAt]) : null;
-            if (sched && sched.getTime() > Date.now()) continue;
 
             queued.push({
                 r,                                 // zero-based index in vals
@@ -730,7 +721,6 @@ export const sendNextBatch = (payload) => {
                 docUrl: String(row[iDocUrl] || ''),
                 attempts: Number(row[iAttempts] || 0),
                 createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
-                scheduledAt: row[iScheduledAt] || '',
                 lastError: row[iLastError] || '',
             });
         }
@@ -758,29 +748,25 @@ export const sendNextBatch = (payload) => {
                     body: makeBody(item.docUrl || '')
                 });
 
-                // write status block (cols 9..15): status, scheduledAt(keep), sentAt, attempts, lastError, createdAt(keep), updatedAt
+                // write status block (cols 9..15): status, sentAt, attempts, lastError, createdAt(keep), updatedAt
                 const values = [
                     'sent',
-                    item.scheduledAt || '',
                     now,
                     newAttempts,
                     '',
                     vals[item.r][iCreatedAt] || now,
-                    now
                 ];
-                sh.getRange(item.rowIndex, 9, 1, 7).setValues([values]);
+                sh.getRange(item.rowIndex, 8, 1, 5).setValues([values]);
                 sent++;
             } catch (err) {
                 const values = [
                     'failed',
-                    item.scheduledAt || '',
                     '',                 // sentAt
                     newAttempts,
                     String(err),
                     vals[item.r][iCreatedAt] || now,
-                    now
                 ];
-                sh.getRange(item.rowIndex, 9, 1, 7).setValues([values]);
+                sh.getRange(item.rowIndex, 8, 1, 5).setValues([values]);
                 failed++;
             }
         });

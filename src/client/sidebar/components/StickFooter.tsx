@@ -81,7 +81,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
     return (
         <div
             ref={ref}
-            className={`sticky bottom-0 z-40 border-t border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60`}
+            className={`sticky bottom-0 z-40 border-t border-gray-200 bg-white backdrop-blur supports-[backdrop-filter]:bg-white`}
             aria-label="LOI Builder actions"
         >
             {/* Helper text (optional) */}
