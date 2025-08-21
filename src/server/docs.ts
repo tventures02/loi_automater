@@ -1,6 +1,4 @@
-import { QueueItem } from "src/client/sidebar/components/SendCenterScreen";
-
-const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
+import { QueueItem } from "../client/sidebar/components/Sidebar";
 
 var LOI_QUEUE_NAME = 'LOI_Queue';
 var LOI_QUEUE_HEADERS = [
@@ -82,7 +80,7 @@ function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
         parts.push(name + '=' + val);
     }
 
-    if (isDev) console.log('KEY_RAW:', JSON.stringify(parts));
+    // console.log('KEY_RAW:', JSON.stringify(parts));
 
     var raw = parts.join('\u241F'); // unit separator to avoid collisions
     var bytes = Utilities.newBlob(raw).getBytes();

@@ -21,6 +21,26 @@ import SendCenterSetup from './SendCenterSetup';
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
+export type QueueItem = {
+    id: string;
+    recipient: string;
+    address?: string;
+    docUrl?: string;
+    scheduled?: string | null;
+    status: "queued" | "scheduled" | "sending" | "sent" | "failed";
+    lastError?: string | null;
+    createdAt?: Date | null;
+};
+
+export type SendSummary = {
+    remaining: number;      // MailApp.getRemainingDailyQuota()
+    queued: number;
+    scheduled: number;
+    sentToday: number;
+};
+
+const SEND_TTL_MS = 60_000; // 1 minute
+
 const SidebarContainer = () => {
     const [mode, setMode] = useState<"build" | "send">("build");
     const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +60,15 @@ const SidebarContainer = () => {
         lois: false,
         send: false,
     });
+
+    // States for send step
+    const [sendData, setSendData] = useState<{
+        summary: SendSummary | null;
+        items: QueueItem[];
+        lastFetched: number;
+        loading: boolean;
+        error?: string | null;
+    }>({ summary: null, items: [], lastFetched: 0, loading: false, error: null });
 
     const [queueReady, setQueueReady] = useState<boolean>(false);
     const [creatingQueue, setCreatingQueue] = useState<boolean>(false);
@@ -286,6 +315,31 @@ const SidebarContainer = () => {
         });
     }
 
+    const refreshSendData = async (force = false) => {
+        if (sendData.loading) return;
+        const now = Date.now();
+        const isStale = now - sendData.lastFetched > SEND_TTL_MS;
+        if (!force && !isStale && sendData.summary) return; // cache hit
+
+        setSendData(s => ({ ...s, loading: true, error: null }));
+        try {
+            const [s, q] = await Promise.all([
+                serverFunctions.getSendSummary(),
+                serverFunctions.queueList({ status: "all", limit: 50 })
+            ]);
+
+            setSendData({
+                summary: s ?? null,
+                items: Array.isArray(q?.items) ? q.items : [],
+                lastFetched: Date.now(),
+                loading: false,
+                error: null
+            });
+        } catch (e: any) {
+            setSendData(s => ({ ...s, loading: false, error: e?.message || "Failed to load queue" }));
+        }
+    };
+
     // Example CTA labels by step
     const primaryLabelByStep: Record<string, string> = {
         template: "Continue to mapping",
@@ -357,7 +411,9 @@ const SidebarContainer = () => {
                                 <div
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => setMode("send")}
+                                    onClick={() => { 
+                                        setMode("send");
+                                    }}
                                     className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                                 >
                                     Open Send Center
@@ -409,9 +465,17 @@ const SidebarContainer = () => {
                 {mode === "send" && !queueReady ? (
                     <SendCenterSetup creating={creatingQueue} error={queueError} onCreate={ensureQueue} />
                 ) : mode === "send" ? (
-                    <SendCenterScreen mode={mode} />
-                ) : (
-                    <>
+                        <SendCenterScreen
+                            mode={mode}
+                            summary={sendData.summary}
+                            items={sendData.items}
+                            isLoading={sendData.loading}
+                            error={sendData.error}
+                            setSendData={setSendData}
+                            onRefresh={() => refreshSendData(true)} // force refresh 
+                        />
+                    ) : (
+                        <>
                         {currentStep === "template" && (
                             <TemplateStepScreen
                                 user={user}
@@ -452,7 +516,15 @@ const SidebarContainer = () => {
                         )}
 
                         {currentStep === "send" && (
-                            <SendCenterScreen mode={mode} />
+                            <SendCenterScreen
+                                mode={mode}
+                                summary={sendData.summary}
+                                items={sendData.items}
+                                isLoading={sendData.loading}
+                                error={sendData.error}
+                                onRefresh={() => refreshSendData(true)} // force refresh
+                                setSendData={setSendData}
+                            />
                         )}
                     </>
                 )}

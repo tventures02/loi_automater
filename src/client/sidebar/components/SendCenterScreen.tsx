@@ -3,33 +3,36 @@ import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
+import { QueueItem } from "./Sidebar";
+import { SendSummary } from "./Sidebar";
 
-type Props = { mode: "build" | "send" };
-
-export type QueueItem = {
-    id: string;
-    recipient: string;
-    address?: string;
-    docUrl?: string;
-    scheduled?: string | null;
-    status: "queued" | "scheduled" | "sending" | "sent" | "failed";
-    lastError?: string | null;
-    createdAt?: Date | null;
-};
-
-type SendSummary = {
-    remaining: number;      // MailApp.getRemainingDailyQuota()
-    queued: number;
-    scheduled: number;
-    sentToday: number;
+type Props = {
+    mode: "build" | "send";
+    summary: SendSummary | null;
+    items: QueueItem[];
+    isLoading: boolean;
+    error?: string | null;
+    onRefresh?: () => void;
+    setSendData: React.Dispatch<React.SetStateAction<{
+        summary: SendSummary | null;
+        items: QueueItem[];
+        lastFetched: number;
+        loading: boolean;
+        error?: string | null;
+    }>>;
 };
 
 const placeholderQueue: QueueItem[] = [];
 
-export default function SendCenterScreen({ mode }: Props) {
-    const [isLoading, setIsLoading] = useState(true);
-    const [summary, setSummary] = useState<SendSummary>({ remaining: 100, queued: 2, scheduled: 0, sentToday: 0 });
-    const [items, setItems] = useState<QueueItem[]>(placeholderQueue);
+export default function SendCenterScreen({ 
+    mode,
+    summary, 
+    items, 
+    isLoading, 
+    error, 
+    onRefresh,
+    setSendData
+}: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "scheduled" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<string>("");
@@ -39,22 +42,22 @@ export default function SendCenterScreen({ mode }: Props) {
         let cancelled = false;
         (async () => {
             try {
-                setIsLoading(true);
-                const s = await safeCall(async () => serverFunctions.getSendSummary());
+                setSendData(s => ({ ...s, loading: true }));
+                const summaryRes = await safeCall(async () => serverFunctions.getSendSummary());
                 const q = await safeCall(async () => serverFunctions.queueList({ status: "all", limit: 50 }));
                 if (!cancelled) {
-                    if (s?.remaining != null) {
-                        setSummary({
-                            remaining: s.remaining,
-                            queued: s.queued ?? items.filter(i => i.status === "queued").length,
-                            scheduled: s.scheduled ?? 0,
-                            sentToday: s.sentToday ?? 0,
-                        });
+                    if (summaryRes?.remaining) {
+                        setSendData(s => ({ ...s, summary: {
+                            remaining: summaryRes.remaining,
+                            queued: summaryRes.queued ?? items.filter(i => i.status === "queued").length,
+                            scheduled: summaryRes.scheduled ?? 0,
+                            sentToday: summaryRes.sentToday ?? 0,
+                        }}));
                     }
-                    if (Array.isArray(q?.items)) setItems(q.items);
+                    if (Array.isArray(q?.items)) setSendData(s => ({ ...s, items: q.items }));
                 }
             } finally {
-                if (!cancelled) setIsLoading(false);
+                if (!cancelled) setSendData(s => ({ ...s, loading: false }));
             }
         })();
         return () => { cancelled = true; };
@@ -67,13 +70,13 @@ export default function SendCenterScreen({ mode }: Props) {
     }, [items, filter]);
 
     const queuedCount = items.filter(i => i.status === "queued").length;
-    const canSend = summary.remaining > 0 && queuedCount > 0;
+    const canSend = summary?.remaining > 0 && queuedCount > 0;
 
     const sendNext = async () => {
         if (!canSend) return;
         setSending(true);
         try {
-            const n = Math.min(summary.remaining, queuedCount, 100);
+            const n = Math.min(summary?.remaining, queuedCount, 100);
             const res = await safeCall(async () => serverFunctions.sendNextBatch({ max: n }));
             const created = res?.sent ?? n;
 
@@ -86,12 +89,15 @@ export default function SendCenterScreen({ mode }: Props) {
                 }
                 return i;
             });
-            setItems(nextItems);
-            setSummary(s => ({
+            setSendData(s => ({ ...s, items: nextItems }));
+            setSendData(s => ({
                 ...s,
-                remaining: Math.max(0, s.remaining - created),
-                sentToday: s.sentToday + created,
-                queued: Math.max(0, s.queued - created),
+                summary: {
+                    ...s.summary,
+                    remaining: Math.max(0, s.summary?.remaining - created),
+                    sentToday: s.summary?.sentToday + created,
+                    queued: Math.max(0, s.summary?.queued - created),
+                }
             }));
             setToast(`Sent ${created} LOIs`);
         } catch {
@@ -112,8 +118,8 @@ export default function SendCenterScreen({ mode }: Props) {
             { id: cryptoId(), recipient: "new1@example.com", address: "11 Birch Ln", docUrl: "#", status: "queued" as const, scheduled: null },
             { id: cryptoId(), recipient: "new2@example.com", address: "22 Cedar Dr", docUrl: "#", status: "queued" as const, scheduled: null },
         ];
-        setItems(prev => [...demo, ...prev]);
-        setSummary(s => ({ ...s, queued: s.queued + demo.length }));
+        setSendData(s => ({ ...s, items: [...demo, ...s.items] }));
+        setSendData(s => ({ ...s, summary: { ...s.summary, queued: s.summary?.queued + demo.length } }));
         setToast(`Queued ${demo.length} new LOIs`);
         setTimeout(() => setToast(""), 2500);
     };
@@ -121,14 +127,28 @@ export default function SendCenterScreen({ mode }: Props) {
     // Main content height: allow space for sticky footer
     return (
         <div className="space-y-3 pb-16">
-            {/* Summary strip (no button here; action moved to sticky footer) */}
+            {/* Summary strip with a Refresh control */}
             <div className="rounded-xl border border-gray-200 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                    <Badge label={`Remaining today: ${summary.remaining}`} />
-                    <Badge label={`Queued: ${summary.queued}`} />
-                    <Badge label={`Sent today: ${summary.sentToday}`} />
+                <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
+                        <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
+                        <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={onRefresh}
+                            className="select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        >
+                            Refresh
+                        </div>
+                    </div>
                 </div>
+                {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
             </div>
+
 
             {/* Queue (collapsible) */}
             <div className="rounded-xl border border-gray-200">
@@ -237,11 +257,11 @@ export default function SendCenterScreen({ mode }: Props) {
 
             {/* Sticky Footer (primary action: Send next) */}
             <StickyFooter
-                primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary.remaining, queuedCount) || 0}`}
+                primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary?.remaining, queuedCount) || 0}`}
                 onPrimary={canSend && !sending ? sendNext : undefined}
                 primaryDisabled={!canSend || sending}
                 primaryLoading={sending}
-                leftSlot={<span>Remaining today: {summary.remaining}</span>}
+                leftSlot={<span>Remaining today: {summary?.remaining}</span>}
                 helperText={queuedCount === 0 ? "No queued items to send." : undefined}
                 currentStep="send"
             />
