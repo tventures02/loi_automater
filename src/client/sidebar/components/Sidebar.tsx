@@ -482,10 +482,7 @@ const SidebarContainer = () => {
                 ) : mode === "send" ? (
                         <SendCenterScreen
                             mode={mode}
-                            summary={sendData.summary}
-                            items={sendData.items}
-                            isLoading={sendData.loading}
-                            error={sendData.error}
+                            sendData={sendData}
                             setSendData={setSendData}
                             onRefresh={() => refreshSendData(true)} // force refresh 
                         />
@@ -534,10 +531,7 @@ const SidebarContainer = () => {
                         {currentStep === "send" && (
                             <SendCenterScreen
                                 mode={mode}
-                                summary={sendData.summary}
-                                items={sendData.items}
-                                isLoading={sendData.loading}
-                                error={sendData.error}
+                                sendData={sendData}
                                 onRefresh={() => refreshSendData(true)} // force refresh
                                 setSendData={setSendData}
                             />

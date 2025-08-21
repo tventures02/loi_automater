@@ -5,13 +5,17 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
 import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 type Props = {
     mode: "build" | "send";
-    summary: SendSummary | null;
-    items: QueueItem[];
-    isLoading: boolean;
-    error?: string | null;
+    sendData: {
+        summary: SendSummary | null;
+        items: QueueItem[];
+        lastFetched: number;
+        loading: boolean;
+        error?: string | null;
+    };
     onRefresh?: () => void;
     setSendData: React.Dispatch<React.SetStateAction<{
         summary: SendSummary | null;
@@ -26,10 +30,7 @@ const placeholderQueue: QueueItem[] = [];
 
 export default function SendCenterScreen({ 
     mode,
-    summary, 
-    items, 
-    isLoading, 
-    error, 
+    sendData,
     onRefresh,
     setSendData
 }: Props) {
@@ -37,6 +38,8 @@ export default function SendCenterScreen({
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<string>("");
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
+
+    const { summary, items, loading, error } = sendData;
 
     useEffect(() => {
         let cancelled = false;
@@ -73,7 +76,7 @@ export default function SendCenterScreen({
     const canSend = summary?.remaining > 0 && queuedCount > 0;
 
     const sendNext = async () => {
-        if (!canSend) return;
+        if (!canSend || loading) return;
         setSending(true);
         try {
             const n = Math.min(summary?.remaining, queuedCount, 100);
@@ -129,23 +132,25 @@ export default function SendCenterScreen({
         <div className="space-y-3 pb-16">
             {/* Summary strip with a Refresh control */}
             <div className="rounded-xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
-                        <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
-                        <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={onRefresh}
-                            className="select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        >
-                            Refresh
+                {loading ? <div className="text-xs text-gray-500 flex items-center gap-2"><InlineSpinner /> Loading...</div> :
+                    <div className="flex items-end justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
+                            <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
+                            <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
+                        </div>
+                        <div className="flex items-start justify-end gap-2">
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={onRefresh}
+                                className="select-none rounded-xl ring-1 ring-gray-200 px-1 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-1"
+                            >
+                                <ArrowPathIcon className="w-4 h-4" />
+                            </div>
                         </div>
                     </div>
-                </div>
+                }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
             </div>
 
@@ -174,7 +179,7 @@ export default function SendCenterScreen({
                     <>
                         <div className="flex items-center justify-between px-3 py-2">
                             <div className="text-xs text-gray-600">
-                                {isLoading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                                {loading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
                             </div>
                             <div className="flex items-center gap-2">
                                 <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
@@ -185,7 +190,7 @@ export default function SendCenterScreen({
                             </div>
                         </div>
 
-                        {isLoading ? (
+                        {loading ? (
                             <div className="px-3 pb-3 text-xs text-gray-500 flex items-center gap-2">
                                 <InlineSpinner /> Loading…
                             </div>
@@ -223,7 +228,7 @@ export default function SendCenterScreen({
             </div>
 
             {/* New data panel */}
-            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+            {!loading && <div className="rounded-xl border border-gray-200 p-3 space-y-2">
                 <div className="text-sm font-semibold text-gray-900">New data?</div>
                 <div className="text-xs text-gray-600">
                     Scan your sheet for rows without an LOI and add them to the queue.
@@ -246,7 +251,7 @@ export default function SendCenterScreen({
                         Create LOIs for new rows
                     </div>
                 </div>
-            </div>
+            </div>}
 
             {/* Toast */}
             {toast && (
@@ -259,10 +264,10 @@ export default function SendCenterScreen({
             <StickyFooter
                 primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary?.remaining, queuedCount) || 0}`}
                 onPrimary={canSend && !sending ? sendNext : undefined}
-                primaryDisabled={!canSend || sending}
+                primaryDisabled={!canSend || sending || loading}
                 primaryLoading={sending}
-                leftSlot={<span>Remaining today: {summary?.remaining}</span>}
-                helperText={queuedCount === 0 ? "No queued items to send." : undefined}
+                leftSlot={loading ? null : <span>Remaining today: {summary?.remaining}</span>}
+                helperText={loading ? null : queuedCount === 0 ? "No queued items to send." : undefined}
                 currentStep="send"
             />
         </div>
