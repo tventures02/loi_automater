@@ -486,11 +486,13 @@ function renderName(pattern, row, tokenCols) {
 export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();
     var sh = ss.getSheetByName(LOI_QUEUE_NAME);
+    let newlyCreated = false;
     if (!sh) {
         sh = ss.insertSheet(LOI_QUEUE_NAME);
         sh.getRange(1, 1, 1, LOI_QUEUE_HEADERS.length).setValues([LOI_QUEUE_HEADERS]);
         sh.setFrozenRows(1);
         sh.autoResizeColumns(1, LOI_QUEUE_HEADERS.length);
+        newlyCreated = true;
     } else {
         // Make sure all columns exist (append any missing headers to the right)
         var lastCol = sh.getLastColumn();
@@ -505,6 +507,7 @@ export const queueEnsureSheet = () => {
         name: LOI_QUEUE_NAME,
         headers: LOI_QUEUE_HEADERS,
         sh,
+        newlyCreated,
     };
 }
 
@@ -538,6 +541,14 @@ function mappingVersion(mapping) {
 
 export const queueExists = () => {
     return !!SpreadsheetApp.getActive().getSheetByName(LOI_QUEUE_NAME);
+}
+
+export const queueStatus = () => {
+    const exists = queueExists();
+    return {
+        exists,
+        empty: exists ? SpreadsheetApp.getActive().getSheetByName(LOI_QUEUE_NAME)?.getLastRow() <= 1 : true,
+    }
 }
 
 /** Return basic counters for Send Center from LOI_Queue. */

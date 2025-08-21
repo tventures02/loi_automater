@@ -39,10 +39,15 @@ export type SendSummary = {
     sentToday: number;
 };
 
+export type QueueStatus = {
+    exists: boolean;
+    empty: boolean;
+};
+
 const SEND_TTL_MS = 60_000; // 1 minute
 
 const SidebarContainer = () => {
-    const [mode, setMode] = useState<"build" | "send">("build");
+    const [mode, setMode] = useState<"build" | "send">("send");
     const [isLoading, setIsLoading] = useState(true);
 
     // State for template step
@@ -61,7 +66,7 @@ const SidebarContainer = () => {
         send: false,
     });
 
-    // States for send step
+    // States for send screen
     const [sendData, setSendData] = useState<{
         summary: SendSummary | null;
         items: QueueItem[];
@@ -69,8 +74,7 @@ const SidebarContainer = () => {
         loading: boolean;
         error?: string | null;
     }>({ summary: null, items: [], lastFetched: 0, loading: false, error: null });
-
-    const [queueReady, setQueueReady] = useState<boolean>(false);
+    const [queueStatus, setQueueStatus] = useState<QueueStatus>({ exists: false, empty: true });
     const [creatingQueue, setCreatingQueue] = useState<boolean>(false);
     const [queueError, setQueueError] = useState<string | null>(null);
 
@@ -178,10 +182,10 @@ const SidebarContainer = () => {
                     setIsLoading(false);
                     if (isDev) console.log('done loading')
                     try {
-                        const queueExists = await serverFunctions.queueExists();
-                        if (isDev) console.log('queueExists', queueExists)
-                        if (queueExists) {
-                            setQueueReady(true);
+                        const status = await serverFunctions.queueStatus();
+                        if (isDev) console.log('queueExists', status)
+                        if (status.exists) {
+                            setQueueStatus(status);
                         }
                     } catch (error) { }
                 }
@@ -276,11 +280,11 @@ const SidebarContainer = () => {
 
     useEffect(() => {
         if (mode !== "send") return;
-        serverFunctions.queueExists?.()
-            .then((exists: boolean) => {
-                setQueueReady(!!exists);
+        serverFunctions.queueStatus()   
+            .then((status: QueueStatus) => {
+                setQueueStatus(status);
             })
-            .catch(() => setQueueReady(false));
+            .catch(() => setQueueStatus({ exists: false, empty: true }));
     }, [mode]);
 
     // create on demand
@@ -292,7 +296,12 @@ const SidebarContainer = () => {
             if (!resp.name) {
                 setQueueError("Could not create queue.");
             } else {
-                setQueueReady(true);
+                if (resp.newlyCreated) {
+                    setQueueStatus({ exists: true, empty: true });
+                } else {
+                    const status = await serverFunctions.queueStatus();
+                    setQueueStatus(status);
+                }
             }
         } catch (e: any) {
             setQueueError(e?.message || "Could not create queue.");
@@ -393,9 +402,9 @@ const SidebarContainer = () => {
         currentStep={currentStep}
     />;
 
-    console.log('sidebar render')
+    console.log('sidebar render-------------------')
     console.log('mode', mode)
-    console.log('currentStep', currentStep)
+    console.log('queueStatus', queueStatus)
 
     return (
         < div className='container' >
@@ -440,7 +449,7 @@ const SidebarContainer = () => {
                                 onClick={() => setMode("build")}
                                 className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                             >
-                                Back to Builder
+                                Go to Builder
                             </div>
                         </div>
                     </div>
@@ -462,8 +471,14 @@ const SidebarContainer = () => {
                 }
 
                 {/* Main content */}
-                {mode === "send" && !queueReady ? (
-                    <SendCenterSetup creating={creatingQueue} error={queueError} onCreate={ensureQueue} />
+                {mode === "send" && (!queueStatus.exists || queueStatus.empty) ? (
+                    <SendCenterSetup 
+                        creating={creatingQueue} 
+                        error={queueError} 
+                        onCreate={ensureQueue} 
+                        queueStatus={queueStatus}
+                        setMode={setMode}
+                    />
                 ) : mode === "send" ? (
                         <SendCenterScreen
                             mode={mode}
@@ -511,7 +526,8 @@ const SidebarContainer = () => {
                                 templateContent={templateContent}
                                 setCanContinue={setCanContinue}
                                 canContinue={canContinue}
-                                setQueueReady={setQueueReady}
+                                queueStatus={queueStatus}
+                                setQueueStatus={setQueueStatus}
                             />
                         )}
 

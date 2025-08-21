@@ -24,6 +24,7 @@ import {
     getSendSummary,
     sendNextBatch,
     queueList,
+    queueStatus,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -47,4 +48,5 @@ export {
     getSendSummary,
     sendNextBatch,
     queueList,
+    queueStatus,
 };

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
+import { QueueStatus } from "./Sidebar";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -19,7 +20,9 @@ type Props = {
     /** Current canContinue state */
     canContinue: { [key: string]: boolean };
     /** Signal parent whether the queue exists */
-    setQueueReady: React.Dispatch<React.SetStateAction<boolean>>;
+    setQueueStatus: React.Dispatch<React.SetStateAction<QueueStatus>>;
+    /** Current queue status */
+    queueStatus: QueueStatus;
 };
 
 type PreflightResult = {
@@ -58,7 +61,8 @@ export default function GenerateLOIsStepScreen({
     onValidChange,
     setCanContinue,
     canContinue,
-    setQueueReady,
+    setQueueStatus,
+    queueStatus,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -96,7 +100,8 @@ export default function GenerateLOIsStepScreen({
                     setPreflight(res);
                     onValidChange?.("lois", !!res.ok);
                     setCanContinue({ ...canContinue, lois: res.queueExists });
-                    setQueueReady(res.queueExists);
+                    const status = await serverFunctions.queueStatus();
+                    setQueueStatus(status);
                 }
             } catch(error: any) {
                 console.log('error', error)
@@ -148,7 +153,7 @@ export default function GenerateLOIsStepScreen({
             onValidChange?.("lois", true);
 
             setCanContinue({ ...canContinue, lois: true });
-            setQueueReady(true);
+            setQueueStatus({ exists: true, empty: false });
         } catch (e) {
             clearInterval(t);
             setToast("Generation failed. Please try again.");
@@ -283,7 +288,7 @@ export default function GenerateLOIsStepScreen({
                                         setPreflight(res);
                                         onValidChange?.("lois", !!res.ok);
                                         setCanContinue({ ...canContinue, lois: res.queueExists });
-                                        setQueueReady(res.queueExists);
+                                        setQueueStatus({ ...queueStatus, exists: res.queueExists });
                                     } finally {
                                         setIsPreflighting(false);
                                     }
