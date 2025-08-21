@@ -39,6 +39,7 @@ export type SendSummary = {
     queued: number;
     scheduled: number;
     sentToday: number;
+    userEmail: string;
 };
 
 export type QueueStatus = {
@@ -395,6 +396,7 @@ const SidebarContainer = () => {
                         queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
                         scheduled: s.scheduled ?? 0,
                         sentToday: s.sentToday ?? 0,
+                        userEmail: s.userEmail,
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
                     lastFetched: Date.now(),

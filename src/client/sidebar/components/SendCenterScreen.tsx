@@ -5,7 +5,9 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
 import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import ConfirmSendDialog from "./ConfirmSendDialog";
+
+type SendDialogState = { open: boolean; variant: "real" | "test" };
 
 type Props = {
     sendData: {
@@ -25,7 +27,7 @@ type Props = {
     }>>;
 };
 
-export default function SendCenterScreen({ 
+export default function SendCenterScreen({
     sendData,
     onRefresh,
     setSendData
@@ -34,6 +36,7 @@ export default function SendCenterScreen({
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<string>("");
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
+    const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
 
     const { summary, items, loading, error } = sendData;
 
@@ -45,31 +48,26 @@ export default function SendCenterScreen({
     const queuedCount = items.filter(i => i.status === "queued").length;
     const canSend = summary?.remaining > 0 && queuedCount > 0;
 
-    const sendNext = async () => {
-        if (!canSend || loading) return;
+    // keep your existing logic but move the entry points:
+    const confirmRealSend = async () => {
+        if (!(summary?.remaining && queuedCount)) return;
         setSending(true);
         try {
-            const n = Math.min(summary?.remaining, queuedCount, 100);
+            const n = Math.min(summary.remaining, queuedCount, 100);
             const res = await safeCall(async () => serverFunctions.sendNextBatch({ max: n }));
             const created = res?.sent ?? n;
 
-            // Update local UI
+            // update local UI as you already do:
             let updated = 0;
-            const nextItems = items.map(i => {
-                if (updated < created && i.status === "queued") {
-                    updated++;
-                    return { ...i, status: "sent" as const };
-                }
-                return i;
-            });
+            const nextItems = items.map(i => (updated < created && i.status === "queued" ? (updated++, { ...i, status: "sent" as const }) : i));
             setSendData(s => ({ ...s, items: nextItems }));
             setSendData(s => ({
                 ...s,
                 summary: {
                     ...s.summary,
-                    remaining: Math.max(0, s.summary?.remaining - created),
-                    sentToday: s.summary?.sentToday + created,
-                    queued: Math.max(0, s.summary?.queued - created),
+                    remaining: Math.max(0, (s.summary?.remaining || 0) - created),
+                    sentToday: (s.summary?.sentToday || 0) + created,
+                    queued: Math.max(0, (s.summary?.queued || 0) - created),
                 }
             }));
             setToast(`Sent ${created} LOIs`);
@@ -77,6 +75,29 @@ export default function SendCenterScreen({
             setToast("Send failed. Please try again.");
         } finally {
             setSending(false);
+            setDialog({ open: false, variant: "real" });
+            setTimeout(() => setToast(""), 3500);
+        }
+    };
+
+    const confirmTestSend = async (sampleCount = 1) => {
+        // do NOT mutate queue locally
+        setSending(true);
+        try {
+            const n = Math.min(sampleCount, queuedCount, 5);
+            await safeCall(async () =>
+                serverFunctions.sendNextBatch({
+                    max: n,
+                    testMode: true,
+                    previewTo: sendData?.summary?.userEmail, // fallback handled server-side
+                })
+            );
+            setToast(`Sent ${n} test email${n > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`);
+        } catch {
+            setToast("Test send failed. Please try again.");
+        } finally {
+            setSending(false);
+            setDialog({ open: false, variant: "test" });
             setTimeout(() => setToast(""), 3500);
         }
     };
@@ -85,6 +106,9 @@ export default function SendCenterScreen({
         setToast("Scanned sheet: 42 new rows found (demo)");
         setTimeout(() => setToast(""), 2500);
     };
+
+    const openRealDialog = () => setDialog({ open: true, variant: "real" });
+    const openTestDialog = () => setDialog({ open: true, variant: "test" });
 
     const addNewLoisToQueue = async () => {
         const demo = [
@@ -97,23 +121,28 @@ export default function SendCenterScreen({
         setTimeout(() => setToast(""), 2500);
     };
 
-    console.log('filtered', filtered)
+    console.log("sendData", sendData);
 
     // Main content height: allow space for sticky footer
     return (
         <div className="space-y-3 pb-16">
-            <h2 className="text-sm font-semibold text-gray-900">Send Center</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Send Emails</h2>
 
             {/* Summary strip with a Refresh control */}
             <div className="rounded-xl border border-gray-200 p-3">
                 {loading ? <div className="text-xs text-gray-500 flex items-center gap-2"><InlineSpinner /> Loading...</div> :
-                    <div className="flex items-end justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
-                            <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
-                            <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
+                    <>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-xs font-medium text-gray-900">Summary</div>
                         </div>
-                    </div>
+                        <div className="flex items-end justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
+                                <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
+                                <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
+                            </div>
+                        </div>
+                    </>
                 }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
                 <div className="w-full flex items-center justify-end gap-2">
@@ -238,13 +267,28 @@ export default function SendCenterScreen({
             {/* Sticky Footer (primary action: Send next) */}
             <StickyFooter
                 primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary?.remaining, queuedCount) || 0}`}
-                onPrimary={canSend && !sending ? sendNext : undefined}
+                secondaryLabel="Send Test Email"
+                onSecondary={queuedCount > 0 ? openTestDialog : undefined}
+                onPrimary={canSend && !sending ? openRealDialog : undefined}
                 primaryDisabled={!canSend || sending || loading}
                 primaryLoading={sending}
-                leftSlot={loading ? null : <span>Remaining today: {summary?.remaining}</span>}
+                leftSlot={null}
                 helperText={loading ? null : queuedCount === 0 ? "No queued items to send." : undefined}
                 currentStep="send"
             />
+
+            <ConfirmSendDialog
+                open={dialog.open}
+                variant={dialog.variant}
+                onCancel={() => setDialog({ open: false, variant: "real" })}
+                onConfirm={dialog.variant === "real" ? () => confirmRealSend() : ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
+                remaining={summary?.remaining}
+                queued={queuedCount}
+                toEmail={sendData?.summary?.userEmail}
+                defaultSampleCount={1}
+                isSubmitting={sending}
+            />
+
         </div>
     );
 }

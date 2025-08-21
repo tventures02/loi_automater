@@ -240,7 +240,7 @@ function renderStringTpl_(tpl, row, tokenCols) {
     return out;
 }
 
-  
+
 export const generateLOIsAndWriteSheet = (payload) => {
     try {
         const ss = SpreadsheetApp.getActive();
@@ -628,7 +628,7 @@ export const getSendSummary = () => {
     }
 
     const remaining = MailApp.getRemainingDailyQuota();
-    return { remaining, queued, scheduled, sentToday };
+    return { remaining, queued, scheduled, sentToday, userEmail: Session.getActiveUser().getEmail() };
 };
 
 
@@ -637,18 +637,18 @@ export const queueList = (payload) => {
     try {
         const statusFilter = String(payload?.status || 'all').toLowerCase();
         const limit = Math.max(1, Math.min(500, Number(payload?.limit || 50)));
-    
+
         const qSheetRes = queueEnsureSheet();
         const sh = qSheetRes.sh;
         const head = headerIndexMap(sh);
         const lastRow = sh.getLastRow();
-    
+
         if (lastRow <= 1) return { items: [] };
-    
+
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
         const iId = head['id'], iEmail = head['email'], iDocUrl = head[normHeader('docUrl')], iStatus = head['status'],
             iLastError = head[normHeader('lastError')], iCreatedAt = head[normHeader('createdAt')], iSubject = head[normHeader('subject')];
-    
+
         // Build objects; sort by createdAt desc, then id
         const items = vals.map((row) => {
             const queueItem: QueueItem = {
@@ -664,10 +664,10 @@ export const queueList = (payload) => {
             return queueItem;
             //@ts-ignore
         }).sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
-    
+
         const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
 
-        return { items: filtered.slice(0, limit).map(({ createdAt, ...rest }) => rest)};
+        return { items: filtered.slice(0, limit).map(({ createdAt, ...rest }) => rest) };
     } catch (error) {
         console.log('error', error)
         throw error;
@@ -694,88 +694,141 @@ export const sendNextBatch = (payload) => {
 
     try {
         const remaining = MailApp.getRemainingDailyQuota();
-        const maxRequested = Math.max(1, Math.min(1000, Number(payload?.max || 100)));
-        const maxToSend = Math.min(remaining, maxRequested);
-        if (maxToSend <= 0) return { sent: 0, failed: 0, attempted: 0 };
+        const requested = Math.max(1, Math.min(1000, Number(payload?.max || 100)));
+        const testMode = !!payload?.testMode;
+        const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
+        // Cap by remaining quota in both modes (avoid quota errors)
+        const effectiveMax = Math.min(requested, remaining);
 
-        const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+        if (effectiveMax <= 0) return { sent: 0, failed: 0, attempted: 0, testMode };
 
-        // Read all rows
+        // Indices (0-based). Some may be undefined if columns don't exist.
+        const iId = head[normHeader('id')];
+        const iEmail = head[normHeader('email')];
+        const iDocId = head[normHeader('docId')];
+        const iDocUrl = head[normHeader('docUrl')];
+        const iStatus = head[normHeader('status')];
+        const iSentAt = head[normHeader('sentAt')];
+        const iAttempts = head[normHeader('attempts')];
+        const iLastError = head[normHeader('lastError')];
+        const iCreatedAt = head[normHeader('createdAt')];
+
+        // New email-related columns (rendered at generate time)
+        const iSubject = head[normHeader('subject')];     // optional
+        const iBody = head[normHeader('body')];        // optional (plain text)
+        const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
+
+        // Read all data rows
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-        const iId = head['id'], iEmail = head['email'], iDocUrl = head['docUrl'], iStatus = head['status'],
-            iSentAt = head['sentAt'], iAttempts = head['attempts'],
-            iLastError = head['lastError'], iCreatedAt = head['createdAt'];
 
-        // Pick oldest queued (by createdAt asc, then row order)
+        // Build list of queued rows (oldest first)
         const queued = [];
         for (let r = 0; r < vals.length; r++) {
             const row = vals[r];
-            const status = String(row[iStatus] || '').toLowerCase();
+            const status = String(safeAt(row, iStatus) || '').toLowerCase();
             if (status !== 'queued') continue;
 
             queued.push({
-                r,                                 // zero-based index in vals
-                rowIndex: r + 2,                   // 1-based in sheet
-                id: String(row[iId] || ''),
-                email: String(row[iEmail] || ''),
-                docUrl: String(row[iDocUrl] || ''),
-                attempts: Number(row[iAttempts] || 0),
-                createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
-                lastError: row[iLastError] || '',
+                r,
+                rowIndex: r + 2,
+                email: String(safeAt(row, iEmail) || ''),
+                docId: String(safeAt(row, iDocId) || ''),
+                docUrl: String(safeAt(row, iDocUrl) || ''),
+                subject: String(safeAt(row, iSubject) || ''), // may be empty
+                body: String(safeAt(row, iBody) || ''),       // may be empty
+                attempts: Number(safeAt(row, iAttempts) || 0),
+                createdAt: safeAt(row, iCreatedAt) ? new Date(safeAt(row, iCreatedAt)) : new Date(0),
             });
         }
-
         queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
-        const batch = queued.slice(0, maxToSend);
 
+        const batch = queued.slice(0, effectiveMax);
         let sent = 0, failed = 0;
 
-        const subject = String(payload?.subject || 'Letter of Intent');
-        const makeBody = (docUrl) =>
+        // Fallbacks in case subject/body not present
+        const defaultSubject = String(payload?.subject || 'Letter of Intent');
+        const defaultBodyMaker = (docUrl) =>
             String(payload?.bodyTemplate ||
                 `Hello,\n\nPlease review the Letter of Intent at the link below:\n${docUrl}\n\nBest regards`);
 
-        // Send + update each row
+        // Cache Doc body text to avoid re-open for same docId
+        const docTextCache = {};
+
         batch.forEach(item => {
             const now = new Date();
             const newAttempts = (item.attempts || 0) + 1;
 
             try {
-                // send
-                MailApp.sendEmail({
-                    to: item.email,
-                    subject: subject,
-                    body: makeBody(item.docUrl || '')
-                });
+                // Determine subject/body from row; fall back if missing
+                const rowSubject = item.subject && item.subject.trim().length ? item.subject.trim() : defaultSubject;
 
-                // write status block (cols 9..15): status, sentAt, attempts, lastError, createdAt(keep), updatedAt
-                const values = [
-                    'sent',
-                    now,
-                    newAttempts,
-                    '',
-                    vals[item.r][iCreatedAt] || now,
-                ];
-                sh.getRange(item.rowIndex, 8, 1, 5).setValues([values]);
+                let rowBody = item.body && item.body.trim().length ? item.body : "";
+                if (!rowBody && item.useDocBody && item.docId) {
+                    if (!docTextCache[item.docId]) {
+                        try {
+                            const doc = DocumentApp.openById(item.docId);
+                            docTextCache[item.docId] = doc.getBody()?.getText() || "";
+                        } catch (e) {
+                            docTextCache[item.docId] = ""; // fail soft, will fall back
+                        }
+                    }
+                    rowBody = docTextCache[item.docId] || "";
+                }
+                if (!rowBody) rowBody = defaultBodyMaker(item.docUrl || "");
+
+                // Test mode: send previews to the user; Real mode: send to recipient
+                const to = testMode ? previewTo : item.email;
+                const subj = testMode ? `[TEST] ${rowSubject}` : rowSubject;
+                const attachPdf = item.attachPdf && asBool(item.attachPdf);
+
+                const pdfBlob = item.docId && attachPdf ? generateLOIPDF(item.docId, item.docId) : null;
+                MailApp.sendEmail({ to, subject: subj, body: rowBody, attachments: pdfBlob ? [pdfBlob] : null });
+
+                if (!testMode) {
+                    // Update status -> sent; attempts +1; clear lastError; set sentAt
+                    if (iStatus != null) sh.getRange(item.rowIndex, iStatus + 1).setValue('sent');
+                    if (iSentAt != null) sh.getRange(item.rowIndex, iSentAt + 1).setValue(now);
+                    if (iAttempts != null) sh.getRange(item.rowIndex, iAttempts + 1).setValue(newAttempts);
+                    if (iLastError != null) sh.getRange(item.rowIndex, iLastError + 1).setValue('');
+                }
                 sent++;
             } catch (err) {
-                const values = [
-                    'failed',
-                    '',                 // sentAt
-                    newAttempts,
-                    String(err),
-                    vals[item.r][iCreatedAt] || now,
-                ];
-                sh.getRange(item.rowIndex, 8, 1, 5).setValues([values]);
+                if (!testMode) {
+                    if (iStatus != null) sh.getRange(item.rowIndex, iStatus + 1).setValue('failed');
+                    if (iSentAt != null) sh.getRange(item.rowIndex, iSentAt + 1).setValue(''); // not sent
+                    if (iAttempts != null) sh.getRange(item.rowIndex, iAttempts + 1).setValue(newAttempts);
+                    if (iLastError != null) sh.getRange(item.rowIndex, iLastError + 1).setValue(String(err));
+                }
                 failed++;
             }
         });
 
-        return { sent, failed, attempted: batch.length };
+        return { sent, failed, attempted: batch.length, testMode };
     } finally {
         lock.releaseLock();
     }
+
+    // Helpers
+    function safeAt(arr, i) {
+        return (i == null || i < 0 || i >= arr.length) ? undefined : arr[i];
+    }
+    function asBool(v) {
+        if (v === true || v === false) return v;
+        const s = String(v || '').trim().toLowerCase();
+        return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+    }
 };
+
+function generateLOIPDF(docId: string, pdfName: string) {
+    // Open the template document
+    const doc = DocumentApp.openById(docId);
+
+    doc.saveAndClose();
+
+    // Convert the document to a PDF blob
+    const pdfBlob = doc.getAs('application/pdf').setName(`${pdfName}.pdf`);
+    return pdfBlob; // Return the PDF blob
+}
 
 
 export const getSheetNames = () => {
