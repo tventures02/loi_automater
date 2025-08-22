@@ -683,8 +683,9 @@ export const queueList = (payload) => {
                 queueTabRow: index + 1,
             }
             return queueItem;
-            //@ts-ignore
-        }).sort((a, b) => (b.createdAt - a.createdAt));
+        })
+        //@ts-ignore
+        //.sort((a, b) => (b.createdAt - a.createdAt));
 
         const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
 

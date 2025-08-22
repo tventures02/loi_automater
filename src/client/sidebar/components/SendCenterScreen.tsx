@@ -71,13 +71,13 @@ export default function SendCenterScreen({
     );
 
     // keep your existing logic but move the entry points:
-    const confirmRealSend = async () => {
+    const confirmRealSend = async (count: number) => {
         if (!(summary?.remaining && queuedTotal)) return;
         setSending(true);
         try {
-            const n = Math.min(summary.remaining, queuedTotal, 100);
-            const res = await serverFunctions.sendNextBatch({ max: n });
-            const sent = res?.sent ?? n;
+            const numEmailsToSend = count;
+            const res = await serverFunctions.sendNextBatch({ max: numEmailsToSend });
+            const sent = res?.sent ?? numEmailsToSend;
 
             // Optimistic local counters; the list itself will be refreshed after
             setSendData(s => ({
@@ -381,9 +381,9 @@ export default function SendCenterScreen({
                 open={dialog.open}
                 variant={dialog.variant}
                 onCancel={() => setDialog({ open: false, variant: "real" })}
-                onConfirm={dialog.variant === "real" ? () => confirmRealSend() : ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
+                onConfirm={dialog.variant === "real" ? ({ count } = { count: 1 }) => confirmRealSend(count) : ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
                 remaining={summary?.remaining}
-                queued={queuedTotal}
+                queued={summary?.queued ?? 0}
                 toEmail={sendData?.summary?.userEmail}
                 defaultSampleCount={1}
                 isSubmitting={sending}
