@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
-import { QueueItem } from "./Sidebar";
+import { QUEUE_DISPLAY_LIMIT, QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
@@ -11,7 +11,7 @@ import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@mui/material";
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
-
+const PAGE_SIZE = 10;
 type Props = {
     sendData: {
         summary: SendSummary | null;
@@ -45,38 +45,40 @@ export default function SendCenterScreen({
     currentStep,
     setCurrentStep,
 }: Props) {
-    const [filter, setFilter] = useState<"all" | "queued" | "scheduled" | "failed" | "sent">("all");
+    const [filter, setFilter] = useState<"all" | "queued" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState<string>("");
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
     const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
-
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [openClear, setOpenClear] = useState(false);
     const [clearing, setClearing] = useState(false);
-
     const { summary, items, loading, error } = sendData;
 
+    const queuedTotal = summary?.queued ?? 0;
+    const canSend = (summary?.remaining ?? 0) > 0 && queuedTotal > 0;
+
     const filtered = useMemo(() => {
+        setVisibleCount(PAGE_SIZE);
         if (filter === "all") return items;
         return items.filter(i => i.status === filter);
     }, [items, filter]);
 
-    const queuedCount = items.filter(i => i.status === "queued").length;
-    const canSend = summary?.remaining > 0 && queuedCount > 0;
+    const visibleItems = useMemo(
+        () => filtered.slice(0, Math.min(visibleCount, filtered.length)),
+        [filtered, visibleCount]
+    );
 
     // keep your existing logic but move the entry points:
     const confirmRealSend = async () => {
-        if (!(summary?.remaining && queuedCount)) return;
+        if (!(summary?.remaining && queuedTotal)) return;
         setSending(true);
         try {
-            const n = Math.min(summary.remaining, queuedCount, 100);
+            const n = Math.min(summary.remaining, queuedTotal, 100);
             const res = await safeCall(async () => serverFunctions.sendNextBatch({ max: n }));
             const created = res?.sent ?? n;
 
-            // update local UI as you already do:
-            let updated = 0;
-            const nextItems = items.map(i => (updated < created && i.status === "queued" ? (updated++, { ...i, status: "sent" as const }) : i));
-            setSendData(s => ({ ...s, items: nextItems }));
+            // Optimistic local counters; the list itself will be refreshed after
             setSendData(s => ({
                 ...s,
                 summary: {
@@ -101,7 +103,7 @@ export default function SendCenterScreen({
         // do NOT mutate queue locally
         setSending(true);
         try {
-            const n = Math.min(sampleCount, queuedCount, 5);
+            const n = Math.min(sampleCount, queuedTotal, 5);
             await safeCall(async () =>
                 serverFunctions.sendNextBatch({
                     max: n,
@@ -173,10 +175,12 @@ export default function SendCenterScreen({
 
     let primaryLabel = "Send Next";
     if (sending) primaryLabel = "Sending…";
-    else if (queuedCount === 0) primaryLabel = "Open Builder";
-    else primaryLabel = `Send Next ${Math.min(summary?.remaining, queuedCount) || 0}`;
+    else if (queuedTotal === 0) primaryLabel = "Open Builder";
+    else primaryLabel = `Send Next ${Math.min(summary?.remaining, queuedTotal) || 0}`;
 
-    const primaryDisabled = queuedCount === 0 ? loading : (!canSend || sending || loading);
+    const primaryDisabled = queuedTotal === 0 ? loading : (!canSend || sending || loading);
+    const canLoadMore = visibleCount < filtered.length;
+    const queueTotal = summary?.total ?? 0;
 
     // Main content height: allow space for sticky footer
     return (
@@ -195,6 +199,7 @@ export default function SendCenterScreen({
                                 <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
                                 <Badge label={`To be sent: ${summary?.queued ?? "—"}`} />
                                 <Badge label={`Successfully sent: ${summary?.sent ?? "—"}`} />
+                                <Badge label={`All queue items: ${summary?.total ?? "—"}`} />
                             </div>
                         </div>
                     </>
@@ -202,19 +207,18 @@ export default function SendCenterScreen({
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
                 {!loading && <div className="w-full flex items-center justify-end gap-2 mt-2">
                     <Tooltip title="Refresh data from Sender Queue sheet">
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={onRefresh}
-                        className="flex items-center gap-1 cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
-                    >
-                        <ArrowPathIcon className="w-3 h-3" />
-                        Refresh
-                    </div>
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={onRefresh}
+                            className="flex items-center gap-1 cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                        >
+                            <ArrowPathIcon className="w-3 h-3" />
+                            Refresh
+                        </div>
                     </Tooltip>
                 </div>}
             </div>
-
 
             {/* Queue (collapsible) */}
             <div className="rounded-xl border border-gray-200">
@@ -241,8 +245,8 @@ export default function SendCenterScreen({
                 {queueOpen && (
                     <>
                         <div className="flex items-center justify-between px-3">
-                            <div className="text-xs text-gray-600">
-                                {loading ? "" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                            <div className="text-xs text-gray-600 truncate overflow-hidden whitespace-nowrap ellipsis">
+                                {loading ? "" : `Showing ${visibleItems.length} of ${queueTotal}`}
                             </div>
                             {/* CLEAR QUEUE (destructive) */}
                             {items.length > 0 && !loading && <div
@@ -279,7 +283,7 @@ export default function SendCenterScreen({
                         ) : (
                             <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
-                                    {filtered.map((item) => (
+                                    {visibleItems.map((item) => (
                                         <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="text-gray-900 truncate">{item.recipient}</div>
@@ -303,6 +307,25 @@ export default function SendCenterScreen({
                                         </li>
                                     ))}
                                 </ul>
+
+                                {/* Showing X of Y */}
+                                <div className="pt-1 pb-1 flex items-center justify-between text-[11px] text-gray-600">
+                                    <span>
+                                        {queueTotal > QUEUE_DISPLAY_LIMIT ? "Queue has more than shown" : ''}
+                                    </span>
+
+                                    {canLoadMore && (
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
+                                            className="select-none rounded-md ring-1 ring-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                        >
+                                            Show next {Math.min(PAGE_SIZE, filtered.length - visibleCount)}
+                                        </div>
+                                    )}
+                                </div>
+
                             </div>
                         )}
                     </>
@@ -346,12 +369,12 @@ export default function SendCenterScreen({
             <StickyFooter
                 primaryLabel={primaryLabel}
                 secondaryLabel="Send Test Email"
-                onSecondary={queuedCount > 0 ? openTestDialog : undefined}
-                onPrimary={canSend && !sending ? openRealDialog : queuedCount === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
+                onSecondary={queuedTotal > 0 ? openTestDialog : undefined}
+                onPrimary={canSend && !sending ? openRealDialog : queuedTotal === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
-                helperText={loading ? null : queuedCount === 0 ? "No queued items to send. Generate some LOIs first." : undefined}
+                helperText={loading ? null : queuedTotal === 0 ? "No queued items to send. Generate some LOIs first." : undefined}
                 currentStep="send"
                 mode={mode}
                 fixYPos={true}
@@ -363,7 +386,7 @@ export default function SendCenterScreen({
                 onCancel={() => setDialog({ open: false, variant: "real" })}
                 onConfirm={dialog.variant === "real" ? () => confirmRealSend() : ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
                 remaining={summary?.remaining}
-                queued={queuedCount}
+                queued={queuedTotal}
                 toEmail={sendData?.summary?.userEmail}
                 defaultSampleCount={1}
                 isSubmitting={sending}

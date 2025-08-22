@@ -1,7 +1,7 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
 var LOI_QUEUE_NAME = 'Sender Queue';
-
+const MAX_QUEUE_ITEMS_FOR_DISPLAY = 500;
 var LOI_QUEUE_HEADERS = [
     'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
     'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'subject', 'body', 'useLOIAsBody', 'attachPdf'
@@ -603,8 +603,6 @@ export const getSendSummary = () => {
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
     const lastRow = sh.getLastRow();
-    const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
-    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
     let queued = 0, sent = 0;
     if (lastRow > 1) {
@@ -622,7 +620,7 @@ export const getSendSummary = () => {
     }
 
     const remaining = MailApp.getRemainingDailyQuota();
-    return { remaining, queued, sent, userEmail: Session.getActiveUser().getEmail() };
+    return { remaining, queued, sent, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
 };
 
 /** Remove all rows from Sender Queue except the header row. */
@@ -648,18 +646,23 @@ export const queueClearAll = () => {
 export const queueList = (payload) => {
     try {
         const statusFilter = String(payload?.status || 'all').toLowerCase();
-        const limit = Math.max(1, Math.min(500, Number(payload?.limit || 50)));
+        const limit = Math.max(1, Math.min(MAX_QUEUE_ITEMS_FOR_DISPLAY, Number(payload?.limit || 50)));
 
         const qSheetRes = queueEnsureSheet();
         const sh = qSheetRes.sh;
         const head = headerIndexMap(sh);
-        const lastRow = sh.getLastRow();
+        const lastRow = Math.min(MAX_QUEUE_ITEMS_FOR_DISPLAY + 1, sh.getLastRow());
 
         if (lastRow <= 1) return { items: [] };
 
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-        const iId = head['id'], iEmail = head['email'], iDocUrl = head[normHeader('docUrl')], iStatus = head['status'],
-            iLastError = head[normHeader('lastError')], iCreatedAt = head[normHeader('createdAt')], iSubject = head[normHeader('subject')];
+        const iId = head['id'];
+        const iEmail = head['email'];
+        const iDocUrl = head[normHeader('docUrl')];
+        const iStatus = head['status'];
+        const iLastError = head[normHeader('lastError')];
+        const iCreatedAt = head[normHeader('createdAt')];
+        const iSubject = head[normHeader('subject')];
 
         // Build objects; sort by createdAt desc, then id
         const items = vals.map((row) => {

@@ -39,6 +39,7 @@ export type SendSummary = {
     queued: number;
     sent: number;
     userEmail: string;
+    total: number;
 };
 
 export type QueueStatus = {
@@ -47,6 +48,7 @@ export type QueueStatus = {
 };
 
 const SEND_TTL_MS = 60_000; // 1 minute
+export const QUEUE_DISPLAY_LIMIT = 100;
 
 const SidebarContainer = () => {
     const [mode, setMode] = useState<"build" | "send">("send");
@@ -391,7 +393,7 @@ const SidebarContainer = () => {
         try {
             const [s, q] = await Promise.all([
                 serverFunctions.getSendSummary(),
-                serverFunctions.queueList({ status: "all", limit: 50 })
+                serverFunctions.queueList({ status: "all", limit: QUEUE_DISPLAY_LIMIT })
             ]);
 
             if (s?.remaining) {
@@ -402,6 +404,7 @@ const SidebarContainer = () => {
                         queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
                         sent: s.sent ?? 0,
                         userEmail: s.userEmail,
+                        total: s.total,
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
                     lastFetched: Date.now(),
