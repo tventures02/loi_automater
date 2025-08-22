@@ -50,7 +50,7 @@ export default function ConfirmGenerateDialog({
         >
             {/* Overlay */}
             <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/40"
                 onClick={onCancel}
                 aria-hidden="true"
             />
@@ -65,7 +65,7 @@ export default function ConfirmGenerateDialog({
                                 Generate LOI documents?
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-gray-600">
-                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in your Drive and add them to the "send" queue.
+                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in your Drive and add them to the Sender queue.
                             </p>
 
                             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700 space-y-1">

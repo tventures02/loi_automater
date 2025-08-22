@@ -7,6 +7,7 @@ import { backendCall } from "../../utils/server-calls";
 import CONSTANTS from '../../utils/constants';
 import { ArrowTopRightOnSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
+import { NewTemplateDialog } from "./NewTemplateDialog";
 
 type Props = {
     user: User;
@@ -45,6 +46,9 @@ const TemplateStepScreen = ({
     const [isCreatingDoc, setIsCreatingDoc] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const selectRef = useRef<HTMLSelectElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const hasUnsaved = isEditing && draft !== templateContent;
 
@@ -158,6 +162,25 @@ const TemplateStepScreen = ({
         if (selectedTemplate) fetchTemplateContent(selectedTemplate);
     };
 
+    const openCreateDialog = () => {
+        setDocTitle('New LOI Template'); // or ''
+        setIsCreateDialogOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
+    const confirmCreate = async () => {
+        if (!docTitle.trim()) {
+            handleError('Please enter a title for the document.');
+            return;
+        }
+        setIsCreateDialogOpen(false);
+        await handleCreateDoc(); // uses `docTitle`
+    };
+
+    const cancelCreate = () => {
+        setIsCreateDialogOpen(false);
+    };
+
     const templateExists = templates.length > 0;
 
     return (
@@ -168,7 +191,20 @@ const TemplateStepScreen = ({
                     templateExists ?
                         "Select the LOI Google Doc Template to use."
                         :
-                        "Create a Google Doc LOI template first."
+                        (
+                            <div className="flex items-center gap-2">
+                                <span>Create a Google Doc LOI template first.</span>
+                                <div
+                                    role="button"
+                                    tabIndex={0} // Makes it focusable
+                                    onClick={openCreateDialog} // Your existing function
+                                    className={`flex items-center gap-1 !cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900 ${isCreatingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <PlusIcon className="h-5 w-5 pointer-events-none" /> {/* Added pointer-events-none to icon */}
+                                    <span className="pointer-events-none whitespace-nowrap">New Template</span> {/* Added pointer-events-none to text */}
+                                </div>
+                            </div>
+                        )
                 }
             </p>
 
@@ -176,14 +212,23 @@ const TemplateStepScreen = ({
                 <div className="mt-1 animate-fadeIn flex items-center gap-2 justify-center text-sm text-gray-500">
                     <InlineSpinner />{isGettingTemplates ? "Loading templates..." : "Creating template..."}
                 </div>
-            ) : templateExists ? (
+            ) : templateExists && (
                 <div className="mt-1 !mb-2 animate-fadeIn">
                     <select
+                        ref={selectRef}
                         id="docTemplateSelect"
                         value={selectedTemplate}
-                        onChange={handleTemplateSelection}
-                        className={`w-full rounded-md border border-gray-200 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 px-2 py-1 text-xs `}
-                    >
+                            onChange={(event) => {
+                                if (event.target.value === 'new') {
+                                    // keep the current selection in UI and open dialog
+                                    if (selectRef.current) selectRef.current.value = selectedTemplate;
+                                    openCreateDialog();
+                                    return;
+                                }
+                                setSelectedTemplate(event.target.value);
+                            }}
+                            className={`w-full rounded-md border border-gray-200 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 px-2 py-1 text-xs `}
+                        >
                         {templates.map((template) => (
                             <option key={template.id} value={template.id}>
                                 {template.name}
@@ -191,16 +236,6 @@ const TemplateStepScreen = ({
                         ))}
                         <option value="new">-- Create New Template --</option>
                     </select>
-                </div>
-            ) : (
-                <div
-                    role="button"
-                    tabIndex={0} // Makes it focusable
-                    onClick={handleCreateDoc} // Your existing function
-                    className={`w-full inline-flex items-center justify-center px-6 py-3 !mb-2 mt-[2px] text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors cursor-pointer select-none ${isCreatingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <PlusIcon className="h-5 w-5 pointer-events-none" /> {/* Added pointer-events-none to icon */}
-                    <span className="pointer-events-none">New Template</span> {/* Added pointer-events-none to text */}
                 </div>
             )}
 
@@ -241,6 +276,14 @@ const TemplateStepScreen = ({
                 </div>
             )}
 
+            <NewTemplateDialog
+                isCreateDialogOpen={isCreateDialogOpen}
+                cancelCreate={cancelCreate}
+                confirmCreate={confirmCreate}
+                inputRef={inputRef}
+                docTitle={docTitle}
+                setDocTitle={setDocTitle}
+            />
 
             {/* Template controls */}
             {templateExists && (

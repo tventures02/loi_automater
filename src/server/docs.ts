@@ -1,6 +1,6 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
-var LOI_QUEUE_NAME = 'Send Queue';
+var LOI_QUEUE_NAME = 'Sender Queue';
 
 var LOI_QUEUE_HEADERS = [
     'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
@@ -106,7 +106,7 @@ export const createGoogleDoc = (docTitle: string) => {
         const body = doc.getBody();
 
         // Fill in the LOI template with provided data
-        const content = `Sample Letter of Intent\n\nHi {{name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
+        const content = `Sample Letter\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
 
         body.appendParagraph(content);
 
@@ -145,13 +145,13 @@ export const getPreviewRowValues = (payload) => {
 /** Preflight: count rows, validate emails, build a sample filename. */
 /** Preflight: count rows, validate emails, build a sample filename.
  *  Uses ONLY the active (or specified) sheet; NO headers are assumed/required.
- *  All tracking/sending will be handled via Send Queue.
+ *  All tracking/sending will be handled via Sender Queue.
  */
 export const preflightGenerateLOIs = (payload) => {
     const ss = SpreadsheetApp.getActive();
     const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
     if (!sheet) throw new Error('Sheet not found');
-    if (sheet.getName().startsWith('Send Queue')) throw new Error('Send Queue is not a raw data sheet.');
+    if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
 
     const lastRow = sheet.getLastRow();
@@ -313,7 +313,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
             // Build deterministic content key as the queue ID
             const id = makeContentKey(row, tokenCols, eIdx, templateId, mapVersion);
 
-            // Skip duplicates already present in Send Queue
+            // Skip duplicates already present in Sender Queue
             if (existingIds.has(id)) {
                 skippedInvalid++;
                 statuses.push({ row: r + 1, status: 'skipped', message: 'Duplicate (already queued/sent with same content)' });
@@ -359,7 +359,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
                 }
 
-                // Queue row in Send Queue
+                // Queue row in Sender Queue
                 const now = new Date();
                 queueBatch.push({
                     id: id,
@@ -394,7 +394,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
             }
         }
 
-        // Bulk append to Send Queue
+        // Bulk append to Sender Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
 
         return {
@@ -528,7 +528,7 @@ function renderName(pattern, row, tokenCols) {
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';
 }
-/** Ensure Send Queue exists with headers; returns sheet. */
+/** Ensure Sender Queue exists with headers; returns sheet. */
 export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();
     var sh = ss.getSheetByName(LOI_QUEUE_NAME);
@@ -597,7 +597,7 @@ export const queueStatus = () => {
     }
 }
 
-/** Return basic counters for Send Center from Send Queue. */
+/** Return basic counters for Sender from Sender Queue. */
 export const getSendSummary = () => {
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
@@ -625,7 +625,7 @@ export const getSendSummary = () => {
     return { remaining, queued, sent, userEmail: Session.getActiveUser().getEmail() };
 };
 
-/** Remove all rows from Send Queue except the header row. */
+/** Remove all rows from Sender Queue except the header row. */
 export const queueClearAll = () => {
     const { sh } = queueEnsureSheet(); // your existing helper
     const lastRow = sh.getLastRow();
@@ -688,7 +688,7 @@ export const queueList = (payload) => {
 
 
 /**
- * Send up to `max` queued items (oldest first) from Send Queue using MailApp.
+ * Send up to `max` queued items (oldest first) from Sender Queue using MailApp.
  * - Respects daily quota
  * - Updates status, attempts, sentAt/updatedAt, lastError
  * @param {{max?: number, subject?: string, bodyTemplate?: string}} payload

@@ -37,7 +37,7 @@ type PreflightResult = {
     invalidEmails: number;
     missingValuesRows: number; // optional heuristic
     sampleFileName: string;
-    queueExists: boolean;   // true if Send Queue exists
+    queueExists: boolean;   // true if Sender Queue exists
 };
 
 type GenerateSummary = {
@@ -113,8 +113,8 @@ export default function GenerateLOIsStepScreen({
 
     // Auto-preflight when pre-conditions are met
     useEffect(() => {
-        const haveAllTokens = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
-        if (!templateDocId || !emailColumn || !haveAllTokens) {
+        const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
+        if (!templateDocId || !emailColumn || !hasAtLeastOneMapped) {
             setPreflight(null);
             onValidChange?.("lois", false);
             return;
@@ -162,8 +162,8 @@ export default function GenerateLOIsStepScreen({
 
     /* Build email preview from first row values (same approach as LOI preview) */
     useEffect(() => {
-        const haveAllTokens = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
-        if (!haveAllTokens) { setEmailPreview(null); return; }
+        const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
+        if (!hasAtLeastOneMapped) { setEmailPreview(null); return; }
 
         let cancelled = false;
         (async () => {
@@ -241,8 +241,9 @@ export default function GenerateLOIsStepScreen({
     };
 
     const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
+    const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
     const templateOk = !!templateDocId;
-    const tokensOk = allTokensMapped;
+    const tokensOk = allTokensMapped || hasAtLeastOneMapped;
     const emailOk = !!mapping.__email;
     const eligibleOk = (preflight?.eligibleRows ?? 0) > 0;
     const checksOk = templateOk && tokensOk && emailOk && eligibleOk;
@@ -264,7 +265,7 @@ export default function GenerateLOIsStepScreen({
                 isSubmitting={isGenerating}
             />
 
-            <h2 className="text-sm font-semibold text-gray-900">Create the LOIs</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
 
             <div className="mt-0 text-[11px] text-gray-500">
                 Placeholders you can use:{" "}
@@ -402,7 +403,7 @@ export default function GenerateLOIsStepScreen({
 
                             <div className="text-gray-600">Placeholders mapped</div>
                             <div className="text-gray-900">
-                                {tokensOk ? "✓" : `${placeholders.filter((p) => !mapping[p]).length} missing`}
+                                {allTokensMapped ? "✓ all mapped" : hasAtLeastOneMapped ? `⚠ ${placeholders.filter((p) => !!mapping[p]).length} mapped` : "none mapped"}
                             </div>
 
                             <div className="text-gray-600">Email column mapped {sheetName ? <>({sheetNameShort})</> : ""}</div>
@@ -452,7 +453,7 @@ export default function GenerateLOIsStepScreen({
                                 })();
                             }}
                             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.currentTarget as any).click()}
-                            className="mt-3 inline-block select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                            className="mt-3 inline-block select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
                         >
                             {isPreflighting ? "Checking…" : "Re-run checks"}
                         </div>

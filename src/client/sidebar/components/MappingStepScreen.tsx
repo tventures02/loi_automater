@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { serverFunctions } from '../../utils/serverFunctions';
 import InlineSpinner from "../../utils/components/InlineSpinner";
+import { PencilIcon } from "node_modules/@heroicons/react/24/outline";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -17,6 +18,9 @@ type Props = {
 
     /** Sheet name to use for preview */
     sheetName?: string;
+
+    /** Set current step */
+    setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
 };
 
 function normalizeNewlines(s: string) {
@@ -71,6 +75,7 @@ export default function MappingStepScreen({
     onMappingChange,
     onValidChange,
     sheetName,
+    setCurrentStep,
 }: Props) {
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
 
@@ -104,13 +109,13 @@ export default function MappingStepScreen({
     // Report changes upward + validity
     useEffect(() => {
         onMappingChange?.({ ...mapping, __email: emailColumn });
-        const allMapped =
-            placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
-        const valid = allMapped && !!emailColumn;
+        
+        const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
+        const valid = hasAtLeastOneMapped && !!emailColumn;
 
         onValidChange?.("map", valid);
 
-        if (!allMapped || !templateContent) {
+        if (!hasAtLeastOneMapped || !templateContent) {
             setPreviewState("idle");
             setPreviewText("");
             setPreviewError(null);
@@ -179,6 +184,7 @@ export default function MappingStepScreen({
     };
 
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
+    const allMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
 
     return (
         <div className="space-y-3">
@@ -237,6 +243,9 @@ export default function MappingStepScreen({
                         <div className="text-[11px] text-gray-600">
                             {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
                         </div>
+                        <div className="text-[11px] text-gray-600 flex items-center justify-end gap-1">
+                            <span onClick={() => setCurrentStep("template")} className="cursor-pointer hover:underline">Change template</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -280,13 +289,8 @@ export default function MappingStepScreen({
             </div>
 
             {/* Preview */}
-            {placeholders.length > 0 && (
+            {allMapped ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50">
-                    {previewState === "idle" && (
-                        <div className="p-3 text-xs text-gray-700">
-                            A preview of an LOI will appear after all columns are mapped.
-                        </div>
-                    )}
                     {previewState === "loading" && (
                         <div className="p-3 text-xs text-gray-500 flex items-center gap-2">
                             <InlineSpinner /> Building preview…
@@ -307,6 +311,12 @@ export default function MappingStepScreen({
                             </div>
                         </>
                     )}
+                </div>
+            ) : (
+                <div className="rounded-lg border border-gray-200 bg-gray-50">
+                    <div className="p-3 text-xs text-gray-700">
+                        An example of the LOI text will appear after all columns are mapped.
+                    </div>
                 </div>
             )}
         </div>

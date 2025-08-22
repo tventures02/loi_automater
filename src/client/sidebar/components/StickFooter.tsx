@@ -66,16 +66,16 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
     let tooltipTitle = "";
     switch (currentStep) {
         case "template":
-            tooltipTitle = "Please select a template";
+            tooltipTitle = "Please select a template and data source";
             break;
         case "map":
-            tooltipTitle = "Please map all placeholders";
+            tooltipTitle = "Please map placeholders and email";
             break;
         case "lois":
             tooltipTitle = "Please generate LOIs";
             break;
         default:
-            tooltipTitle = "Please fill in all fields";
+            tooltipTitle = "";
     }
 
     return (

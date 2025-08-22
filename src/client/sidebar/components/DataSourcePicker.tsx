@@ -23,10 +23,10 @@ export default function DataSourcePicker({
 
     return (
 
-        <div className="space-y-2 mt-2">
+        <div className="space-y-2 mt-4 border-t border-gray-200 pt-2">
             <h2 className="text-sm font-semibold text-gray-900">Select Data Source</h2>
             <p className="text-xs text-gray-600 mb-[6px]">
-                Select the data source for the LOIs.
+                Select the data source for your LOIs.
             </p>
 
             <div className="flex items-center justify-between gap-2">

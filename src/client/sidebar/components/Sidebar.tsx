@@ -236,7 +236,13 @@ const SidebarContainer = () => {
                 }
             }
 
-            refreshSendData(true);
+            const getQueueData = async () => {
+                if (await serverFunctions.queueExists()) {
+                    refreshSendData(true);
+                }
+            }
+
+            getQueueData();
             getData();
         }
         catch (e) {
@@ -487,7 +493,7 @@ const SidebarContainer = () => {
                                     }}
                                     className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                                 >
-                                    Open Send Center
+                                    Open Sender
                                 </div>
                                 <div
                                     role="button"
@@ -499,12 +505,13 @@ const SidebarContainer = () => {
                                 </div>
                             </div>
                         }
+                        mode={mode}
                     />
                 ) : (
-                    // Minimal header bar for Send Center
+                    // Minimal header bar for Sender
                     <div className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
                         <div className="flex items-center justify-between px-3 py-2">
-                            <div className="text-sm font-semibold text-gray-900">Send Center</div>
+                            <div className="text-sm font-semibold text-gray-900">Sender</div>
                             <div
                                 role="button"
                                 tabIndex={0}
@@ -587,6 +594,7 @@ const SidebarContainer = () => {
                                 onMappingChange={setMapping}
                                 onValidChange={(key, ok) => setCanContinue({ ...canContinue, [key]: ok })}
                                 sheetName={dataSheet || undefined}
+                                setCurrentStep={setCurrentStep}
                             />
                         )}
 

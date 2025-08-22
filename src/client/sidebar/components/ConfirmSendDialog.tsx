@@ -11,7 +11,7 @@ type Props = {
 
     // Context
     remaining?: number;     // MailApp daily quota remaining
-    queued?: number;        // queued in Send Queue
+    queued?: number;        // queued in Sender Queue
     toEmail?: string;       // user's email (for test mode)
     defaultSampleCount?: number; // test mode: how many previews to send
     isSubmitting?: boolean;
@@ -57,7 +57,7 @@ export default function ConfirmSendDialog({
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
             {/* overlay */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
             {/* panel */}
             <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
                 <div className="p-4">
@@ -98,7 +98,7 @@ export default function ConfirmSendDialog({
                                 </div>
                             </div>
                             <div className="mt-2 text-gray-500">
-                                This won't change the queue status; test emails are sent to you to verify everything is working.
+                                This won't change the queue status; test emails are sent to you to verify everything is correct.
                             </div>
                         </div>
                     )}

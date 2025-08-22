@@ -11,6 +11,8 @@ type Props = {
     onStepChange?: (key: string) => void;
     /** Optional right-side slot (e.g., Help) */
     rightSlot?: React.ReactNode;
+    /** Mode */
+    mode: "build" | "send";
 };
 
 const DEFAULT_STEPS: Step[] = [
@@ -25,7 +27,7 @@ function cx(...c: (string | false | null | undefined)[]) {
 }
 
 const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHeaderStepper(
-    { steps = DEFAULT_STEPS, current, onStepChange, rightSlot },
+    { steps = DEFAULT_STEPS, current, onStepChange, rightSlot, mode },
     ref
 ) {
     const order = useMemo(() => steps.map(s => s.key), [steps]);
@@ -38,9 +40,15 @@ const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHea
             role="navigation"
             aria-label="LOI Builder steps"
         >
-            {/* Optional actions row */}
-            <div className="w-full flex items-center justify-end px-3 pt-2 pb-2">
-                {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
+
+            <div className="flex items-center">
+                {mode === "build" && (
+                    <div className="text-sm font-semibold text-gray-900 justify-start px-3">Builder</div>
+                )}
+                {/* Optional actions row */}
+                <div className="w-full flex items-center justify-end px-3 pt-2 pb-2">
+                    {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
+                </div>
             </div>
 
             {/* Stepper */}

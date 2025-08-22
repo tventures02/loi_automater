@@ -7,6 +7,7 @@ import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
+import { TrashIcon } from "@heroicons/react/24/outline";
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
 
@@ -236,7 +237,7 @@ export default function SendCenterScreen({
                                     }`}
                                 aria-disabled={items.length === 0}
                             >
-                                Clear queue…
+                                <div className="flex items-center gap-1"><TrashIcon className="w-3 h-3" /> Clear queue…</div>
                             </div>
                             }
                         </div>
