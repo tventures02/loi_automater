@@ -19,13 +19,13 @@ export default function SendCenterSetup({
     const { exists } = queueStatus;
 
     const message = !exists ?
-        <>Create a sheet tab (<span className="font-mono">LOI_Queue</span>) to track and send LOIs. This won’t modify your data.</> :
-        <>The <span className="font-mono">LOI_Queue</span> sheet tab is ready to use. Go to the builder to generate some LOIs.</>;
+        <>Create a sheet tab (<span className="font-mono">Send Queue</span>) to track and send LOIs. This won’t modify your data.</> :
+        <>The <span className="font-mono">Send Queue</span> sheet tab is ready to use. Go to the builder to generate some LOIs.</>;
 
     return (
         <div className="space-y-3">
             <div className="rounded-xl border border-gray-200 p-4">
-                <div className="text-sm font-semibold text-gray-900">Setup</div>
+                <div className="text-sm font-semibold text-gray-900">{exists ? "Ready to build LOIs" : "Setup"}</div>
                 <p className="mt-1 text-xs text-gray-600">
                     {message}
                 </p>

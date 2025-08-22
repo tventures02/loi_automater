@@ -6,6 +6,7 @@ import StickyFooter from "./StickFooter";
 import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
+import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
 
@@ -38,6 +39,9 @@ export default function SendCenterScreen({
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
     const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
 
+    const [openClear, setOpenClear] = useState(false);
+    const [clearing, setClearing] = useState(false);
+
     const { summary, items, loading, error } = sendData;
 
     const filtered = useMemo(() => {
@@ -66,7 +70,7 @@ export default function SendCenterScreen({
                 summary: {
                     ...s.summary,
                     remaining: Math.max(0, (s.summary?.remaining || 0) - created),
-                    sentToday: (s.summary?.sentToday || 0) + created,
+                    sent: (s.summary?.sent || 0) + created,
                     queued: Math.max(0, (s.summary?.queued || 0) - created),
                 }
             }));
@@ -99,6 +103,28 @@ export default function SendCenterScreen({
             setSending(false);
             setDialog({ open: false, variant: "test" });
             setTimeout(() => setToast(""), 3500);
+        }
+    };
+
+    const handleClearQueue = async () => {
+        if (clearing) return;
+        setClearing(true);
+        try {
+            await serverFunctions.queueClearAll();
+            // Optimistic local reset; also call onRefresh to re-pull counts
+            setSendData(s => ({ ...s, items: [] }));
+            setSendData(s => ({
+                ...s,
+                summary: s.summary ? { ...s.summary, queued: 0 } : s.summary
+            }));
+            onRefresh?.();
+            setToast("Queue cleared.");
+        } catch {
+            setToast("Failed to clear queue. Please try again.");
+        } finally {
+            setClearing(false);
+            setOpenClear(false);
+            setTimeout(() => setToast(""), 2500);
         }
     };
 
@@ -137,15 +163,15 @@ export default function SendCenterScreen({
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge label={`Remaining today: ${summary?.remaining ?? "—"}`} />
-                                <Badge label={`Queued: ${summary?.queued ?? "—"}`} />
-                                <Badge label={`Sent today: ${summary?.sentToday ?? "—"}`} />
+                                <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
+                                <Badge label={`Waiting to be sent: ${summary?.queued ?? "—"}`} />
+                                <Badge label={`Successfully sent: ${summary?.sent ?? "—"}`} />
                             </div>
                         </div>
                     </>
                 }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
-                <div className="w-full flex items-center justify-end gap-2">
+                <div className="w-full flex items-center justify-end gap-2 mt-2">
                     <div
                         role="button"
                         tabIndex={0}
@@ -168,7 +194,9 @@ export default function SendCenterScreen({
                     onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setQueueOpen(v => !v)}
                     className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                 >
-                    <div className="text-sm font-semibold text-gray-900">Queue</div>
+                    <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-gray-900">Queue</div>
+                    </div>
                     <svg
                         className={`h-4 w-4 text-gray-500 transition-transform ${queueOpen ? "rotate-180" : ""}`}
                         viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
@@ -180,9 +208,27 @@ export default function SendCenterScreen({
                 {/* Details (collapsible) */}
                 {queueOpen && (
                     <>
-                        <div className="text-xs text-gray-600 px-3">
-                            {loading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                        <div className="flex items-center justify-between px-3">
+                            <div className="text-xs text-gray-600">
+                                {loading ? "" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+                            </div>
+                            {/* CLEAR QUEUE (destructive) */}
+                            {items.length > 0 && <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setOpenClear(true)}
+                                className={`select-none !w-auto rounded-md px-2 py-1 text-[11px] ring-1 ${items.length === 0
+                                    ? "ring-gray-200 text-gray-400 cursor-not-allowed"
+                                    : "ring-red-300 text-red-700 hover:bg-red-50 cursor-pointer"
+                                    }`}
+                                aria-disabled={items.length === 0}
+                            >
+                                Clear queue…
+                            </div>
+                            }
                         </div>
+
+
                         <div className="flex items-center justify-between px-3 py-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
@@ -273,7 +319,7 @@ export default function SendCenterScreen({
                 primaryDisabled={!canSend || sending || loading}
                 primaryLoading={sending}
                 leftSlot={null}
-                helperText={loading ? null : queuedCount === 0 ? "No queued items to send." : undefined}
+                helperText={loading ? null : queuedCount === 0 ? "No queued items to send. Generate some LOIs first." : undefined}
                 currentStep="send"
             />
 
@@ -289,12 +335,20 @@ export default function SendCenterScreen({
                 isSubmitting={sending}
             />
 
+            {openClear && (
+                <ConfirmClearQueueModal
+                    count={items.length}
+                    clearing={clearing}
+                    onCancel={() => { if (!clearing) { setOpenClear(false); } }}
+                    onConfirm={handleClearQueue}
+                />
+            )}
+
         </div>
     );
 }
 
 /* Small subcomponents */
-
 function Badge({ label }: { label: string }) {
     return (
         <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">

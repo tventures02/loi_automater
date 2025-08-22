@@ -1,6 +1,6 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
-var LOI_QUEUE_NAME = 'LOI_Queue';
+var LOI_QUEUE_NAME = 'Send Queue';
 
 var LOI_QUEUE_HEADERS = [
     'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
@@ -145,13 +145,13 @@ export const getPreviewRowValues = (payload) => {
 /** Preflight: count rows, validate emails, build a sample filename. */
 /** Preflight: count rows, validate emails, build a sample filename.
  *  Uses ONLY the active (or specified) sheet; NO headers are assumed/required.
- *  All tracking/sending will be handled via LOI_Queue.
+ *  All tracking/sending will be handled via Send Queue.
  */
 export const preflightGenerateLOIs = (payload) => {
     const ss = SpreadsheetApp.getActive();
     const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
     if (!sheet) throw new Error('Sheet not found');
-    if (sheet.getName().startsWith('LOI_Queue')) throw new Error('LOI_Queue is not a raw data sheet.');
+    if (sheet.getName().startsWith('Send Queue')) throw new Error('Send Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
 
     const lastRow = sheet.getLastRow();
@@ -313,7 +313,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
             // Build deterministic content key as the queue ID
             const id = makeContentKey(row, tokenCols, eIdx, templateId, mapVersion);
 
-            // Skip duplicates already present in LOI_Queue
+            // Skip duplicates already present in Send Queue
             if (existingIds.has(id)) {
                 skippedInvalid++;
                 statuses.push({ row: r + 1, status: 'skipped', message: 'Duplicate (already queued/sent with same content)' });
@@ -359,7 +359,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
                     bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
                 }
 
-                // Queue row in LOI_Queue
+                // Queue row in Send Queue
                 const now = new Date();
                 queueBatch.push({
                     id: id,
@@ -394,7 +394,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
             }
         }
 
-        // Bulk append to LOI_Queue
+        // Bulk append to Send Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
 
         return {
@@ -528,7 +528,7 @@ function renderName(pattern, row, tokenCols) {
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';
 }
-/** Ensure LOI_Queue exists with headers; returns sheet. */
+/** Ensure Send Queue exists with headers; returns sheet. */
 export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();
     var sh = ss.getSheetByName(LOI_QUEUE_NAME);
@@ -597,7 +597,7 @@ export const queueStatus = () => {
     }
 }
 
-/** Return basic counters for Send Center from LOI_Queue. */
+/** Return basic counters for Send Center from Send Queue. */
 export const getSendSummary = () => {
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
@@ -606,31 +606,43 @@ export const getSendSummary = () => {
     const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
     const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
-    let queued = 0, scheduled = 0, sentToday = 0;
+    let queued = 0, sent = 0;
     if (lastRow > 1) {
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-        const iStatus = head['status'], iSentAt = head['sentAt'];
+        const iStatus = head['status'];
 
         for (let r = 0; r < vals.length; r++) {
             const row = vals[r];
             const status = String(row[iStatus] || '').toLowerCase();
             if (status === 'queued') queued++;
-            else if (status === 'scheduled') scheduled++;
             else if (status === 'sent') {
-                const sentAt = row[iSentAt];
-                if (sentAt) {
-                    const d = (sentAt instanceof Date) ? sentAt : new Date(sentAt);
-                    const key = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
-                    if (key === today) sentToday++;
-                }
+                sent++
             }
         }
     }
 
     const remaining = MailApp.getRemainingDailyQuota();
-    return { remaining, queued, scheduled, sentToday, userEmail: Session.getActiveUser().getEmail() };
+    return { remaining, queued, sent, userEmail: Session.getActiveUser().getEmail() };
 };
 
+/** Remove all rows from Send Queue except the header row. */
+export const queueClearAll = () => {
+    const { sh } = queueEnsureSheet(); // your existing helper
+    const lastRow = sh.getLastRow();
+    if (lastRow <= 1) return { cleared: 0, remaining: 0 };
+
+    const lock = LockService.getDocumentLock();
+    if (!lock.tryLock(10_000)) {
+        throw new Error('Another operation is in progress. Try again soon.');
+    }
+    try {
+        const rows = lastRow - 1; // everything below the header
+        sh.getRange(2, 1, rows, sh.getLastColumn()).clearContent(); // keep header, formatting
+        return { cleared: rows, remaining: 0 };
+    } finally {
+        lock.releaseLock();
+    }
+};
 
 
 export const queueList = (payload) => {
@@ -676,7 +688,7 @@ export const queueList = (payload) => {
 
 
 /**
- * Send up to `max` queued items (oldest first) from LOI_Queue using MailApp.
+ * Send up to `max` queued items (oldest first) from Send Queue using MailApp.
  * - Respects daily quota
  * - Updates status, attempts, sentAt/updatedAt, lastError
  * @param {{max?: number, subject?: string, bodyTemplate?: string}} payload
@@ -738,6 +750,7 @@ export const sendNextBatch = (payload) => {
                 body: String(safeAt(row, iBody) || ''),       // may be empty
                 attempts: Number(safeAt(row, iAttempts) || 0),
                 createdAt: safeAt(row, iCreatedAt) ? new Date(safeAt(row, iCreatedAt)) : new Date(0),
+                attachPdf: asBool(safeAt(row, iAttachPdf) || false),
             });
         }
         queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));

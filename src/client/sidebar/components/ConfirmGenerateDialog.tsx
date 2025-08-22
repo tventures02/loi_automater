@@ -1,4 +1,6 @@
 // ConfirmGenerateDialog.tsx
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { Tooltip } from "@mui/material";
 import React, { useEffect, useRef } from "react";
 
 type Props = {
@@ -63,20 +65,29 @@ export default function ConfirmGenerateDialog({
                                 Generate LOI documents?
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-gray-600">
-                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in your Drive and add them to the "Send Center" queue.
+                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in your Drive and add them to the "send" queue.
                             </p>
 
                             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700 space-y-1">
                                 {templateDocId ? (
                                     <div>
-                                        <span className="text-gray-500">
-                                            <a href={`https://docs.google.com/document/d/${templateDocId}`} target="_blank" rel="noopener noreferrer">Template</a>
-                                            </span>
+                                        <span className="text-gray-500 flex items-center gap-1">
+                                            LOI template: <a
+                                                href={`https://docs.google.com/document/d/${templateDocId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[11px] text-gray-600 hover:text-gray-900 underline underline-offset-2 ml-1"
+                                            >
+                                                <Tooltip title="Open in Docs">
+                                                    <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+                                                </Tooltip>
+                                            </a>
+                                        </span>
                                     </div>
                                 ) : null}
                                 {sheetName ? (
                                     <div>
-                                        <span className="text-gray-500">Source sheet: </span>
+                                        <span className="text-gray-500">Data source sheet: </span>
                                         <span className="font-medium text-gray-800 overflow-ellipsis">{sheetName}</span>
                                     </div>
                                 ) : null}

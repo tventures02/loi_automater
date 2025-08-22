@@ -26,6 +26,8 @@ type Props = {
     setQueueStatus: React.Dispatch<React.SetStateAction<QueueStatus>>;
     /** Current queue status */
     queueStatus: QueueStatus;
+
+    refreshSendData: (force?: boolean) => void;
 };
 
 type PreflightResult = {
@@ -35,7 +37,7 @@ type PreflightResult = {
     invalidEmails: number;
     missingValuesRows: number; // optional heuristic
     sampleFileName: string;
-    queueExists: boolean;   // true if LOI_Queue exists
+    queueExists: boolean;   // true if Send Queue exists
 };
 
 type GenerateSummary = {
@@ -85,6 +87,7 @@ export default function GenerateLOIsStepScreen({
     canContinue,
     setQueueStatus,
     queueStatus,
+    refreshSendData,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -233,6 +236,7 @@ export default function GenerateLOIsStepScreen({
             setIsGenerating(false);
             setProgressText("");
             setTimeout(() => setToast(""), 8000);
+            refreshSendData(true);
         }
     };
 

@@ -37,8 +37,7 @@ export type QueueItem = {
 export type SendSummary = {
     remaining: number;      // MailApp.getRemainingDailyQuota()
     queued: number;
-    scheduled: number;
-    sentToday: number;
+    sent: number;
     userEmail: string;
 };
 
@@ -394,8 +393,7 @@ const SidebarContainer = () => {
                     summary: {
                         remaining: s.remaining,
                         queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
-                        scheduled: s.scheduled ?? 0,
-                        sentToday: s.sentToday ?? 0,
+                        sent: s.sent ?? 0,
                         userEmail: s.userEmail,
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
@@ -599,6 +597,7 @@ const SidebarContainer = () => {
                                 queueStatus={queueStatus}
                                 setQueueStatus={setQueueStatus}
                                 sheetName={dataSheet || undefined}
+                                refreshSendData={refreshSendData}
                             />
                         )}
 
