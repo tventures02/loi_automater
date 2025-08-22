@@ -32,12 +32,15 @@ export type QueueItem = {
     lastError?: string | null;
     createdAt?: Date | null;
     subject?: string;
+    sourceRow?: string;
+    queueTabRow?: number;
 };
 
 export type SendSummary = {
     remaining: number;      // MailApp.getRemainingDailyQuota()
     queued: number;
     sent: number;
+    failed: number;
     userEmail: string;
     total: number;
 };
@@ -403,6 +406,7 @@ const SidebarContainer = () => {
                         remaining: s.remaining,
                         queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
                         sent: s.sent ?? 0,
+                        failed: s.failed ?? 0,
                         userEmail: s.userEmail,
                         total: s.total,
                     },

@@ -1,14 +1,15 @@
 // src/client/components/SendCenterScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
-import { QUEUE_DISPLAY_LIMIT, QueueItem } from "./Sidebar";
+import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
 import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { Tooltip } from "@mui/material";
+import { Alert, Tooltip } from "@mui/material";
+import { Snackbar } from "@mui/material";
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
 const PAGE_SIZE = 10;
@@ -47,7 +48,7 @@ export default function SendCenterScreen({
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
-    const [toast, setToast] = useState<string>("");
+    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
     const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -75,26 +76,26 @@ export default function SendCenterScreen({
         setSending(true);
         try {
             const n = Math.min(summary.remaining, queuedTotal, 100);
-            const res = await safeCall(async () => serverFunctions.sendNextBatch({ max: n }));
-            const created = res?.sent ?? n;
+            const res = await serverFunctions.sendNextBatch({ max: n });
+            const sent = res?.sent ?? n;
 
             // Optimistic local counters; the list itself will be refreshed after
             setSendData(s => ({
                 ...s,
                 summary: {
                     ...s.summary,
-                    remaining: Math.max(0, (s.summary?.remaining || 0) - created),
-                    sent: (s.summary?.sent || 0) + created,
-                    queued: Math.max(0, (s.summary?.queued || 0) - created),
+                    remaining: res?.creditsLeft ?? Math.max(0, (s.summary?.remaining || 0) - sent),
+                    sent: (s.summary?.sent || 0) + sent,
+                    queued: Math.max(0, (s.summary?.queued || 0) - sent),
                 }
             }));
-            setToast(`Sent ${created} LOIs`);
-        } catch {
-            setToast("Send failed. Please try again.");
+            setSnackbar({ open: true, message: `Sent ${sent} LOIs`, severity: "success" });
+        } catch (e) {
+            setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
-            setTimeout(() => setToast(""), 3500);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 3500);
             refreshSendData(true);
         }
     };
@@ -104,20 +105,19 @@ export default function SendCenterScreen({
         setSending(true);
         try {
             const n = Math.min(sampleCount, queuedTotal, 5);
-            await safeCall(async () =>
-                serverFunctions.sendNextBatch({
-                    max: n,
-                    testMode: true,
-                    previewTo: sendData?.summary?.userEmail, // fallback handled server-side
-                })
-            );
-            setToast(`Sent ${n} test email${n > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`);
+            await serverFunctions.sendNextBatch({
+                max: n,
+                testMode: true,
+                previewTo: sendData?.summary?.userEmail, // fallback handled server-side
+            });
+
+            setSnackbar({ open: true, message: `Sent ${n} test email${n > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
         } catch {
-            setToast("Test send failed. Please try again.");
+            setSnackbar({ open: true, message: "Test send failed. Please try again.", severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
-            setTimeout(() => setToast(""), 3500);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 3500);
             refreshSendData(true);
         }
     };
@@ -134,13 +134,13 @@ export default function SendCenterScreen({
                 summary: s.summary ? { ...s.summary, queued: 0 } : s.summary
             }));
             onRefresh?.();
-            setToast("Queue cleared.");
+            setSnackbar({ open: true, message: "Queue cleared.", severity: "success" });
         } catch {
-            setToast("Failed to clear queue. Please try again.");
+            setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
         } finally {
             setClearing(false);
             setOpenClear(false);
-            setTimeout(() => setToast(""), 2500);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
         }
     };
 
@@ -155,23 +155,22 @@ export default function SendCenterScreen({
     }
 
     const scanForNewRows = async () => {
-        setToast("Scanned sheet: 42 new rows found (demo)");
-        setTimeout(() => setToast(""), 2500);
+        setSnackbar({ open: true, message: "Scanned sheet: 42 new rows found (demo)", severity: "success" });
+        setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
     };
-
-    const openRealDialog = () => setDialog({ open: true, variant: "real" });
-    const openTestDialog = () => setDialog({ open: true, variant: "test" });
 
     const addNewLoisToQueue = async () => {
         const demo = [
             { id: cryptoId(), recipient: "new1@example.com", address: "11 Birch Ln", docUrl: "#", status: "queued" as const, scheduled: null },
             { id: cryptoId(), recipient: "new2@example.com", address: "22 Cedar Dr", docUrl: "#", status: "queued" as const, scheduled: null },
         ];
-        setSendData(s => ({ ...s, items: [...demo, ...s.items] }));
         setSendData(s => ({ ...s, summary: { ...s.summary, queued: s.summary?.queued + demo.length } }));
-        setToast(`Queued ${demo.length} new LOIs`);
-        setTimeout(() => setToast(""), 2500);
+        setSnackbar({ open: true, message: `Queued ${demo.length} new LOIs`, severity: "success" });
+        setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
     };
+
+    const openRealDialog = () => setDialog({ open: true, variant: "real" });
+    const openTestDialog = () => setDialog({ open: true, variant: "test" });
 
     let primaryLabel = "Send Next";
     if (sending) primaryLabel = "Sending…";
@@ -198,7 +197,8 @@ export default function SendCenterScreen({
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
                                 <Badge label={`To be sent: ${summary?.queued ?? "—"}`} />
-                                <Badge label={`Successfully sent: ${summary?.sent ?? "—"}`} />
+                                <Badge label={`Sent: ${summary?.sent ?? "—"}`} />
+                                <Badge label={`Failed: ${summary?.failed ?? "—"}`} />
                                 <Badge label={`All queue items: ${summary?.total ?? "—"}`} />
                             </div>
                         </div>
@@ -246,7 +246,7 @@ export default function SendCenterScreen({
                     <>
                         <div className="flex items-center justify-between px-3">
                             <div className="text-xs text-gray-600 truncate overflow-hidden whitespace-nowrap ellipsis">
-                                {loading ? "" : `Showing ${visibleItems.length} of ${queueTotal}`}
+                                {loading ? "" : queueTotal > 0 ? `Showing ${visibleItems.length} of ${queueTotal}` : ""}
                             </div>
                             {/* CLEAR QUEUE (destructive) */}
                             {items.length > 0 && !loading && <div
@@ -290,13 +290,14 @@ export default function SendCenterScreen({
                                                 <div className="text-[11px] text-gray-600 truncate">
                                                     {item.subject || "(no subject)"}
                                                 </div>
+                                                <div className="text-gray-600 text-[11px]">Queue tab row: {item.queueTabRow}</div>
                                                 <div className="text-[11px] text-gray-600 truncate">
                                                     {item.docUrl ? (
                                                         <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                            open doc
+                                                            Open doc
                                                         </a>
                                                     ) : (
-                                                        "no doc"
+                                                        "No doc"
                                                     )}
                                                 </div>
                                                 {item.status === "failed" && item.lastError ? (
@@ -310,16 +311,12 @@ export default function SendCenterScreen({
 
                                 {/* Showing X of Y */}
                                 <div className="pt-1 pb-1 flex items-center justify-between text-[11px] text-gray-600">
-                                    <span>
-                                        {queueTotal > QUEUE_DISPLAY_LIMIT ? "Queue has more than shown" : ''}
-                                    </span>
-
                                     {canLoadMore && (
                                         <div
                                             role="button"
                                             tabIndex={0}
                                             onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
-                                            className="select-none rounded-md ring-1 ring-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                            className="select-none rounded-md ring-1 ring-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer justify-end"
                                         >
                                             Show next {Math.min(PAGE_SIZE, filtered.length - visibleCount)}
                                         </div>
@@ -358,12 +355,12 @@ export default function SendCenterScreen({
                 </div>
             </div>} */}
 
-            {/* Toast */}
-            {toast && (
-                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-blue-500 px-3 py-2 text-xs text-white shadow">
-                    {toast}
-                </div>
-            )}
+            {/* Snackbar */}
+            {snackbar.open && (
+                <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                    <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+                </Snackbar>
+            )}  
 
             {/* Sticky Footer (primary action: Send next) */}
             <StickyFooter
@@ -394,7 +391,7 @@ export default function SendCenterScreen({
 
             {openClear && (
                 <ConfirmClearQueueModal
-                    count={items.length}
+                    count={queueTotal}
                     clearing={clearing}
                     onCancel={() => { if (!clearing) { setOpenClear(false); } }}
                     onConfirm={handleClearQueue}

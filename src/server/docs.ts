@@ -604,7 +604,7 @@ export const getSendSummary = () => {
     const head = headerIndexMap(sh);
     const lastRow = sh.getLastRow();
 
-    let queued = 0, sent = 0;
+    let queued = 0, sent = 0, failed = 0;
     if (lastRow > 1) {
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
         const iStatus = head['status'];
@@ -616,14 +616,17 @@ export const getSendSummary = () => {
             else if (status === 'sent') {
                 sent++
             }
+            else if (status === 'failed') {
+                failed++
+            }
         }
     }
 
     const remaining = MailApp.getRemainingDailyQuota();
-    return { remaining, queued, sent, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
+    return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
 };
 
-/** Remove all rows from Sender Queue except the header row. */
+/** Remove ALL rows from Sender Queue except the header row. */
 export const queueClearAll = () => {
     const { sh } = queueEnsureSheet(); // your existing helper
     const lastRow = sh.getLastRow();
@@ -651,7 +654,7 @@ export const queueList = (payload) => {
         const qSheetRes = queueEnsureSheet();
         const sh = qSheetRes.sh;
         const head = headerIndexMap(sh);
-        const lastRow = Math.min(MAX_QUEUE_ITEMS_FOR_DISPLAY + 1, sh.getLastRow());
+        const lastRow = sh.getLastRow();
 
         if (lastRow <= 1) return { items: [] };
 
@@ -663,9 +666,10 @@ export const queueList = (payload) => {
         const iLastError = head[normHeader('lastError')];
         const iCreatedAt = head[normHeader('createdAt')];
         const iSubject = head[normHeader('subject')];
+        const iSourceRow = head[normHeader('sourceRow')];
 
         // Build objects; sort by createdAt desc, then id
-        const items = vals.map((row) => {
+        const items = vals.map((row, index) => {
             const queueItem: QueueItem = {
                 id: String(row[iId] || ''),
                 recipient: String(row[iEmail] || ''),
@@ -675,10 +679,12 @@ export const queueList = (payload) => {
                 lastError: row[iLastError] || '',
                 createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
                 subject: row[iSubject] || '',
+                sourceRow: row[iSourceRow] || '',
+                queueTabRow: index + 1,
             }
             return queueItem;
             //@ts-ignore
-        }).sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
+        }).sort((a, b) => (b.createdAt - a.createdAt));
 
         const filtered = statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter);
 
@@ -704,10 +710,10 @@ export const sendNextBatch = (payload) => {
     const lastRow = sh.getLastRow();
     if (lastRow <= 1) return { sent: 0, failed: 0, attempted: 0 };
 
-    const lock = LockService.getDocumentLock();
-    if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
-
+    const lock = LockService.getDocumentLock();    
     try {
+        if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
+
         const remaining = MailApp.getRemainingDailyQuota();
         const requested = Math.max(1, Math.min(1000, Number(payload?.max || 100)));
         const testMode = !!payload?.testMode;
@@ -829,8 +835,14 @@ export const sendNextBatch = (payload) => {
             }
         });
 
-        return { sent, failed, attempted: batch.length, testMode };
-    } finally {
+        return { sent, failed, attempted: batch.length, testMode, creditsLeft: MailApp.getRemainingDailyQuota() };
+    }
+    catch (error) {
+        console.log('error', error)
+        lock.releaseLock();
+        throw error;
+    }
+    finally {
         lock.releaseLock();
     }
 
