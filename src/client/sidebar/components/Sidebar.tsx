@@ -299,7 +299,7 @@ const SidebarContainer = () => {
         try {
             const names = await serverFunctions.getSheetNames();
             setSheetNames(names);
-    
+
             // pick default only if none selected yet
             if (!dataSheet) {
                 const saved = localStorage.getItem("loi:dataSheet");
@@ -395,7 +395,8 @@ const SidebarContainer = () => {
             ]);
 
             if (s?.remaining) {
-                setSendData(prev => ({...prev,
+                setSendData(prev => ({
+                    ...prev,
                     summary: {
                         remaining: s.remaining,
                         queued: s.queued ?? sendData.items.filter(i => i.status === "queued").length,
@@ -470,6 +471,15 @@ const SidebarContainer = () => {
         currentStep={currentStep}
     />;
 
+    const helpButton = (<div
+        role="button"
+        tabIndex={0}
+        className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+        onClick={() => window.open('https://support.google.com/docs', '_blank')}
+    >
+        Help
+    </div>);
+
     console.log('sidebar render-------------------')
     console.log('mode', mode)
     console.log('dataSheet', dataSheet)
@@ -495,14 +505,7 @@ const SidebarContainer = () => {
                                 >
                                     Open Sender
                                 </div>
-                                <div
-                                    role="button"
-                                    tabIndex={0}
-                                    className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-                                    onClick={() => window.open('https://support.google.com/docs', '_blank')}
-                                >
-                                    Help
-                                </div>
+                                {helpButton}
                             </div>
                         }
                         mode={mode}
@@ -512,13 +515,16 @@ const SidebarContainer = () => {
                     <div className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
                         <div className="flex items-center justify-between px-3 py-2">
                             <div className="text-sm font-semibold text-gray-900">Sender</div>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => setMode("build")}
-                                className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            >
-                                Go to Builder
+                            <div className="flex items-center gap-2">
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => setMode("build")}
+                                    className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Open Builder
+                                </div>
+                                {helpButton}
                             </div>
                         </div>
                     </div>
@@ -556,6 +562,8 @@ const SidebarContainer = () => {
                         refreshSendData={refreshSendData}
                         setMode={setMode}
                         mode={mode}
+                        currentStep={currentStep}
+                        setCurrentStep={setCurrentStep}
                     />
                 ) : (
                     <>
@@ -619,7 +627,9 @@ const SidebarContainer = () => {
                                 setSendData={setSendData}
                                 refreshSendData={refreshSendData}
                                 setMode={setMode}
-                                mode={mode} 
+                                mode={mode}
+                                currentStep={currentStep}
+                                setCurrentStep={setCurrentStep}
                             />
                         )}
                     </>

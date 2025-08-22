@@ -86,6 +86,7 @@ export default function MappingStepScreen({
     const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [firstRowEmail, setFirstRowEmail] = useState<string | null>(null);
+    const [onMapperHover, setOnMapperHover] = useState<boolean>(false);
 
     useEffect(() => {
         setMapping({});
@@ -200,7 +201,7 @@ export default function MappingStepScreen({
                     then refresh in the previous step.
                 </div>
             ) : (
-                <div className="rounded-xl border border-gray-200 p-3" id="mapping-parameters">
+                <div className="rounded-xl border border-gray-200 p-3" id="mapping-parameters" onMouseEnter={() => setOnMapperHover(true)} onMouseLeave={() => setOnMapperHover(false)}>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="text-gray-500">Placeholder</div>
                         <div className="text-gray-500">Mapped column</div>
@@ -236,18 +237,22 @@ export default function MappingStepScreen({
                                 </React.Fragment>
                             );
                         })}
-                    </div>
+                        </div>
 
-                    {/* Small helper footer */}
-                    <div className="mt-3 flex items-center justify-between">
-                        <div className="text-[11px] text-gray-600">
-                            {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
-                        </div>
-                        <div className="text-[11px] text-gray-600 flex items-center justify-end gap-1">
-                            <span onClick={() => setCurrentStep("template")} className="cursor-pointer hover:underline">Change template</span>
+                        {/* Small helper footer */}
+                        <div className="mt-3 flex items-center justify-between">
+                            <div className="text-[11px] text-gray-600">
+                                {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
+                            </div>
+                            {
+                                onMapperHover && (
+                                    <div className="text-[11px] text-gray-600 flex items-center justify-end gap-1">
+                                        <span onClick={() => setCurrentStep("template")} className="cursor-pointer hover:underline">Change template</span>
+                                    </div>
+                                )
+                            }
                         </div>
                     </div>
-                </div>
             )}
 
             {/* Delivery email column (separate card for clarity) */}

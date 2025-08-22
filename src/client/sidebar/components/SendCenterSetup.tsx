@@ -60,7 +60,7 @@ export default function SendCenterSetup({
                             className={`mt-3 inline-block select-none rounded-md px-3 py-2 text-xs font-medium text-white ${creating ? "bg-gray-300 cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800 cursor-pointer"
                                 }`}
                         >
-                            Go to builder
+                            Open Builder
                         </div>
                 }
 

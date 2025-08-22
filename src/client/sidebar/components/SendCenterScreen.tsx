@@ -7,7 +7,8 @@ import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Tooltip } from "@mui/material";
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
 
@@ -30,6 +31,8 @@ type Props = {
     refreshSendData: (force?: boolean) => void;
     setMode: (mode: "build" | "send") => void;
     mode: "build" | "send";
+    currentStep: string;
+    setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export default function SendCenterScreen({
@@ -39,6 +42,8 @@ export default function SendCenterScreen({
     refreshSendData,
     setMode,
     mode,
+    currentStep,
+    setCurrentStep,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "scheduled" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
@@ -137,6 +142,16 @@ export default function SendCenterScreen({
         }
     };
 
+    const handleGoToGenLOIs = () => {
+        if (mode === "send") {
+            setMode("build");
+            setCurrentStep("template");
+        }
+        else {
+            setCurrentStep("lois");
+        }
+    }
+
     const scanForNewRows = async () => {
         setToast("Scanned sheet: 42 new rows found (demo)");
         setTimeout(() => setToast(""), 2500);
@@ -158,7 +173,7 @@ export default function SendCenterScreen({
 
     let primaryLabel = "Send Next";
     if (sending) primaryLabel = "Sending…";
-    else if (queuedCount === 0) primaryLabel = "Go to builder";
+    else if (queuedCount === 0) primaryLabel = "Open Builder";
     else primaryLabel = `Send Next ${Math.min(summary?.remaining, queuedCount) || 0}`;
 
     const primaryDisabled = queuedCount === 0 ? loading : (!canSend || sending || loading);
@@ -186,14 +201,17 @@ export default function SendCenterScreen({
                 }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
                 {!loading && <div className="w-full flex items-center justify-end gap-2 mt-2">
+                    <Tooltip title="Refresh data from Sender Queue sheet">
                     <div
                         role="button"
                         tabIndex={0}
                         onClick={onRefresh}
-                        className="cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                        className="flex items-center gap-1 cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
                     >
+                        <ArrowPathIcon className="w-3 h-3" />
                         Refresh
                     </div>
+                    </Tooltip>
                 </div>}
             </div>
 
@@ -319,7 +337,7 @@ export default function SendCenterScreen({
 
             {/* Toast */}
             {toast && (
-                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow">
+                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-blue-500 px-3 py-2 text-xs text-white shadow">
                     {toast}
                 </div>
             )}
@@ -329,7 +347,7 @@ export default function SendCenterScreen({
                 primaryLabel={primaryLabel}
                 secondaryLabel="Send Test Email"
                 onSecondary={queuedCount > 0 ? openTestDialog : undefined}
-                onPrimary={canSend && !sending ? openRealDialog : queuedCount === 0 && !loading && mode === "send" ? () => setMode("build") : undefined}
+                onPrimary={canSend && !sending ? openRealDialog : queuedCount === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}

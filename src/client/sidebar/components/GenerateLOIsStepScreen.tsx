@@ -97,7 +97,7 @@ export default function GenerateLOIsStepScreen({
     const [summary, setSummary] = useState<GenerateSummary | null>(null);
     const [toast, setToast] = useState<string>("");
     const [checksOpen, setChecksOpen] = useState(false);
-
+    const [emailSettingsHovered, setEmailSettingsHovered] = useState<boolean>(false);
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const emailColumn = mapping?.__email || "";
@@ -282,17 +282,17 @@ export default function GenerateLOIsStepScreen({
                 <input
                     value={pattern}
                     onChange={(e) => setPattern(e.target.value)}
-                    className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
+                    className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
                     placeholder={DEFAULT_PATTERN}
                 />
                 {preflight?.sampleFileName && (
-                    <div className="text-[11px] text-gray-600">Example: {preflight.sampleFileName}</div>
+                    <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>
                 )}
             </div>
 
 
             {/* Email settings */}
-            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+            <div className="rounded-xl border border-gray-200 p-3 space-y-2" onMouseEnter={() => setEmailSettingsHovered(true)} onMouseLeave={() => setEmailSettingsHovered(false)}>
                 <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-gray-900">Email settings</div>
                 </div>
@@ -303,7 +303,7 @@ export default function GenerateLOIsStepScreen({
                         <input
                             value={emailSubjectTpl}
                             onChange={(e) => setEmailSubjectTpl(e.target.value)}
-                            className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                            className="w-full !bg-gray-50 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
                             placeholder="Letter of Intent – {{Address}}"
                         />
                     </div>
@@ -324,7 +324,7 @@ export default function GenerateLOIsStepScreen({
                                 <textarea
                                     value={emailBodyTpl}
                                     onChange={(e) => setEmailBodyTpl(e.target.value)}
-                                    className="w-full h-28 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 whitespace-pre-wrap"
+                                    className="w-full h-28 rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 whitespace-pre-wrap"
                                     placeholder="Hi {{AgentName}}, …"
                                 />
                             </>
@@ -344,17 +344,17 @@ export default function GenerateLOIsStepScreen({
                             <div className="text-xs text-gray-900 mt-3">
                                 <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed"><b>Subject:</b> {emailPreview.subject}</div>
                             </div>
-                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3"><b>Body:</b></div>
+                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3 bg-gray-50"><b>Body:</b></div>
                             {useLOIAsBody ? (
                                 <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
                             ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
                                 <div>{emailPreview.body}</div>
                             </div>}
                         </div>
-                        <div className="text-[11px] text-gray-500 cursor-pointer" onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
+                        <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-900' : 'text-white'} hover:underline cursor-pointer flex justify-end`}onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
                     </>
                 ) : (
-                    <span className="text-[11px] text-gray-500 cursor-pointer" onClick={() => setShowEmailPreview(true)}>Show email preview</span>
+                    <span className={`text-[11px] ${emailSettingsHovered ? 'text-gray-900' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(true)}>Show email preview</span>
                 )}
             </div>
 
@@ -510,7 +510,7 @@ export default function GenerateLOIsStepScreen({
 
             {/* Tiny toast */}
             {toast && (
-                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow">
+                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-blue-500 px-3 py-2 text-xs text-white shadow">
                     {toast}
                 </div>
             )}
