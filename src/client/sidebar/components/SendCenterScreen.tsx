@@ -26,12 +26,18 @@ type Props = {
         loading: boolean;
         error?: string | null;
     }>>;
+    refreshSendData: (force?: boolean) => void;
+    setMode: (mode: "build" | "send") => void;
+    mode: "build" | "send";
 };
 
 export default function SendCenterScreen({
     sendData,
     onRefresh,
-    setSendData
+    setSendData,
+    refreshSendData,
+    setMode,
+    mode,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "scheduled" | "failed" | "sent">("all");
     const [sending, setSending] = useState(false);
@@ -81,6 +87,7 @@ export default function SendCenterScreen({
             setSending(false);
             setDialog({ open: false, variant: "real" });
             setTimeout(() => setToast(""), 3500);
+            refreshSendData(true);
         }
     };
 
@@ -103,6 +110,7 @@ export default function SendCenterScreen({
             setSending(false);
             setDialog({ open: false, variant: "test" });
             setTimeout(() => setToast(""), 3500);
+            refreshSendData(true);
         }
     };
 
@@ -147,7 +155,12 @@ export default function SendCenterScreen({
         setTimeout(() => setToast(""), 2500);
     };
 
-    console.log("sendData", sendData);
+    let primaryLabel = "Send Next";
+    if (sending) primaryLabel = "Sending…";
+    else if (queuedCount === 0) primaryLabel = "Go to builder";
+    else primaryLabel = `Send Next ${Math.min(summary?.remaining, queuedCount) || 0}`;
+
+    const primaryDisabled = queuedCount === 0 ? loading : (!canSend || sending || loading);
 
     // Main content height: allow space for sticky footer
     return (
@@ -171,7 +184,7 @@ export default function SendCenterScreen({
                     </>
                 }
                 {error ? <div className="mt-2 text-[11px] text-red-600">{error}</div> : null}
-                <div className="w-full flex items-center justify-end gap-2 mt-2">
+                {!loading && <div className="w-full flex items-center justify-end gap-2 mt-2">
                     <div
                         role="button"
                         tabIndex={0}
@@ -180,7 +193,7 @@ export default function SendCenterScreen({
                     >
                         Refresh
                     </div>
-                </div>
+                </div>}
             </div>
 
 
@@ -213,7 +226,7 @@ export default function SendCenterScreen({
                                 {loading ? "" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
                             </div>
                             {/* CLEAR QUEUE (destructive) */}
-                            {items.length > 0 && <div
+                            {items.length > 0 && !loading && <div
                                 role="button"
                                 tabIndex={0}
                                 onClick={() => setOpenClear(true)}
@@ -312,11 +325,11 @@ export default function SendCenterScreen({
 
             {/* Sticky Footer (primary action: Send next) */}
             <StickyFooter
-                primaryLabel={sending ? "Sending…" : `Send next ${Math.min(summary?.remaining, queuedCount) || 0}`}
+                primaryLabel={primaryLabel}
                 secondaryLabel="Send Test Email"
                 onSecondary={queuedCount > 0 ? openTestDialog : undefined}
-                onPrimary={canSend && !sending ? openRealDialog : undefined}
-                primaryDisabled={!canSend || sending || loading}
+                onPrimary={canSend && !sending ? openRealDialog : queuedCount === 0 && !loading && mode === "send" ? () => setMode("build") : undefined}
+                primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
                 helperText={loading ? null : queuedCount === 0 ? "No queued items to send. Generate some LOIs first." : undefined}

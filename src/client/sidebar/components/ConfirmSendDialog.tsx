@@ -51,7 +51,7 @@ export default function ConfirmSendDialog({
     const title = variant === "real" ? "Send emails now?" : "Send a test email?";
     const description =
         variant === "real"
-            ? `This will send up to ${Math.max(0, Math.min(remaining ?? 0, queued ?? 0))} emails now.`
+            ? `This will send ${Math.max(0, Math.min(remaining ?? 0, queued ?? 0))} emails now.`
             : `We'll send ${sampleCount > 1 ? "" : "a"} preview email${sampleCount > 1 ? "s" : ""} to you (${toEmail || "your email address"}) using the next queued LOIs.`;
 
     return (
@@ -78,7 +78,7 @@ export default function ConfirmSendDialog({
                     ) : (
                         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700">
                             <div className="flex items-center justify-between">
-                                <div className="text-gray-600">Test emails</div>
+                                <div className="text-gray-600">Number of test emails</div>
                                 <div className="inline-flex items-center rounded-md ring-1 ring-gray-200">
                                     <button
                                         type="button"

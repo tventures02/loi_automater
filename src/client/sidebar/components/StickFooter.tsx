@@ -104,7 +104,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
 
                 {/* Actions (clickable divs) */}
                 <div className="flex items-center gap-2">
-                    {secondaryLabel ? (
+                    {secondaryLabel && onSecondary ? (
                         <div
                             role="button"
                             tabIndex={0}

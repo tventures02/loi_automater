@@ -546,6 +546,9 @@ const SidebarContainer = () => {
                         sendData={sendData}
                         setSendData={setSendData}
                         onRefresh={() => refreshSendData(true)} // force refresh 
+                        refreshSendData={refreshSendData}
+                        setMode={setMode}
+                        mode={mode}
                     />
                 ) : (
                     <>
@@ -606,6 +609,9 @@ const SidebarContainer = () => {
                                 sendData={sendData}
                                 onRefresh={() => refreshSendData(true)} // force refresh
                                 setSendData={setSendData}
+                                refreshSendData={refreshSendData}
+                                setMode={setMode}
+                                mode={mode} 
                             />
                         )}
                     </>

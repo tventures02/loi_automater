@@ -762,7 +762,7 @@ export const sendNextBatch = (payload) => {
         const defaultSubject = String(payload?.subject || 'Letter of Intent');
         const defaultBodyMaker = (docUrl) =>
             String(payload?.bodyTemplate ||
-                `Hello,\n\nPlease review the Letter of Intent at the link below:\n${docUrl}\n\nBest regards`);
+                `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
 
         // Cache Doc body text to avoid re-open for same docId
         const docTextCache = {};
