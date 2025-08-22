@@ -180,7 +180,7 @@ export default function SendCenterScreen({
 
     // Main content height: allow space for sticky footer
     return (
-        <div className="space-y-3 pb-16">
+        <div className="space-y-3 pb-3">
             <h2 className="text-sm font-semibold text-gray-900">Send Emails</h2>
 
             {/* Summary strip with a Refresh control */}
@@ -193,7 +193,7 @@ export default function SendCenterScreen({
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
-                                <Badge label={`Waiting to be sent: ${summary?.queued ?? "—"}`} />
+                                <Badge label={`To be sent: ${summary?.queued ?? "—"}`} />
                                 <Badge label={`Successfully sent: ${summary?.sent ?? "—"}`} />
                             </div>
                         </div>
@@ -353,6 +353,8 @@ export default function SendCenterScreen({
                 leftSlot={null}
                 helperText={loading ? null : queuedCount === 0 ? "No queued items to send. Generate some LOIs first." : undefined}
                 currentStep="send"
+                mode={mode}
+                fixYPos={true}
             />
 
             <ConfirmSendDialog

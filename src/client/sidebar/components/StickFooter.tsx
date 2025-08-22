@@ -27,6 +27,12 @@ type Props = {
 
     /** Current step */
     currentStep?: string;
+
+    /** Mode */
+    mode: "send" | "build";
+
+    /** Whether to fix the Y position */
+    fixYPos?: boolean;
 };
 
 function cx(...cls: (string | false | null | undefined)[]) {
@@ -45,6 +51,8 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
         progress,
         helperText,
         currentStep,
+        mode = "send",
+        fixYPos = false,
     },
     ref
 ) {
@@ -81,7 +89,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
     return (
         <div
             ref={ref}
-            className={`sticky bottom-0 z-40 border-t border-gray-200 bg-white backdrop-blur supports-[backdrop-filter]:bg-white`}
+            className={`sticky ${mode === "build" && currentStep === "send" && fixYPos ? "bottom-[-9px]" : "bottom-0"} z-40 border-t border-gray-200 bg-white backdrop-blur supports-[backdrop-filter]:bg-white`}
             aria-label="LOI Builder actions"
         >
             {/* Helper text (optional) */}

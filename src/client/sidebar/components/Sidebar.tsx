@@ -469,6 +469,7 @@ const SidebarContainer = () => {
         helperText={undefined}
         leftSlot={null}
         currentStep={currentStep}
+        mode={mode} 
     />;
 
     const helpButton = (<div

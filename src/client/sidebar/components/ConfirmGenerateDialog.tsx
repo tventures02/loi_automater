@@ -13,6 +13,8 @@ type Props = {
     templateDocId?: string;
     fileNamePattern?: string;        // e.g. "LOI - {{Address}} - {{AgentName}}"
     isSubmitting?: boolean;          // show spinner while server runs
+    attachPdf: boolean;
+    useLOIAsBody: boolean;
 };
 
 export default function ConfirmGenerateDialog({
@@ -23,6 +25,8 @@ export default function ConfirmGenerateDialog({
     sheetName,
     templateDocId,
     fileNamePattern,
+    attachPdf,
+    useLOIAsBody,
     isSubmitting = false,
 }: Props) {
     const confirmRef = useRef<HTMLDivElement>(null);
@@ -40,6 +44,7 @@ export default function ConfirmGenerateDialog({
     }, [open, onCancel, onConfirm]);
 
     if (!open) return null;
+    const sheetNameShort = sheetName?.length > 20 ? sheetName.slice(0, 20) + "..." : sheetName;
 
     return (
         <div
@@ -69,10 +74,11 @@ export default function ConfirmGenerateDialog({
                             </p>
 
                             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700 space-y-1">
+                            <span className="text-gray-800 font-semibold mb-4">LOI Settings:</span>
                                 {templateDocId ? (
                                     <div>
                                         <span className="text-gray-500 flex items-center gap-1">
-                                            LOI template: <a
+                                            Template: <a
                                                 href={`https://docs.google.com/document/d/${templateDocId}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -88,7 +94,7 @@ export default function ConfirmGenerateDialog({
                                 {sheetName ? (
                                     <div>
                                         <span className="text-gray-500">Data source sheet: </span>
-                                        <span className="font-medium text-gray-800 overflow-ellipsis">{sheetName}</span>
+                                        <code className="rounded bg-white px-1 py-[1px]">{sheetNameShort}</code>
                                     </div>
                                 ) : null}
                                 {fileNamePattern ? (
@@ -97,11 +103,20 @@ export default function ConfirmGenerateDialog({
                                         <code className="rounded bg-white px-1 py-[1px]">{fileNamePattern}</code>
                                     </div>
                                 ) : null}
+                                <div className="truncate">
+                                    <span className="text-gray-500">Attach LOI as PDF: </span>
+                                    <code className="rounded bg-white px-1 py-[1px]">{attachPdf ? "Yes" : "No"}</code>
+                                </div>
+                                {
+                                    useLOIAsBody && (
+                                        <div className="truncate">
+                                            <span className="text-gray-500">Use LOI as email body: </span>
+                                            <code className="rounded bg-white px-1 py-[1px]">{useLOIAsBody ? "Yes" : "No"}</code>
+                                        </div>
+                                    )
+                                }
                             </div>
 
-                            {/* <div className="mt-3 text-[11px] text-gray-500">
-                                Tip: You can cancel now to review mappings or email settings.
-                            </div> */}
                         </div>
                     </div>
 

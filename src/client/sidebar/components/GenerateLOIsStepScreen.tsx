@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
@@ -101,6 +101,8 @@ export default function GenerateLOIsStepScreen({
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const emailColumn = mapping?.__email || "";
+    const containerRef = useRef<HTMLDivElement>(null);
+
 
     /* -------- Email settings state -------- */
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
@@ -200,6 +202,11 @@ export default function GenerateLOIsStepScreen({
         setSummary(null);
         setProgressText("Preparing run sheet and files…");
 
+        const container = containerRef.current;
+        if (container) {
+            container.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+
         // lightweight progress while server runs
         let pct = 5;
         const t = setInterval(() => {
@@ -240,6 +247,14 @@ export default function GenerateLOIsStepScreen({
         }
     };
 
+    useLayoutEffect(() => {
+        if (!summary) return;
+        const container = containerRef.current;
+        if (container) {
+            container.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+    }, [summary]);
+
     const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
     const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
     const templateOk = !!templateDocId;
@@ -252,8 +267,7 @@ export default function GenerateLOIsStepScreen({
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
 
     return (
-        <div className="space-y-3">
-
+        <div className="space-y-3 pb-[40px]" id="generate-lois-step" ref={containerRef}>
             <ConfirmGenerateDialog
                 open={confirmOpen}
                 onCancel={() => setConfirmOpen(false)}
@@ -263,6 +277,8 @@ export default function GenerateLOIsStepScreen({
                 templateDocId={templateDocId}
                 fileNamePattern={pattern}
                 isSubmitting={isGenerating}
+                attachPdf={attachPdf}
+                useLOIAsBody={useLOIAsBody}
             />
 
             <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
@@ -295,6 +311,13 @@ export default function GenerateLOIsStepScreen({
             <div className="rounded-xl border border-gray-200 p-3 space-y-2" onMouseEnter={() => setEmailSettingsHovered(true)} onMouseLeave={() => setEmailSettingsHovered(false)}>
                 <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-gray-900">Email settings</div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="text-[11px] text-gray-600">Attach LOI as PDF</div>
+                        <Switch color="primary" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} size="small" />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
@@ -351,10 +374,10 @@ export default function GenerateLOIsStepScreen({
                                 <div>{emailPreview.body}</div>
                             </div>}
                         </div>
-                        <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-900' : 'text-white'} hover:underline cursor-pointer flex justify-end`}onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
+                        <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`}onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
                     </>
                 ) : (
-                    <span className={`text-[11px] ${emailSettingsHovered ? 'text-gray-900' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(true)}>Show email preview</span>
+                    <span className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(true)}>Show email preview</span>
                 )}
             </div>
 

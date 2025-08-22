@@ -711,7 +711,6 @@ export const sendNextBatch = (payload) => {
         const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
         // Cap by remaining quota in both modes (avoid quota errors)
         const effectiveMax = Math.min(requested, remaining);
-
         if (effectiveMax <= 0) return { sent: 0, failed: 0, attempted: 0, testMode };
 
         // Indices (0-based). Some may be undefined if columns don't exist.
@@ -729,6 +728,10 @@ export const sendNextBatch = (payload) => {
         const iSubject = head[normHeader('subject')];     // optional
         const iBody = head[normHeader('body')];        // optional (plain text)
         const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
+        const iUseDocBody = coalesce(
+            head[normHeader('useLOIAsBody')],
+            head[normHeader('useDocBody')] // legacy fallback if needed
+        );
 
         // Read all data rows
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
@@ -751,6 +754,8 @@ export const sendNextBatch = (payload) => {
                 attempts: Number(safeAt(row, iAttempts) || 0),
                 createdAt: safeAt(row, iCreatedAt) ? new Date(safeAt(row, iCreatedAt)) : new Date(0),
                 attachPdf: asBool(safeAt(row, iAttachPdf) || false),
+                useDocBody: asBool(safeAt(row, iUseDocBody) || false),
+                lastError: String(safeAt(row, iLastError) || '')
             });
         }
         queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
@@ -765,7 +770,7 @@ export const sendNextBatch = (payload) => {
                 `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
 
         // Cache Doc body text to avoid re-open for same docId
-        const docTextCache = {};
+        const docBodyCache = Object.create(null);
 
         batch.forEach(item => {
             const now = new Date();
@@ -774,28 +779,33 @@ export const sendNextBatch = (payload) => {
             try {
                 // Determine subject/body from row; fall back if missing
                 const rowSubject = item.subject && item.subject.trim().length ? item.subject.trim() : defaultSubject;
+                const finalSubject = testMode ? `[TEST] ${rowSubject}` : rowSubject;
 
-                let rowBody = item.body && item.body.trim().length ? item.body : "";
+                // BODY
+                let rowBody = (item.body && item.body.trim()) ? item.body : "";
                 if (!rowBody && item.useDocBody && item.docId) {
-                    if (!docTextCache[item.docId]) {
-                        try {
-                            const doc = DocumentApp.openById(item.docId);
-                            docTextCache[item.docId] = doc.getBody()?.getText() || "";
-                        } catch (e) {
-                            docTextCache[item.docId] = ""; // fail soft, will fall back
-                        }
+                    if (!docBodyCache[item.docId]) {
+                        docBodyCache[item.docId] = buildPlainTextFromDoc(item.docId);
                     }
-                    rowBody = docTextCache[item.docId] || "";
+                    rowBody = docBodyCache[item.docId] || "";
                 }
                 if (!rowBody) rowBody = defaultBodyMaker(item.docUrl || "");
 
                 // Test mode: send previews to the user; Real mode: send to recipient
                 const to = testMode ? previewTo : item.email;
-                const subj = testMode ? `[TEST] ${rowSubject}` : rowSubject;
-                const attachPdf = item.attachPdf && asBool(item.attachPdf);
 
-                const pdfBlob = item.docId && attachPdf ? generateLOIPDF(item.docId, item.docId) : null;
-                MailApp.sendEmail({ to, subject: subj, body: rowBody, attachments: pdfBlob ? [pdfBlob] : null });
+                // Attach PDF if requested (optional)
+                let attachments = null;
+                if (item.attachPdf && item.docId) {
+                    try {
+                        const pdf = generateLOIPDF(item.docId, item.docId); // your existing helper
+                        if (pdf) attachments = [pdf];
+                    } catch (_) {
+                        // fail-soft: just skip attachment
+                    }
+                }
+
+                MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
                 if (!testMode) {
                     // Update status -> sent; attempts +1; clear lastError; set sentAt
@@ -830,7 +840,79 @@ export const sendNextBatch = (payload) => {
         const s = String(v || '').trim().toLowerCase();
         return s === 'true' || s === '1' || s === 'yes' || s === 'y';
     }
+    function coalesce(...xs) {
+        for (let i = 0; i < xs.length; i++) if (xs[i] != null) return xs[i];
+        return null;
+    }
 };
+
+/**
+   * Build a plain-text email body from a Google Doc, preserving paragraph breaks,
+   * list bullets (•) and basic table structure with tabs.
+   */
+function buildPlainTextFromDoc(docId: string) {
+    try {
+        const doc = DocumentApp.openById(docId);
+        const body = doc.getBody();
+        if (!body) return "";
+
+        const parts = [];
+        const n = body.getNumChildren();
+
+        for (let i = 0; i < n; i++) {
+            const el = body.getChild(i);
+            const t = el.getType();
+
+            if (t === DocumentApp.ElementType.PARAGRAPH) {
+                const p = el.asParagraph();
+                const txt = p.getText() || "";
+                // Headings just become paragraphs in plain text
+                parts.push(txt);
+            }
+            else if (t === DocumentApp.ElementType.LIST_ITEM) {
+                const li = el.asListItem();
+                const depth = Math.max(0, li.getNestingLevel() || 0);
+                const indent = depth > 0 ? Array(depth + 1).join("  ") : "";
+                const bullet = "• ";
+                parts.push(indent + bullet + (li.getText() || ""));
+            }
+            else if (t === DocumentApp.ElementType.TABLE) {
+                const table = el.asTable();
+                for (let r = 0; r < table.getNumRows(); r++) {
+                    const row = table.getRow(r);
+                    const cells = [];
+                    for (let c = 0; c < row.getNumCells(); c++) {
+                        cells.push(row.getCell(c).getText() || "");
+                    }
+                    // tab-separated row; add a line per row
+                    parts.push(cells.join("\t"));
+                }
+            }
+            else if (t === DocumentApp.ElementType.TABLE_ROW) {
+                // Rarely encountered directly; treat as a single row
+                const tr = el.asTableRow();
+                const cells = [];
+                for (let c = 0; c < tr.getNumCells(); c++) {
+                    cells.push(tr.getCell(c).getText() || "");
+                }
+                parts.push(cells.join("\t"));
+            }
+            else if (t === DocumentApp.ElementType.TEXT) {
+                parts.push(el.asText().getText() || "");
+            }
+            // Ignore images, page breaks, drawings, etc. for plain text
+        }
+
+        // Join with newlines, compact excessive blank lines a bit
+        let out = parts.join("\n");
+        out = out.replace(/\n{3,}/g, "\n\n").trim();
+        return out;
+    } catch (e) {
+        // Fail soft: caller will use fallback body
+        return "";
+    }
+}
+
 
 function generateLOIPDF(docId: string, pdfName: string) {
     // Open the template document
