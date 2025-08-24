@@ -1,7 +1,6 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 
 var LOI_QUEUE_NAME = 'Sender Queue';
-const MAX_QUEUE_ITEMS_FOR_DISPLAY = 500;
 var LOI_QUEUE_HEADERS = [
     'id', 'sourceSheet', 'sourceRow', 'email', 'docId', 'docUrl', 'templateId', 'mappingVersion',
     'status', 'sentAt', 'attempts', 'lastError', 'createdAt', 'subject', 'body', 'useLOIAsBody', 'attachPdf'
@@ -11,6 +10,7 @@ export type DocInfo = {
     name?: string; // Optional because it might not be found
     error?: string; // Optional for when an error occurs
 };
+const QUEUE_DISPLAY_LIMIT = 500;
 
 /**
  * Gets the names of multiple Google Docs given an array of their file IDs.
@@ -626,30 +626,10 @@ export const getSendSummary = () => {
     return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
 };
 
-/** Remove ALL rows from Sender Queue except the header row. */
-export const queueClearAll = () => {
-    const { sh } = queueEnsureSheet(); // your existing helper
-    const lastRow = sh.getLastRow();
-    if (lastRow <= 1) return { cleared: 0, remaining: 0 };
-
-    const lock = LockService.getDocumentLock();
-    if (!lock.tryLock(10_000)) {
-        throw new Error('Another operation is in progress. Try again soon.');
-    }
-    try {
-        const rows = lastRow - 1; // everything below the header
-        sh.getRange(2, 1, rows, sh.getLastColumn()).clearContent(); // keep header, formatting
-        return { cleared: rows, remaining: 0 };
-    } finally {
-        lock.releaseLock();
-    }
-};
-
-
 export const queueList = (payload) => {
     try {
         const statusFilter = String(payload?.status || 'all').toLowerCase();
-        const limit = Math.max(1, Math.min(MAX_QUEUE_ITEMS_FOR_DISPLAY, Number(payload?.limit || 50)));
+        const limit = Math.max(1, Math.min(QUEUE_DISPLAY_LIMIT, Number(payload?.limit || 50)));
 
         const qSheetRes = queueEnsureSheet();
         const sh = qSheetRes.sh;
@@ -878,6 +858,72 @@ export const sendNextBatch = (payload) => {
     }
 };
 
+// Update one queue row’s status by ID.
+// Allowed statuses: queued | paused | sent | failed
+export const queueUpdateStatus = (payload) => {
+    const id = String(payload?.id || '').trim();
+    const newStatus = String(payload?.status || '').trim().toLowerCase();
+    const allowed = new Set(['queued', 'paused', 'sent', 'failed']);
+    if (!id) throw new Error('Missing id');
+    if (!allowed.has(newStatus)) throw new Error('Invalid status');
+
+    const { sh } = queueEnsureSheet();
+    const head = headerIndexMap(sh);
+    const lastRow = sh.getLastRow();
+    if (lastRow <= 1) throw new Error('Queue is empty');
+
+    const iId = head[normHeader('id')];
+    const iStatus = head[normHeader('status')];
+    const iSentAt = head[normHeader('sentAt')];
+    const iLastErr = head[normHeader('lastError')];
+    const iAttempts = head[normHeader('attempts')];
+
+    // Read IDs once
+    const ids = sh.getRange(2, iId + 1, lastRow - 1, 1).getValues().map(r => String(r[0] || ''));
+    const idx = ids.findIndex(v => v === id);
+    if (idx === -1) throw new Error('ID not found');
+
+    const rowIndex = idx + 2; // convert to sheet row
+    const now = new Date();
+
+    // Write status
+    sh.getRange(rowIndex, iStatus + 1).setValue(newStatus);
+
+    // Minimal hygiene on related columns
+    if (newStatus === 'queued') {
+        if (iLastErr != null) sh.getRange(rowIndex, iLastErr + 1).setValue('');
+        // keep sentAt as-is (blank or past)
+    } else if (newStatus === 'sent') {
+        if (iSentAt != null) sh.getRange(rowIndex, iSentAt + 1).setValue(now);
+    } else if (newStatus === 'failed') {
+        // no-op
+    } else if (newStatus === 'paused') {
+        // ensure it won't be picked up by sender; no further changes needed
+    }
+
+    return { id, status: newStatus, rowIndex };
+};
+
+
+/** Remove ALL rows from Sender Queue except the header row. */
+export const queueClearAll = () => {
+    const { sh } = queueEnsureSheet(); // your existing helper
+    const lastRow = sh.getLastRow();
+    if (lastRow <= 1) return { cleared: 0, remaining: 0 };
+
+    const lock = LockService.getDocumentLock();
+    if (!lock.tryLock(10_000)) {
+        throw new Error('Another operation is in progress. Try again soon.');
+    }
+    try {
+        const rows = lastRow - 1; // everything below the header
+        sh.getRange(2, 1, rows, sh.getLastColumn()).clearContent(); // keep header, formatting
+        return { cleared: rows, remaining: 0 };
+    } finally {
+        lock.releaseLock();
+    }
+};
+
 /**
    * Build a plain-text email body from a Google Doc, preserving paragraph breaks,
    * list bullets (•) and basic table structure with tabs.
@@ -966,3 +1012,17 @@ export const getSheetNames = () => {
 export const getActiveSheetName = () => {
     return SpreadsheetApp.getActive().getActiveSheet().getName();
 };
+
+/**
+ * Show (unhide) the "Send Queue" tab and make it active.
+ * Creates the sheet if it doesn't exist.
+ */
+export const showSendQueueTab = () => {
+    const ss = SpreadsheetApp.getActive();
+    let sh = ss.getSheetByName(LOI_QUEUE_NAME);
+    if (sh) {
+        // Unhide if hidden, then activate
+        sh.showSheet();
+        ss.setActiveSheet(sh);
+    }
+}

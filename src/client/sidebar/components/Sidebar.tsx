@@ -15,7 +15,7 @@ import MappingStepScreen from './MappingStepScreen';
 import GenerateLOIsStepScreen from './GenerateLOIsStepScreen';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
-import SendCenterScreen from './SendCenterScreen';
+import SendCenterScreen, { QUEUE_DISPLAY_LIMIT } from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
 import DataSourcePicker from './DataSourcePicker';
 
@@ -28,7 +28,7 @@ export type QueueItem = {
     address?: string;
     docUrl?: string;
     scheduled?: string | null;
-    status: "queued" | "scheduled" | "sending" | "sent" | "failed";
+    status: "queued" | "paused" | "sending" | "sent" | "failed";
     lastError?: string | null;
     createdAt?: Date | null;
     subject?: string;
@@ -52,7 +52,6 @@ export type QueueStatus = {
 };
 
 const SEND_TTL_MS = 60_000; // 1 minute
-export const QUEUE_DISPLAY_LIMIT = 100;
 
 const SidebarContainer = () => {
     const [mode, setMode] = useState<"build" | "send">("send");
@@ -131,6 +130,7 @@ const SidebarContainer = () => {
     //@ts-ignore
     useEffect(() => {
         try {
+            console.clear()
             const getData = async () => {
                 try {
                     setIsLoading(true);

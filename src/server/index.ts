@@ -28,6 +28,8 @@ import {
     getSheetNames,
     getActiveSheetName,
     queueClearAll,
+    queueUpdateStatus,
+    showSendQueueTab,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -55,4 +57,6 @@ export {
     getSheetNames,
     getActiveSheetName,
     queueClearAll,
+    queueUpdateStatus,
+    showSendQueueTab,
 };

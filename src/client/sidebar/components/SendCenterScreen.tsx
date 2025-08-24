@@ -1,5 +1,6 @@
 // src/client/components/SendCenterScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import StickyFooter from "./StickFooter";
@@ -7,13 +8,15 @@ import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
-import { ArrowPathIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { Alert, Tooltip } from "@mui/material";
+import { ArrowPathIcon, LinkIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Alert, Link, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
+export const QUEUE_DISPLAY_LIMIT = 500;
+type AllowedStatus = "queued" | "paused" | "sent" | "failed";
 type Props = {
     sendData: {
         summary: SendSummary | null;
@@ -47,7 +50,7 @@ export default function SendCenterScreen({
     currentStep,
     setCurrentStep,
 }: Props) {
-    const [filter, setFilter] = useState<"all" | "queued" | "failed" | "sent">("all");
+    const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
     const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
@@ -55,35 +58,50 @@ export default function SendCenterScreen({
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [openClear, setOpenClear] = useState(false);
     const [clearing, setClearing] = useState(false);
+    const [openMenu, setOpenMenu] = useState<{
+        open: boolean;
+        id: string | null;
+        x: number;
+        y: number;
+        current: AllowedStatus;
+    }>({ open: false, id: null, x: 0, y: 0, current: "queued" });
+    const [pendingId, setPendingId] = useState<string | null>(null);
     const { summary, items, loading, error } = sendData;
 
     const queuedTotal = summary?.queued ?? 0;
     const canSend = (summary?.remaining ?? 0) > 0 && queuedTotal > 0;
 
-    const filtered = useMemo(() => {
+    useEffect(() => {
         setVisibleCount(PAGE_SIZE);
-        if (filter === "all") return items;
-        return items.filter(i => i.status === filter);
-    }, [items, filter]);
+    }, [filter, items.length]);
 
-    const visibleItems = useMemo(
-        () => filtered.slice(0, Math.min(visibleCount, filtered.length)),
-        [filtered, visibleCount]
-    );
+    useEffect(() => {
+        if (!openMenu.open) return;
+        const close = () => setOpenMenu(m => ({ ...m, open: false }));
+        const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        window.addEventListener("keydown", onKey);
+        return () => {
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+            window.removeEventListener("keydown", onKey);
+        };
+    }, [openMenu.open]);
 
     // keep your existing logic but move the entry points:
     const confirmRealSend = async (
-        count: number, 
-        attachPolicy: "respect" | "forceOn" | "forceOff" = 'respect', 
+        count: number,
+        attachPolicy: "respect" | "forceOn" | "forceOff" = 'respect',
         stopOnError: boolean = false,
     ) => {
         if (!(summary?.remaining && queuedTotal)) return;
         setSending(true);
         try {
             const numEmailsToSend = count;
-            const res = await serverFunctions.sendNextBatch({ 
-                count: numEmailsToSend, 
-                attachPolicy, 
+            const res = await serverFunctions.sendNextBatch({
+                count: numEmailsToSend,
+                attachPolicy,
                 stopOnError,
             });
             const sent = res?.sent ?? numEmailsToSend;
@@ -107,6 +125,35 @@ export default function SendCenterScreen({
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
             refreshSendData(true);
         }
+    };
+
+    const updateItemStatus = async (item: QueueItem, next: AllowedStatus) => {
+        if (pendingId) return;
+        setPendingId(item.id);
+        try {
+            await serverFunctions.queueUpdateStatus({ id: item.id, status: next });
+            setSendData(s => ({
+                ...s,
+                items: s.items.map(it => (it.id === item.id ? { ...it, status: next } : it)),
+            }));
+            // refreshSendData(true);
+        } finally {
+            setPendingId(null);
+            setOpenMenu(m => ({ ...m, open: false }));
+        }
+    };
+
+    const onStatusPillClick = (e: React.MouseEvent, item: QueueItem) => {
+        if (pendingId) return;
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const menuWidth = 160;
+        setOpenMenu({
+            open: true,
+            id: item.id,
+            x: Math.min(rect.left, window.innerWidth - menuWidth - 8),
+            y: rect.bottom + 6,
+            current: (item.status as AllowedStatus) || "queued",
+        });
     };
 
     const confirmTestSend = async (sampleCount = 1) => {
@@ -163,23 +210,22 @@ export default function SendCenterScreen({
         }
     }
 
-    const scanForNewRows = async () => {
-        setSnackbar({ open: true, message: "Scanned sheet: 42 new rows found (demo)", severity: "success" });
-        setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
-    };
-
-    const addNewLoisToQueue = async () => {
-        const demo = [
-            { id: cryptoId(), recipient: "new1@example.com", address: "11 Birch Ln", docUrl: "#", status: "queued" as const, scheduled: null },
-            { id: cryptoId(), recipient: "new2@example.com", address: "22 Cedar Dr", docUrl: "#", status: "queued" as const, scheduled: null },
-        ];
-        setSendData(s => ({ ...s, summary: { ...s.summary, queued: s.summary?.queued + demo.length } }));
-        setSnackbar({ open: true, message: `Queued ${demo.length} new LOIs`, severity: "success" });
-        setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
-    };
-
     const openRealDialog = () => setDialog({ open: true, variant: "real" });
     const openTestDialog = () => setDialog({ open: true, variant: "test" });
+
+    const filtered = useMemo(() => {
+        if (filter === "all") return items;
+        return items.filter(i => (i.status || "").toLowerCase() === filter);
+    }, [items, filter]);
+
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [filter, items.length]);
+
+    const visibleItems = useMemo(
+        () => filtered.slice(0, Math.min(visibleCount, filtered.length)),
+        [filtered, visibleCount]
+    );
 
     let primaryLabel = "Send Next";
     if (sending) primaryLabel = "Sending…";
@@ -190,7 +236,7 @@ export default function SendCenterScreen({
     const canLoadMore = visibleCount < filtered.length;
     const queueTotal = summary?.total ?? 0;
 
-    if (isDev) console.log('items', items.slice(0, 10));
+    // if (isDev) console.log('items', items.slice(0, 10));
 
     // Main content height: allow space for sticky footer
     return (
@@ -203,6 +249,9 @@ export default function SendCenterScreen({
                     <>
                         <div className="flex items-center justify-between mb-3">
                             <div className="text-xs font-medium text-gray-900">Summary</div>
+                            <Tooltip title={`Open Sender Queue tab`}>
+                                <LinkIcon className="w-3 h-3 cursor-pointer" onClick={() => serverFunctions.showSendQueueTab()} />
+                            </Tooltip>
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
@@ -294,13 +343,13 @@ export default function SendCenterScreen({
                         ) : (
                             <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
-                                    {visibleItems.map((item) => (
-                                        <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
+                                    {visibleItems.map((item, index) => (
+                                        <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="text-gray-900 truncate">{item.recipient}</div>
                                                 <div className="text-[11px] text-gray-600 truncate flex">
-                                                    <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">  
-                                                        {item.subject || "(no subject)"} 
+                                                    <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
+                                                        {item.subject || "(no subject)"}
                                                     </span>
                                                     <span className="w-[10%] text-right">
                                                         <Tooltip title="Has attached PDF">
@@ -322,7 +371,11 @@ export default function SendCenterScreen({
                                                     <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
                                                 ) : null}
                                             </div>
-                                            <StatusPill status={item.status} />
+                                            <StatusPill
+                                                status={item.status as any}
+                                                loading={pendingId === item.id}
+                                                onClick={(e) => onStatusPillClick(e, item)}
+                                            />
                                         </li>
                                     ))}
                                 </ul>
@@ -347,38 +400,12 @@ export default function SendCenterScreen({
                 )}
             </div>
 
-            {/* New data panel */}
-            {/* {!loading && <div className="rounded-xl border border-gray-200 p-3 space-y-2">
-                <div className="text-sm font-semibold text-gray-900">New data?</div>
-                <div className="text-xs text-gray-600">
-                    Scan your sheet for rows without an LOI and add them to the queue.
-                </div>
-                <div className="flex items-center gap-2">
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={scanForNewRows}
-                        className="select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                        Scan for new rows
-                    </div>
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={addNewLoisToQueue}
-                        className="select-none rounded-md px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 cursor-pointer"
-                    >
-                        Create LOIs for new rows
-                    </div>
-                </div>
-            </div>} */}
-
             {/* Snackbar */}
             {snackbar.open && (
                 <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
                     <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
                 </Snackbar>
-            )}  
+            )}
 
             {/* Sticky Footer (primary action: Send next) */}
             <StickyFooter
@@ -395,11 +422,25 @@ export default function SendCenterScreen({
                 fixYPos={true}
             />
 
+            {openMenu.open && openMenu.id && (
+                <StatusDropdownGlobal
+                    x={openMenu.x}
+                    y={openMenu.y}
+                    current={openMenu.current}
+                    disabled={pendingId === openMenu.id}
+                    onChoose={(next) => {
+                        const it = sendData.items.find(i => i.id === openMenu.id);
+                        if (it) updateItemStatus(it, next);
+                    }}
+                    onRequestClose={() => setOpenMenu(m => ({ ...m, open: false }))}
+                />
+            )}
+
             <ConfirmSendDialog
                 open={dialog.open}
                 variant={dialog.variant}
                 onCancel={() => setDialog({ open: false, variant: "real" })}
-                onConfirm={dialog.variant === "real" ? 
+                onConfirm={dialog.variant === "real" ?
                     ({ count, attachPolicy, stopOnError } = { count: 1, attachPolicy: "respect", stopOnError: false }) => confirmRealSend(count, attachPolicy, stopOnError) :
                     ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
                 remaining={summary?.remaining}
@@ -445,18 +486,79 @@ function FilterPill({ label, active, onClick }: { label: string; active: boolean
     );
 }
 
-function StatusPill({ status }: { status: QueueItem["status"] }) {
+function StatusPill({
+    status,
+    loading,
+    onClick,
+}: {
+    status: QueueItem["status"] | "paused";
+    loading?: boolean;
+    onClick?: (e: React.MouseEvent) => void;
+}) {
     const tone =
         status === "queued" ? "bg-gray-100 text-gray-700" :
-            status === "scheduled" ? "bg-indigo-50 text-indigo-700" :
-                status === "sending" ? "bg-amber-50 text-amber-700" :
-                    status === "sent" ? "bg-emerald-50 text-emerald-700" :
-                        "bg-red-50 text-red-700";
+            status === "paused" ? "bg-yellow-50 text-yellow-700" :
+                status === "sent" ? "bg-emerald-50 text-emerald-700" :
+                    status === "failed" ? "bg-red-50 text-red-700" :
+                        "bg-gray-100 text-gray-700";
     return (
-        <div className={`shrink-0 rounded-md px-2 py-1 text-[11px] ${tone}`}>
-            {status}
-        </div>
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            className={`shrink-0 rounded-md px-2 py-1 text-[11px] ${tone} hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 disabled:opacity-60 cursor-pointer`}
+            title={loading ? "Updating…" : "Change status"}
+        >
+            {loading ? (
+                <span className="inline-block h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin align-middle" />
+            ) : (
+                status
+            )}
+        </button>
     );
+}
+
+function StatusDropdownGlobal({
+    x, y, current, disabled, onChoose, onRequestClose
+}: {
+    x: number;
+    y: number;
+    current: AllowedStatus;
+    disabled?: boolean;
+    onChoose: (next: AllowedStatus) => void;
+    onRequestClose: () => void;
+}) {
+    const options: AllowedStatus[] = ["queued", "paused", "sent", "failed"];
+    const body = (
+        <>
+            {/* backdrop to close on outside click */}
+            <div className="fixed inset-0 z-[998]" onClick={onRequestClose} />
+            <div
+                className="fixed z-[999] w-40 rounded-md border border-gray-200 bg-white shadow-lg"
+                style={{ left: x, top: y }}
+                role="menu"
+            >
+                {options.map(opt => {
+                    const active = opt === current;
+                    return (
+                        <button
+                            key={opt}
+                            type="button"
+                            disabled={disabled || active}
+                            onClick={() => { onChoose(opt); }}
+                            className={`block w-full text-left px-3 py-1.5 text-[11px] ${active ? "bg-gray-100 text-gray-900 cursor-default"
+                                : "text-gray-700 hover:bg-gray-50"
+                                } disabled:opacity-50`}
+                            role="menuitem"
+                        >
+                            {opt}{active ? " ✓" : ""}
+                        </button>
+                    );
+                })}
+            </div>
+        </>
+    );
+    return createPortal(body, document.body);
 }
 
 /* Helpers */
