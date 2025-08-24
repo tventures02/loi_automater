@@ -34,6 +34,7 @@ export type QueueItem = {
     subject?: string;
     sourceRow?: string;
     queueTabRow?: number;
+    attachPdf?: boolean;
 };
 
 export type SendSummary = {

@@ -667,6 +667,7 @@ export const queueList = (payload) => {
         const iCreatedAt = head[normHeader('createdAt')];
         const iSubject = head[normHeader('subject')];
         const iSourceRow = head[normHeader('sourceRow')];
+        const iAttachPdf = head[normHeader('attachPdf')];
 
         // Build objects; sort by createdAt desc, then id
         const items = vals.map((row, index) => {
@@ -680,6 +681,7 @@ export const queueList = (payload) => {
                 createdAt: row[iCreatedAt] ? new Date(row[iCreatedAt]) : new Date(0),
                 subject: row[iSubject] || '',
                 sourceRow: row[iSourceRow] || '',
+                attachPdf: String(row[iAttachPdf] || '')?.toLowerCase() === 'true' || false,
                 queueTabRow: index + 1,
             }
             return queueItem;
@@ -697,13 +699,6 @@ export const queueList = (payload) => {
 };
 
 
-/**
- * Send up to `max` queued items (oldest first) from Sender Queue using MailApp.
- * - Respects daily quota
- * - Updates status, attempts, sentAt/updatedAt, lastError
- * @param {{max?: number, subject?: string, bodyTemplate?: string}} payload
- * @return {{sent:number, failed:number, attempted:number}}
- */
 export const sendNextBatch = (payload) => {
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
@@ -711,12 +706,17 @@ export const sendNextBatch = (payload) => {
     const lastRow = sh.getLastRow();
     if (lastRow <= 1) return { sent: 0, failed: 0, attempted: 0 };
 
+    // Normalize controls
+    const attachPolicy = String(payload?.attachPolicy || 'respect').toLowerCase(); // 'respect' | 'forceon' | 'forceoff'
+    const stopOnError = !!payload?.stopOnError;
+
     const lock = LockService.getDocumentLock();    
     try {
         if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
 
         const remaining = MailApp.getRemainingDailyQuota();
-        const requested = Math.max(1, Math.min(1000, Number(payload?.max || 100)));
+        const requestedRaw = Number(payload?.count ?? 100);
+        const requested = Math.max(1, Math.min(1000, isFinite(requestedRaw) ? requestedRaw : 100));
         const testMode = !!payload?.testMode;
         const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
         // Cap by remaining quota in both modes (avoid quota errors)
@@ -768,10 +768,9 @@ export const sendNextBatch = (payload) => {
                 lastError: String(safeAt(row, iLastError) || '')
             });
         }
-        queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
+        // queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
 
         const batch = queued.slice(0, effectiveMax);
-        let sent = 0, failed = 0;
 
         // Fallbacks in case subject/body not present
         const defaultSubject = String(payload?.subject || 'Letter of Intent');
@@ -782,7 +781,9 @@ export const sendNextBatch = (payload) => {
         // Cache Doc body text to avoid re-open for same docId
         const docBodyCache = Object.create(null);
 
-        batch.forEach(item => {
+        let sent = 0, failed = 0, attempted = 0;
+        for (let k = 0; k < batch.length; k++) {
+            const item = batch[k];
             const now = new Date();
             const newAttempts = (item.attempts || 0) + 1;
 
@@ -804,14 +805,23 @@ export const sendNextBatch = (payload) => {
                 // Test mode: send previews to the user; Real mode: send to recipient
                 const to = testMode ? previewTo : item.email;
 
-                // Attach PDF if requested (optional)
+                // ATTACHMENTS with attachPolicy
+                // - 'respect': use per-row attachPdf flag
+                // - 'forceon': always attach if docId present
+                // - 'forceoff': never attach
+                const policy = attachPolicy;
+                const wantAttach =
+                    policy === 'forceoff' ? false :
+                        policy === 'forceon' ? !!item.docId :
+                            (item.attachPdf && !!item.docId);
+
                 let attachments = null;
-                if (item.attachPdf && item.docId) {
+                if (wantAttach) {
                     try {
-                        const pdf = generateLOIPDF(item.docId, item.docId); // your existing helper
+                        const pdf = generateLOIPDF(item.docId, item.docId);
                         if (pdf) attachments = [pdf];
                     } catch (_) {
-                        // fail-soft: just skip attachment
+                        // fail soft: skip attachment if PDF generation fails
                     }
                 }
 
@@ -833,8 +843,14 @@ export const sendNextBatch = (payload) => {
                     if (iLastError != null) sh.getRange(item.rowIndex, iLastError + 1).setValue(String(err));
                 }
                 failed++;
+
+                // Stop on first error if requested
+                if (stopOnError) {
+                    attempted = k + 1; // processed this many (including the failure)
+                    return { sent, failed, attempted, testMode, stoppedEarly: true, creditsLeft: MailApp.getRemainingDailyQuota() };
+                }
             }
-        });
+        }
 
         return { sent, failed, attempted: batch.length, testMode, creditsLeft: MailApp.getRemainingDailyQuota() };
     }

@@ -7,9 +7,10 @@ import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
-import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Alert, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
+const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
 const PAGE_SIZE = 10;
@@ -71,12 +72,20 @@ export default function SendCenterScreen({
     );
 
     // keep your existing logic but move the entry points:
-    const confirmRealSend = async (count: number) => {
+    const confirmRealSend = async (
+        count: number, 
+        attachPolicy: "respect" | "forceOn" | "forceOff" = 'respect', 
+        stopOnError: boolean = false,
+    ) => {
         if (!(summary?.remaining && queuedTotal)) return;
         setSending(true);
         try {
             const numEmailsToSend = count;
-            const res = await serverFunctions.sendNextBatch({ max: numEmailsToSend });
+            const res = await serverFunctions.sendNextBatch({ 
+                count: numEmailsToSend, 
+                attachPolicy, 
+                stopOnError,
+            });
             const sent = res?.sent ?? numEmailsToSend;
 
             // Optimistic local counters; the list itself will be refreshed after
@@ -95,7 +104,7 @@ export default function SendCenterScreen({
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 3500);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
             refreshSendData(true);
         }
     };
@@ -104,20 +113,20 @@ export default function SendCenterScreen({
         // do NOT mutate queue locally
         setSending(true);
         try {
-            const n = Math.min(sampleCount, queuedTotal, 5);
+            const numEmailsToSend = Math.min(sampleCount, queuedTotal, 5);
             await serverFunctions.sendNextBatch({
-                max: n,
+                count: numEmailsToSend,
                 testMode: true,
                 previewTo: sendData?.summary?.userEmail, // fallback handled server-side
             });
 
-            setSnackbar({ open: true, message: `Sent ${n} test email${n > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
+            setSnackbar({ open: true, message: `Sent ${numEmailsToSend} test email${numEmailsToSend > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
         } catch {
             setSnackbar({ open: true, message: "Test send failed. Please try again.", severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 3500);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
             refreshSendData(true);
         }
     };
@@ -180,6 +189,8 @@ export default function SendCenterScreen({
     const primaryDisabled = queuedTotal === 0 ? loading : (!canSend || sending || loading);
     const canLoadMore = visibleCount < filtered.length;
     const queueTotal = summary?.total ?? 0;
+
+    if (isDev) console.log('items', items.slice(0, 10));
 
     // Main content height: allow space for sticky footer
     return (
@@ -287,8 +298,15 @@ export default function SendCenterScreen({
                                         <li key={item.id} className="py-2 text-xs flex items-center justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="text-gray-900 truncate">{item.recipient}</div>
-                                                <div className="text-[11px] text-gray-600 truncate">
-                                                    {item.subject || "(no subject)"}
+                                                <div className="text-[11px] text-gray-600 truncate flex">
+                                                    <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">  
+                                                        {item.subject || "(no subject)"} 
+                                                    </span>
+                                                    <span className="w-[10%] text-right">
+                                                        <Tooltip title="Has attached PDF">
+                                                            {item.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
+                                                        </Tooltip>
+                                                    </span>
                                                 </div>
                                                 <div className="text-gray-600 text-[11px]">Queue tab row: {item.queueTabRow}</div>
                                                 <div className="text-[11px] text-gray-600 truncate">
@@ -357,7 +375,7 @@ export default function SendCenterScreen({
 
             {/* Snackbar */}
             {snackbar.open && (
-                <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
                     <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
                 </Snackbar>
             )}  
@@ -381,7 +399,9 @@ export default function SendCenterScreen({
                 open={dialog.open}
                 variant={dialog.variant}
                 onCancel={() => setDialog({ open: false, variant: "real" })}
-                onConfirm={dialog.variant === "real" ? ({ count } = { count: 1 }) => confirmRealSend(count) : ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
+                onConfirm={dialog.variant === "real" ? 
+                    ({ count, attachPolicy, stopOnError } = { count: 1, attachPolicy: "respect", stopOnError: false }) => confirmRealSend(count, attachPolicy, stopOnError) :
+                    ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
                 remaining={summary?.remaining}
                 queued={summary?.queued ?? 0}
                 toEmail={sendData?.summary?.userEmail}

@@ -7,7 +7,7 @@ type Props = {
     open: boolean;
     variant: Variant;
     onCancel: () => void;
-    onConfirm: (opts?: { sampleCount?: number, count?: number }) => void;
+    onConfirm: (opts?: { sampleCount?: number, count?: number, attachPolicy?: "respect" | "forceOn" | "forceOff", stopOnError?: boolean }) => void;
 
     // Context
     remaining?: number;     // MailApp daily quota remaining
@@ -41,10 +41,10 @@ export default function ConfirmSendDialog({
         setAdvancedOpen(false);
         setAttachPolicy("respect");
         setCount(Math.max(0, Math.min(remaining ?? 0, queued ?? 0)));
-        setSampleCount(defaultSampleCount);
+        // setSampleCount(defaultSampleCount);
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") onCancel();
-            if (e.key === "Enter") onConfirm(variant === "test" ? { sampleCount } : { count });
+            if (e.key === "Enter") onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError });
         };
         window.addEventListener("keydown", onKey);
         setTimeout(() => primaryRef.current?.focus(), 0);
@@ -59,6 +59,8 @@ export default function ConfirmSendDialog({
             ? `This will send ${count} emails now.`
             : `We'll send ${sampleCount > 1 ? "" : "a"} preview email${sampleCount > 1 ? "s" : ""} to you (${toEmail || "your email address"}) using the next queued LOIs.`;
 
+
+            console.log('sampleCount', sampleCount);
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
             {/* overlay */}
@@ -195,12 +197,7 @@ export default function ConfirmSendDialog({
                             tabIndex={0}
                             ref={primaryRef}
                             aria-disabled={isSubmitting}
-                            onClick={!isSubmitting ? () => onConfirm(variant === "test" ? { sampleCount } : { count }) : undefined}
-                            onKeyDown={(e) =>
-                                (e.key === "Enter" || e.key === " ") &&
-                                !isSubmitting &&
-                                onConfirm(variant === "test" ? { sampleCount } : undefined)
-                            }
+                            onClick={!isSubmitting ? () => onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError }) : undefined}
                             className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800 cursor-pointer"
                                 } focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900`}
                         >
