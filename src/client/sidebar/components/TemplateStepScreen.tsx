@@ -63,8 +63,9 @@ const TemplateStepScreen = ({
         }
         setIsCreatingDoc(true);
         try {
+            const { templatesFolderId } = await serverFunctions.loiEnsureFolders();
             // The server function now returns an object { url, id }
-            const docData = await serverFunctions.createGoogleDoc(docTitle);
+            const docData = await serverFunctions.createGoogleDoc(docTitle, templatesFolderId);
             if (!docData.id) {
                 handleError('Error: Problem creating Google Doc. Please try again.');
                 return;
@@ -141,17 +142,6 @@ const TemplateStepScreen = ({
             e.preventDefault();
             handleSave();
         }
-    };
-
-    const handleTemplateSelection = (event) => {
-        if (event.target.value === 'new') {
-            handleCreateDoc();
-            return;
-        }
-        setSelectedTemplate(event.target.value);
-        // You can add logic here to act on the selection,
-        // for example, load the template's content.
-        console.log("Selected Template:", event.target.value);
     };
 
     const handleRefresh = () => {

@@ -96,6 +96,10 @@ export default function SendCenterScreen({
         stopOnError: boolean = false,
     ) => {
         if (!(summary?.remaining && queuedTotal)) return;
+        if (count === 0) {
+            setSnackbar({ open: true, message: "No emails to send. Please generate some LOIs first or increase the number of emails to send.", severity: "error" });
+            return;
+        }
         setSending(true);
         try {
             const numEmailsToSend = count;
@@ -229,10 +233,10 @@ export default function SendCenterScreen({
         [filtered, visibleCount]
     );
 
-    let primaryLabel = "Send Next";
+    let primaryLabel = "Send...";
     if (sending) primaryLabel = "Sending…";
     else if (queuedTotal === 0) primaryLabel = "Open Builder";
-    else primaryLabel = `Send Next ${Math.min(summary?.remaining, queuedTotal) || 0}`;
+    else primaryLabel = `Send...`;
 
     const primaryDisabled = queuedTotal === 0 ? loading : (!canSend || sending || loading);
     const canLoadMore = visibleCount < filtered.length;

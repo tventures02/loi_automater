@@ -106,7 +106,7 @@ export default function GenerateLOIsStepScreen({
 
     /* -------- Email settings state -------- */
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
-    const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{your_name}}");
+    const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{buyer_name}}");
     const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
     const [attachPdf, setAttachPdf] = useState<boolean>(true);
     const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);

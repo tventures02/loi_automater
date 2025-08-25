@@ -31,6 +31,8 @@ import {
     queueUpdateStatus,
     showSendQueueTab,
     highlightQueueRow,
+    loiEnsureRootFolder,
+    loiEnsureFolders,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -61,4 +63,6 @@ export {
     queueUpdateStatus,
     showSendQueueTab,
     highlightQueueRow,
+    loiEnsureRootFolder,
+    loiEnsureFolders,
 };

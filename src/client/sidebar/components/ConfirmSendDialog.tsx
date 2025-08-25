@@ -41,7 +41,6 @@ export default function ConfirmSendDialog({
         setAdvancedOpen(false);
         setAttachPolicy("respect");
         setCount(Math.max(0, Math.min(remaining ?? 0, queued ?? 0)));
-        // setSampleCount(defaultSampleCount);
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") onCancel();
             if (e.key === "Enter") onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError });
@@ -59,8 +58,6 @@ export default function ConfirmSendDialog({
             ? `This will send ${count} emails now.`
             : `We'll send ${sampleCount > 1 ? "" : "a"} preview email${sampleCount > 1 ? "s" : ""} to you (${toEmail || "your email address"}) using the next queued LOIs.`;
 
-
-            console.log('sampleCount', sampleCount);
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
             {/* overlay */}
@@ -112,11 +109,11 @@ export default function ConfirmSendDialog({
 
                     {variant === "real" && (
 
-                        <div className="mt-2">
+                        <div className="mt-2 flex justify-end flex-col">
                             <button
                                 type="button"
                                 onClick={() => setAdvancedOpen((v) => !v)}
-                                className="text-[11px] text-gray-600 hover:text-gray-900 hover:underline cursor-pointer"
+                                className="text-[11px] text-gray-600 hover:text-gray-900 hover:underline cursor-pointer flex justify-end"
                             >
                                 {advancedOpen ? "Hide advanced options" : "Show advanced options"}
                             </button>

@@ -11,6 +11,9 @@ export type DocInfo = {
     error?: string; // Optional for when an error occurs
 };
 const QUEUE_DISPLAY_LIMIT = 500;
+const ROOT_FOLDER_NAME = 'LOI Mailer';
+const TEMPLATES_FOLDER_NAME = 'LOI Templates';
+const OUTPUT_FOLDER_NAME = 'LOIs';
 
 /**
  * Gets the names of multiple Google Docs given an array of their file IDs.
@@ -95,31 +98,45 @@ export const getGoogleDocPlainText = (docId: string): string => {
 };
 
 /**
- * Creates a new Google Doc with the given title.
+ * Creates a new Google Doc in the LOI Templates folder (or a provided folder).
+ * Requires Advanced Drive API (v2) enabled and the drive.file scope.
+ *
  * @param {string} docTitle - The title for the new Google Document.
- * @returns {{url: string, id: string}} An object containing the URL and the ID of the new document.
+ * @param {string=} templatesFolderId - Optional folder id to create the doc in. If omitted, we ensure/find the "LOI Templates" folder.
+ * @returns {{url: string, id: string, parentId: string}} An object containing the URL, ID, and parent folder ID.
  */
-export const createGoogleDoc = (docTitle: string) => {
+export const createGoogleDoc = (docTitle: string, templatesFolderId?: string) => {
     try {
-        // Create the document
-        const doc = DocumentApp.create(docTitle);
+        // 1) Resolve target folder
+        const folderId = templatesFolderId || loiEnsureTemplatesFolder(); // <- your ensure function
+
+        // 2) Create the Doc directly inside the folder via Drive v2
+        const title = (docTitle && docTitle.trim()) || 'New LOI Template';
+        const file = Drive.Files.insert({
+            title,
+            mimeType: 'application/vnd.google-apps.document',
+            parents: [{ id: folderId }]
+        });
+
+        // 3) Prime body with sample template content (optional)
+        const doc = DocumentApp.openById(file.id);
         const body = doc.getBody();
-
-        // Fill in the LOI template with provided data
+        body.clear(); // ensure empty body
         const content = `Sample Letter\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
-
         body.appendParagraph(content);
+        doc.saveAndClose();
 
-        // Get the URL and ID
-        const url = doc.getUrl();
-        const id = doc.getId();
-
-        return { url, id };
-    } catch (error) {
-        console.error(`Error creating document: ${error.toString()}`);
+        return {
+            url: 'https://docs.google.com/document/d/' + file.id + '/edit',
+            id: file.id,
+            parentId: folderId,
+        };
+    } catch (error: any) {
+        console.error(`Error creating document: ${error && error.message ? error.message : error}`);
         throw new Error('There was an error creating the Google Doc.');
     }
 };
+
 
 
 export const getPreviewRowValues = (payload) => {
@@ -306,6 +323,9 @@ export const generateLOIsAndWriteSheet = (payload) => {
         const mapVersion = mappingVersion(mapping);
         const templateId = payload.templateDocId;
 
+        const outFolderId = loiEnsureOutputFolder();
+
+
         for (let r = 0; r < data.length; r++) {
             const row = data[r];
             const email = (row[eIdx] || '').toString().trim();
@@ -338,7 +358,8 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 // Create a Doc from template and replace tokens
                 const docInfo = generateLOIDocFromTemplate(templateId, {
                     fileName,
-                    placeholders
+                    placeholders,
+                    outFolderId: outFolderId
                 });
 
                 // Compute SUBJECT and BODY now (so future sends don’t depend on changed templates)
@@ -409,19 +430,6 @@ export const generateLOIsAndWriteSheet = (payload) => {
     }
 }
 
-function copyTextAttributes(sourceElement, targetElement) {
-    const sourceText = sourceElement.editAsText();
-    const targetText = targetElement.editAsText();
-
-    const textLength = sourceText.getText().length;
-
-    // Iterate through each character and copy attributes
-    for (let i = 0; i < textLength; i++) {
-        const attributes = sourceText.getAttributes(i);
-        targetText.setAttributes(i, i, attributes);
-    }
-}
-
 /**
 * Make a copy of the template Doc, replace placeholders, and return its ID/URL.
 * Supports both {{Token}} and <token> styles.
@@ -434,73 +442,40 @@ function copyTextAttributes(sourceElement, targetElement) {
 * @returns {{ fileId: string, fileUrl: string }}
 */
 function generateLOIDocFromTemplate(templateId, opts) {
-    // Open the template document
-    const templateDoc = DocumentApp.openById(templateId);
-    const templateBody = templateDoc.getBody();
 
-    // Create a new temporary document
-    const tempDoc = DocumentApp.create(opts.fileName || 'LOI');
-    const tempBody = tempDoc.getBody();
-    const tempDocId = tempDoc.getId();
+    const fileName = opts.fileName;
+    const outFolderId = opts.outFolderId; // REQUIRED to save in the right place
 
-    // Copy each element from the template to the temporary document
-    const numElements = templateBody.getNumChildren();
-    for (let i = 0; i < numElements; i++) {
-        const element = templateBody.getChild(i).copy(); // Clone the element to preserve formatting
-
-        // Append the copied element based on its type
-        switch (element.getType()) {
-            case DocumentApp.ElementType.PARAGRAPH:
-                tempBody.appendParagraph(element.asParagraph());
-                break;
-            case DocumentApp.ElementType.LIST_ITEM:
-                // tempBody.appendListItem(element.asListItem());
-                const sourceListItem = element.asListItem();
-                const listText = sourceListItem.getText();
-                const glyphType = sourceListItem.getGlyphType();
-                const nestingLevel = sourceListItem.getNestingLevel();
-
-                // Append the list item with the same text
-                const newListItem = tempBody.appendListItem(listText);
-
-                // Set the glyph type and nesting level to match the source
-                newListItem.setGlyphType(glyphType);
-                newListItem.setNestingLevel(nestingLevel);
-
-                // Copy text attributes from source to new list item
-                copyTextAttributes(sourceListItem, newListItem);
-                break;
-            case DocumentApp.ElementType.TABLE:
-                tempBody.appendTable(element.asTable());
-                break;
-            case DocumentApp.ElementType.TABLE_ROW:
-                //@ts-ignore
-                tempBody.appendTableRow(element.asTableRow());
-                break;
-            case DocumentApp.ElementType.TEXT:
-                //@ts-ignore
-                tempBody.appendParagraph(element.asText());
-                break;
-            default:
-                // For unsupported elements, skip or log
-                Logger.log(`Unsupported element type: ${element.getType()}`);
-        }
+    if (!outFolderId || !fileName) {
+        throw new Error('generateLOIDocFromTemplate: outFolderId and fileName are required.');
     }
+
+    const copy = Drive.Files.copy(
+        {
+            title: fileName,
+            parents: [{ id: outFolderId }],
+        },
+        templateId
+    );
+
+    const newDocId = copy.id;
+    const newDoc = DocumentApp.openById(newDocId);
+    const body = newDoc.getBody();
 
     // Replace placeholders with actual data
-    var map = opts.placeholders || {};
+    const map = opts.placeholders || {};
     for (var key in map) {
         var value = String(map[key] ?? '');
-        // {{ Token }}
-        tempBody.replaceText('{{\\s*' + escapeRegExp(key) + '\\s*}}', value);
-        // <token> (case-insensitive: try original + lowercased key)
-        tempBody.replaceText('<\\s*' + escapeRegExp(key) + '\\s*>', value);
-        tempBody.replaceText('<\\s*' + escapeRegExp(String(key).toLowerCase()) + '\\s*>', value);
+        body.replaceText('{{\\s*' + escapeRegExp(key) + '\\s*}}', value);
+        body.replaceText('<\\s*' + escapeRegExp(key) + '\\s*>', value);
+        body.replaceText('<\\s*' + escapeRegExp(String(key).toLowerCase()) + '\\s*>', value);
     }
 
-    tempDoc.saveAndClose();
+    newDoc.saveAndClose();
 
-    return { fileId: tempDocId, fileUrl: tempDoc.getUrl() };
+    return { fileId: newDocId, fileUrl: newDoc.getUrl() };
+
+    function escapeRegExp(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 }
 
 // --- helpers ---
@@ -690,7 +665,7 @@ export const sendNextBatch = (payload) => {
     const attachPolicy = String(payload?.attachPolicy || 'respect').toLowerCase(); // 'respect' | 'forceon' | 'forceoff'
     const stopOnError = !!payload?.stopOnError;
 
-    const lock = LockService.getDocumentLock();    
+    const lock = LockService.getDocumentLock();
     try {
         if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
 
@@ -1030,8 +1005,104 @@ export const showSendQueueTab = () => {
 export const highlightQueueRow = (rowNumber: number) => {
     const ss = SpreadsheetApp.getActive();
     const sh = ss.getSheetByName(LOI_QUEUE_NAME);
-    if (sh) {        
-        const rangeToInsertRow = sh.getRange(rowNumber, 1,1, sh.getLastColumn());
+    if (sh) {
+        const rangeToInsertRow = sh.getRange(rowNumber, 1, 1, sh.getLastColumn());
         sh.setActiveRange(rangeToInsertRow); // highlight row in sheet
     }
+}
+
+/**************
+ * FOLDERS
+ **************/
+
+// server: add this next to your other exports
+export function loiEnsureFolders() {
+    return {
+        rootId: loiEnsureRootFolder(),
+        templatesFolderId: loiEnsureTemplatesFolder(),
+    };
+}
+
+function props() {
+    return PropertiesService.getDocumentProperties();
+}
+
+/** Safely read a cached folder id; clears cache if missing/trashed. */
+function getCachedFolderId(key: string): string | null {
+    const id = props().getProperty(key);
+    if (!id) return null;
+    try {
+        const f = Drive.Files.get(id);
+        if (f && !f.labels?.trashed) return id;
+    } catch (_) { /* fall through */ }
+    props().deleteProperty(key);
+    return null;
+}
+
+function escapeForQ(s: string) {
+    // basic quote escape for Drive v2 Q
+    return String(s).replace(/'/g, "\\'");
+}
+
+function findOrCreateFolderUnder(parentId: string, name: string): string {
+    const q =
+        "mimeType='application/vnd.google-apps.folder' and trashed=false" +
+        " and title='" + escapeForQ(name) + "'" +
+        " and '" + parentId + "' in parents";
+    const res = Drive.Files.list({ q, maxResults: 1 });
+    if (res.items && res.items.length) return res.items[0].id;
+
+    const created = Drive.Files.insert({
+        title: name,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [{ id: parentId }]
+    });
+    return created.id;
+}
+
+/** Ensure the single app root folder exists under My Drive. */
+export const loiEnsureRootFolder = (): string => {
+    let id = getCachedFolderId('loiRootFolderId');
+    if (id) return id;
+
+    const q =
+        "mimeType='application/vnd.google-apps.folder' and trashed=false" +
+        " and title='" + escapeForQ(ROOT_FOLDER_NAME) + "'" +
+        " and 'root' in parents";
+    const res = Drive.Files.list({ q, maxResults: 1 });
+
+    id = (res.items && res.items.length)
+        ? res.items[0].id
+        : Drive.Files.insert({
+            title: ROOT_FOLDER_NAME,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [{ id: 'root' }]
+        }).id;
+
+    props().setProperty('loiRootFolderId', id);
+    return id;
+}
+
+/** Ensure /LOI Templates exists inside the app root. */
+export const loiEnsureTemplatesFolder = (): string => {
+    const cacheKey = 'loiTemplatesFolderId';
+    let id = getCachedFolderId(cacheKey);
+    const rootId = loiEnsureRootFolder();
+    if (!id) {
+        id = findOrCreateFolderUnder(rootId, TEMPLATES_FOLDER_NAME);
+        props().setProperty(cacheKey, id);
+    }
+    return id;
+}
+
+/** Ensure /LOIs exists inside the app root. */
+export const loiEnsureOutputFolder = (): string => {
+    const cacheKey = 'loiOutputFolderId';
+    let id = getCachedFolderId(cacheKey);
+    const rootId = loiEnsureRootFolder();
+    if (!id) {
+        id = findOrCreateFolderUnder(rootId, OUTPUT_FOLDER_NAME);
+        props().setProperty(cacheKey, id);
+    }
+    return id;
 }
