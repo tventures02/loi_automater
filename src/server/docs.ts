@@ -662,7 +662,7 @@ export const queueList = (payload) => {
                 subject: row[iSubject] || '',
                 sourceRow: row[iSourceRow] || '',
                 attachPdf: String(row[iAttachPdf] || '')?.toLowerCase() === 'true' || false,
-                queueTabRow: index + 1,
+                queueTabRow: index + 2,
             }
             return queueItem;
         })
@@ -1024,5 +1024,14 @@ export const showSendQueueTab = () => {
         // Unhide if hidden, then activate
         sh.showSheet();
         ss.setActiveSheet(sh);
+    }
+}
+
+export const highlightQueueRow = (rowNumber: number) => {
+    const ss = SpreadsheetApp.getActive();
+    const sh = ss.getSheetByName(LOI_QUEUE_NAME);
+    if (sh) {        
+        const rangeToInsertRow = sh.getRange(rowNumber, 1,1, sh.getLastColumn());
+        sh.setActiveRange(rangeToInsertRow); // highlight row in sheet
     }
 }

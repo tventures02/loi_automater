@@ -30,6 +30,7 @@ import {
     queueClearAll,
     queueUpdateStatus,
     showSendQueueTab,
+    highlightQueueRow,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -59,4 +60,5 @@ export {
     queueClearAll,
     queueUpdateStatus,
     showSendQueueTab,
+    highlightQueueRow,
 };

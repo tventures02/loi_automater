@@ -131,15 +131,17 @@ export default function SendCenterScreen({
         if (pendingId) return;
         setPendingId(item.id);
         try {
+            setOpenMenu(m => ({ ...m, open: false }));
             await serverFunctions.queueUpdateStatus({ id: item.id, status: next });
             setSendData(s => ({
                 ...s,
                 items: s.items.map(it => (it.id === item.id ? { ...it, status: next } : it)),
             }));
+            serverFunctions.highlightQueueRow(item.queueTabRow);
+            setSnackbar({ open: true, message: `Updated status to ${next}.`, severity: "success" });
             // refreshSendData(true);
         } finally {
             setPendingId(null);
-            setOpenMenu(m => ({ ...m, open: false }));
         }
     };
 
