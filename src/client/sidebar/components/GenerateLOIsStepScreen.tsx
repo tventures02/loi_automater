@@ -108,6 +108,7 @@ export default function GenerateLOIsStepScreen({
     const [checksOpen, setChecksOpen] = useState(false);
     const [emailSettingsHovered, setEmailSettingsHovered] = useState<boolean>(false);
     const placeholders = useMemo(() => extractPlaceholders(templateContent, mapping), [templateContent, mapping]);
+    const [previewValues, setPreviewValues] = useState<Record<string, any> | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const emailColumn = mapping?.__email || "";
     const outputFolderId = preflight?.outputFolderId || "";
@@ -121,6 +122,24 @@ export default function GenerateLOIsStepScreen({
     const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
     const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
     /* -------- /Email settings state -------- */
+
+    useEffect(() => {
+        const getPreviewValues = async () => {
+            const colsRequested = Array.from(
+                new Set(
+                    Object.entries(mapping)
+                        .filter(([k, v]) => k !== "__email" && !!v)
+                        .map(([_, v]) => v as string)
+                )
+            );
+            if (emailColumn) colsRequested.push(emailColumn);
+            const valuesByColumn: Record<string, any> = await serverFunctions.getPreviewRowValues({
+                columns: colsRequested, sheetName: sheetName || null
+            });
+            setPreviewValues(valuesByColumn);
+        }
+        getPreviewValues();
+    }, []);
 
     // Auto-preflight when pre-conditions are met
     useEffect(() => {
@@ -169,7 +188,14 @@ export default function GenerateLOIsStepScreen({
         })();
 
         return () => { cancelled = true; };
-    }, [templateDocId, emailColumn, JSON.stringify(mapping), sheetName, placeholders, onValidChange, pattern]);
+    }, [templateDocId, emailColumn, JSON.stringify(mapping), sheetName, placeholders, onValidChange]);
+
+    useEffect(() => {
+        if (!preflight) return;
+        const raw = renderPreviewTemplate(pattern, mapping, previewValues);
+        const sample = raw.replace(/[\/\\:*?"<>|]/g, " ").trim(); // mimic server sanitization
+        setPreflight(prev => prev ? { ...prev, sampleFileName: sample } : prev);
+    }, [pattern]);
 
     /* Build email preview from first row values (same approach as LOI preview) */
     useEffect(() => {
@@ -179,23 +205,9 @@ export default function GenerateLOIsStepScreen({
         let cancelled = false;
         (async () => {
             try {
-                const colsRequested = Array.from(
-                    new Set(
-                        Object.entries(mapping)
-                            .filter(([k, v]) => k !== "__email" && !!v)
-                            .map(([_, v]) => v as string)
-                    )
-                );
-                if (emailColumn) colsRequested.push(emailColumn);
-
-                const valuesByColumn: Record<string, any> = await serverFunctions.getPreviewRowValues({
-                    columns: colsRequested, sheetName: sheetName || null
-                });
-
-                if (cancelled) return;
-
-                const subject = renderPreviewTemplate(emailSubjectTpl, mapping, valuesByColumn);
-                const body = renderPreviewTemplate(emailBodyTpl, mapping, valuesByColumn);
+                if (cancelled || !previewValues) return;
+                const subject = renderPreviewTemplate(emailSubjectTpl, mapping, previewValues);
+                const body = renderPreviewTemplate(emailBodyTpl, mapping, previewValues);
                 setEmailPreview({ subject, body });
             } catch {
                 if (!cancelled) setEmailPreview(null);
@@ -203,7 +215,7 @@ export default function GenerateLOIsStepScreen({
         })();
 
         return () => { cancelled = true; };
-    }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders]);
+    }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders, previewValues]);
 
     const runGenerate = async () => {
         if (!preflight?.ok) return;
