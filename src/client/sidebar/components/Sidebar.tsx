@@ -21,6 +21,7 @@ import DataSourcePicker from './DataSourcePicker';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
+const LOI_QUEUE_NAME = 'Sender Queue';
 
 export type QueueItem = {
     id: string;
@@ -313,9 +314,11 @@ const SidebarContainer = () => {
                     setDataSheet(saved);
                 } else {
                     const active = await serverFunctions.getActiveSheetName();
-                    const def = forceActiveDefault && active ? active : (names[0] || null);
-                    setDataSheet(def);
-                    if (def) localStorage.setItem("loi:dataSheet", def);
+                    if (active !== LOI_QUEUE_NAME) {
+                        const def = forceActiveDefault && active ? active : (names[0] || null);
+                        setDataSheet(def);
+                        if (def) localStorage.setItem("loi:dataSheet", def);
+                    }
                 }
             }
         } catch (error) {
@@ -329,8 +332,8 @@ const SidebarContainer = () => {
         setDataSheet(name);
         localStorage.setItem("loi:dataSheet", name);
     };
-
     const refreshSheets = async () => {
+
         try {
             setIsLoadingSheets(true);
             await loadSheets(false);

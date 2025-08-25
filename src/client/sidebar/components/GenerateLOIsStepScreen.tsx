@@ -289,7 +289,8 @@ export default function GenerateLOIsStepScreen({
     const tokensOk = allTokensMapped || hasAtLeastOneMapped;
     const emailOk = !!mapping.__email;
     const eligibleOk = (preflight?.eligibleRows ?? 0) > 0;
-    const checksOk = templateOk && tokensOk && emailOk && eligibleOk;
+    const dataSourceOk = !!sheetName;
+    const checksOk = templateOk && tokensOk && emailOk && eligibleOk && dataSourceOk;
 
     const canGenerate = checksOk && !!preflight?.ok;
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
@@ -479,7 +480,7 @@ export default function GenerateLOIsStepScreen({
                                     </span>}
                             </div>
 
-                            <div className="text-gray-600">Email column mapped {sheetName ? <>({sheetNameShort})</> : ""}</div>
+                            <div className="text-gray-600">Email column mapped</div>
                             <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` : 
                                 <span className="text-amber-600">
                                     ⚠ email column not mapped
@@ -488,7 +489,7 @@ export default function GenerateLOIsStepScreen({
                                     </Tooltip>
                                 </span>}</div>
 
-                            <div className="text-gray-600">Eligible rows {sheetName ? <>({sheetNameShort})</> : ""}</div>
+                            <div className="text-gray-600">Eligible rows</div>
                             <div className="text-gray-900">
                                 {isPreflighting ? (
                                     <span className="inline-flex items-center gap-1">
@@ -505,9 +506,17 @@ export default function GenerateLOIsStepScreen({
                                 )}
                             </div>
 
-                            <div className="text-gray-600">Invalid emails {sheetName ? <>({sheetNameShort})</> : ""}</div>
+                            <div className="text-gray-600">Invalid emails</div>
                             <div className="text-gray-900">
                                 {isPreflighting ? "…" : preflight ? preflight.invalidEmails : "—"}
+                            </div>
+                            <div className="text-gray-600">Data source</div>
+                            <div className="text-gray-900">
+                                {sheetName ? <>{sheetNameShort}</> : <span className="text-amber-600">⚠ no data source
+                                    <Tooltip title="No data source found. Please select a data source or refresh the data source dropdown in step 1.">
+                                        <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
+                                    </Tooltip>
+                                </span>}
                             </div>
                         </div>
 

@@ -195,8 +195,8 @@ export default function ConfirmSendDialog({
                             ref={primaryRef}
                             aria-disabled={isSubmitting}
                             onClick={!isSubmitting ? () => onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError }) : undefined}
-                            className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800 cursor-pointer"
-                                } focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900`}
+                            className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : 
+                                "bg-green-600 hover:bg-green-700 shadow-sm transition-colors focus:outline-none cursor-pointer"}`}
                         >
                             <div className="flex items-center gap-2">
                                 {isSubmitting ? (
