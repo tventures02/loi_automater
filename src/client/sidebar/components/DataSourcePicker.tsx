@@ -59,13 +59,6 @@ export default function DataSourcePicker({
                     </div>
                 ) : null}
             </div>
-
-
-            {/* {value ? (
-                    <div className="text-[11px] text-gray-600">
-                        Using <span className="font-medium">{value}</span> • Columns A–H
-                    </div>
-                ) : null} */}
         </div>
     );
 }

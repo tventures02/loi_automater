@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { User } from "../../utils/types";
 import { serverFunctions } from '../../utils/serverFunctions';
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { DocInfo } from "../../../server/docs";
 import { backendCall } from "../../utils/server-calls";
 import CONSTANTS from '../../utils/constants';
-import { ArrowTopRightOnSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
 import { NewTemplateDialog } from "./NewTemplateDialog";
 
@@ -179,7 +179,11 @@ const TemplateStepScreen = ({
             <p className="text-xs text-gray-600 mb-[3px]">
                 {
                     templateExists ?
-                        "Select the LOI Google Doc Template to use."
+                        <span>Select the LOI Google Doc Template to use. 
+                            <Tooltip title="Use the {{ }} placeholder format to insert data into the template.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-600" />
+                            </Tooltip>
+                        </span>
                         :
                         (
                             <div className="flex items-center gap-2">
@@ -259,7 +263,7 @@ const TemplateStepScreen = ({
                     </div>
                     {isEditing && (
                         <div className="mt-1 text-[10px] text-gray-500">
-                            Press <span className="font-medium">⌘/Ctrl + S</span> to save.
+                            Press <span className="font-medium">⌘/Ctrl + S</span> to save this text only.
                             {hasUnsaved && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 mr-[3px] ml-[3px]" title="Unsaved changes" />}
                         </div>
                     )}
@@ -283,7 +287,7 @@ const TemplateStepScreen = ({
                             href={templateUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                            className="text-[11px] !text-gray-600 hover:!text-gray-900 underline underline-offset-2"
                         >
                             <Tooltip title="Open in Docs">
                                 <ArrowTopRightOnSquareIcon className="h-4 w-4" />

@@ -70,7 +70,7 @@ export default function ConfirmGenerateDialog({
                                 Generate LOI documents?
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-gray-600">
-                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in your Drive and add them to the Sender queue. Don't worry you can review them before sending.
+                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in a folder in your Drive and add them to the Sender queue. Don't worry, you can review them before sending.
                             </p>
 
                             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700 space-y-1">
@@ -82,7 +82,7 @@ export default function ConfirmGenerateDialog({
                                                 href={`https://docs.google.com/document/d/${templateDocId}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[11px] text-gray-600 hover:text-gray-900 underline underline-offset-2 ml-1"
+                                                className="text-[11px] !text-gray-600 hover:!text-gray-900 underline underline-offset-2 ml-1"
                                             >
                                                 <Tooltip title="Open in Docs">
                                                     <ArrowTopRightOnSquareIcon className="h-3 w-3" />

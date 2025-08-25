@@ -3,8 +3,9 @@ import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
-import { Switch } from "@mui/material";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
+import { DocumentIcon, EnvelopeIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { Tooltip } from "@mui/material";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -38,6 +39,7 @@ type PreflightResult = {
     missingValuesRows: number; // optional heuristic
     sampleFileName: string;
     queueExists: boolean;   // true if Sender Queue exists
+    outputFolderId: string;
 };
 
 type GenerateSummary = {
@@ -47,10 +49,10 @@ type GenerateSummary = {
     statuses: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
   };
 
-const DEFAULT_PATTERN = "LOI - {{address}}";
+const DEFAULT_PATTERN = "LOI - {{email}}";
 
 /* ---------- helpers ---------- */
-function extractPlaceholders(text: string): string[] {
+function extractPlaceholders(text: string, mapping?: Record<string, string>): string[] {
     if (!text) return [];
     const re = /{{\s*([^{}]+?)\s*}}/g;
     const set = new Set<string>();
@@ -72,6 +74,13 @@ function renderPreviewTemplate(
         const val = valuesByColumn?.[col] ?? "";
         const re = new RegExp(`{{\\s*${escapeRegExp(ph)}\\s*}}`, "g");
         out = out.replace(re, String(val));
+
+        if (mapping.__email) {
+            const emailVal = valuesByColumn?.[mapping.__email] ?? "";
+            out = out
+                .replace(/{{\s*email\s*}}/gi, String(emailVal))
+                .replace(/{{\s*__email\s*}}/gi, String(emailVal));
+        }
     }
     return out;
 }
@@ -98,11 +107,11 @@ export default function GenerateLOIsStepScreen({
     const [toast, setToast] = useState<string>("");
     const [checksOpen, setChecksOpen] = useState(false);
     const [emailSettingsHovered, setEmailSettingsHovered] = useState<boolean>(false);
-    const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
+    const placeholders = useMemo(() => extractPlaceholders(templateContent, mapping), [templateContent, mapping]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const emailColumn = mapping?.__email || "";
+    const outputFolderId = preflight?.outputFolderId || "";
     const containerRef = useRef<HTMLDivElement>(null);
-
 
     /* -------- Email settings state -------- */
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
@@ -132,7 +141,6 @@ export default function GenerateLOIsStepScreen({
                     pattern,
                     sheetName: sheetName || null,
                 });
-                console.log('res', res)
                 if (!cancelled) {
                     setPreflight(res);
                     onValidChange?.("lois", !!res.ok);
@@ -151,6 +159,7 @@ export default function GenerateLOIsStepScreen({
                         missingValuesRows: 0,
                         sampleFileName: "",
                         queueExists: false,
+                        outputFolderId: "",
                     });
                     onValidChange?.("lois", false);
                 }
@@ -265,6 +274,7 @@ export default function GenerateLOIsStepScreen({
 
     const canGenerate = checksOk && !!preflight?.ok;
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
+    const placeholdersWithEmail = [...placeholders, "email"];
 
     return (
         <div className="space-y-3 pb-[40px]" id="generate-lois-step" ref={containerRef}>
@@ -285,16 +295,16 @@ export default function GenerateLOIsStepScreen({
 
             <div className="mt-0 text-[11px] text-gray-500">
                 Placeholders you can use:{" "}
-                {placeholders.length
-                    ? placeholders.map((t, i) => (
-                        <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholders.length - 1 ? "," : ""}</code>
+                {placeholdersWithEmail.length
+                    ? placeholdersWithEmail.map((t, i) => (
+                        <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholdersWithEmail.length - 1 ? "," : ""}</code>
                     ))
                     : <span className="italic">none</span>}
             </div>
 
             {/* File naming pattern */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-2">
-                <div className="text-xs text-gray-500">File name pattern</div>
+                <div className="text-xs font-medium text-gray-900"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File name pattern</div>
                 <input
                     value={pattern}
                     onChange={(e) => setPattern(e.target.value)}
@@ -310,13 +320,21 @@ export default function GenerateLOIsStepScreen({
             {/* Email settings */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-2" onMouseEnter={() => setEmailSettingsHovered(true)} onMouseLeave={() => setEmailSettingsHovered(false)}>
                 <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-gray-900">Email settings</div>
+                    <div className="text-xs font-medium text-gray-900"><EnvelopeIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Email settings</div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
                     <div className="flex items-center justify-between mb-1">
                         <div className="text-[11px] text-gray-600">Attach LOI as PDF</div>
-                        <Switch color="primary" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} size="small" />
+                        {/* <Switch color="primary" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} size="small" /> */}
+                        <span
+                            role="switch"
+                            aria-checked={attachPdf}
+                            onClick={() => setAttachPdf(!attachPdf)}
+                            className={`ml-3 inline-flex h-5 w-9 items-center rounded-full ${attachPdf ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                        >
+                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${attachPdf ? "translate-x-3.5" : ""}`} />
+                        </span>
                     </div>
                 </div>
 
@@ -337,8 +355,15 @@ export default function GenerateLOIsStepScreen({
 
                             {/* Toggle */}
                             <div className={`relative inline-flex items-center gap-1`}>
-                            <span className="text-[11px] text-gray-700 select-none">Use LOI as body</span>
-                                <Switch color="primary" checked={useLOIAsBody} onChange={(e) => setUseLOIAsBody(e.target.checked)} size="small" />
+                            <span className="text-[11px] text-gray-700 select-none">Use LOI as body:</span>
+                                <span
+                                    role="switch"
+                                    aria-checked={useLOIAsBody}
+                                    onClick={() => setUseLOIAsBody(!useLOIAsBody)}
+                                    className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${useLOIAsBody ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                                >
+                                    <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${useLOIAsBody ? "translate-x-3.5" : ""}`} />
+                                </span>
                             </div>
                         </div>
 
@@ -377,7 +402,9 @@ export default function GenerateLOIsStepScreen({
                         <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`}onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
                     </>
                 ) : (
-                    <span className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(true)}>Show email preview</span>
+                    <>
+                        {checksOk && <span className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(true)}>Show email preview</span>}
+                    </>
                 )}
             </div>
 
@@ -426,11 +453,21 @@ export default function GenerateLOIsStepScreen({
 
                             <div className="text-gray-600">Placeholders mapped</div>
                             <div className="text-gray-900">
-                                {allTokensMapped ? "✓ all mapped" : hasAtLeastOneMapped ? `⚠ ${placeholders.filter((p) => !!mapping[p]).length} mapped` : "none mapped"}
+                                {allTokensMapped ? "✓ all mapped" : hasAtLeastOneMapped ? `⚠ ${placeholders.filter((p) => !!mapping[p]).length} mapped` : <span className="text-amber-600">⚠ none mapped
+                                    <Tooltip title="Please map all placeholders to a valid column.">
+                                        <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
+                                    </Tooltip>
+                                    </span>}
                             </div>
 
                             <div className="text-gray-600">Email column mapped {sheetName ? <>({sheetNameShort})</> : ""}</div>
-                            <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` : "—"}</div>
+                            <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` : 
+                                <span className="text-amber-600">
+                                    ⚠ email column not mapped
+                                    <Tooltip title="Please map the email column to valid email addresses in the source data sheet.">
+                                        <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
+                                    </Tooltip>
+                                </span>}</div>
 
                             <div className="text-gray-600">Eligible rows {sheetName ? <>({sheetNameShort})</> : ""}</div>
                             <div className="text-gray-900">
@@ -441,7 +478,11 @@ export default function GenerateLOIsStepScreen({
                                 ) : preflight ? (
                                     `${preflight.eligibleRows} / ${preflight.totalRows}`
                                 ) : (
-                                    "—"
+                                    <span className="text-amber-600">⚠ no eligible rows
+                                        <Tooltip title="No eligible rows found. Please check your mapping and data.">
+                                            <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
+                                        </Tooltip>
+                                    </span>
                                 )}
                             </div>
 
@@ -487,7 +528,7 @@ export default function GenerateLOIsStepScreen({
             {/* Generate action + progress */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-3">
                 <div className="text-xs text-gray-600">
-                    Generate the LOIs in your Drive {sheetName ? <>from <b>{sheetNameShort}</b></> : ""}.
+                    <SparklesIcon className="w-4 h-4 inline-block mr-1 text-indigo-600" />Create LOIs Docs {sheetName ? <>from <b>{sheetNameShort}</b></> : ""}.
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px]">
@@ -499,20 +540,22 @@ export default function GenerateLOIsStepScreen({
                     </div>
                 </div>
 
-                <div
-                    role="button"
-                    tabIndex={0}
-                    aria-disabled={!canGenerate || isGenerating}
-                    onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
-                    className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
+                <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : !canGenerate ? "Create LOIs in your Drive" : !isGenerating ? "" : ""}>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        aria-disabled={!canGenerate || isGenerating}
+                        onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
+                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
+                        className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
             ${!canGenerate || isGenerating
-                            ? "bg-gray-300 text-white cursor-not-allowed"
-                            : "bg-gray-900 text-white hover:bg-gray-800"
-                        }`}
-                >
-                    {isGenerating ? "Generating…" : `Generate LOIs${preflight?.eligibleRows ? ` (${preflight.eligibleRows})` : ""}`}
-                </div>
+                                ? "bg-gray-300 text-white cursor-not-allowed"
+                                : "bg-gray-900 text-white hover:bg-gray-800"
+                            }`}
+                    >
+                        {isGenerating ? "Generating…" : `Generate LOIs${preflight?.eligibleRows ? ` (${preflight.eligibleRows})` : ""}`}
+                    </div>
+                </Tooltip>
 
                 {/* Progress / results */}
                 {isGenerating && (
@@ -527,6 +570,8 @@ export default function GenerateLOIsStepScreen({
                         <div>Created: {summary.created}</div>
                         <div>Skipped: {summary.skippedInvalid}</div>
                         <div>Failed: {summary.failed}</div>
+                        <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
+                            target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 hover:underline">Open Docs in Drive</a></div>
                     </div>
                 )}
             </div>

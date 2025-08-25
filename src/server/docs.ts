@@ -122,7 +122,7 @@ export const createGoogleDoc = (docTitle: string, templatesFolderId?: string) =>
         const doc = DocumentApp.openById(file.id);
         const body = doc.getBody();
         body.clear(); // ensure empty body
-        const content = `Sample Letter\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
+        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
         body.appendParagraph(content);
         doc.saveAndClose();
 
@@ -170,11 +170,21 @@ export const preflightGenerateLOIs = (payload) => {
     if (!sheet) throw new Error('Sheet not found');
     if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
+    const outputFolderId = loiEnsureOutputFolder();
 
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     if (lastRow < 1) {
-        return { ok: false, totalRows: 0, eligibleRows: 0, invalidEmails: 0, missingValuesRows: 0, sampleFileName: '', queueExists: queueExistsFlag };
+        return {
+            ok: false,
+            totalRows: 0,
+            eligibleRows: 0,
+            invalidEmails: 0,
+            missingValuesRows: 0,
+            sampleFileName: '',
+            queueExists: queueExistsFlag,
+            outputFolderId,
+        };
     }
 
     const width = Math.min(lastCol, 8); // A..H only
@@ -183,7 +193,16 @@ export const preflightGenerateLOIs = (payload) => {
     const mapping = payload.mapping || {};
     const emailColLetter = payload.emailColumn || mapping.__email;
     if (!emailColLetter) {
-        return { ok: false, totalRows: values.length, eligibleRows: 0, invalidEmails: 0, missingValuesRows: 0, sampleFileName: '', queueExists: queueExistsFlag };
+        return { 
+            ok: false, 
+            totalRows: values.length, 
+            eligibleRows: 0, 
+            invalidEmails: 0, 
+            missingValuesRows: 0, 
+            sampleFileName: '', 
+            queueExists: queueExistsFlag, 
+            outputFolderId,
+        };
     }
     const emailIndex = colToNumber(emailColLetter) - 1;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -199,6 +218,10 @@ export const preflightGenerateLOIs = (payload) => {
             (first[idx] || '')
         );
     });
+
+    if (mapping.__email) {
+        sampleName = sampleName.replace(/{{\s*email\s*}}/gi, String(first[emailIndex] || ''));
+    }
 
     let eligible = 0, invalid = 0, missingValsRows = 0;
 
@@ -225,7 +248,8 @@ export const preflightGenerateLOIs = (payload) => {
         invalidEmails: invalid,
         missingValuesRows: missingValsRows,
         sampleFileName: sampleName,
-        queueExists: queueExistsFlag
+        queueExists: queueExistsFlag,
+        outputFolderId,
     };
 };
 
@@ -353,7 +377,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
 
                 // Compute Doc name from pattern
-                const fileName = renderName(payload.pattern || "LOI", row, tokenCols);
+                const fileName = renderName(payload.pattern || "LOI", row, tokenCols, eIdx);
 
                 // Create a Doc from template and replace tokens
                 const docInfo = generateLOIDocFromTemplate(templateId, {
@@ -494,11 +518,17 @@ function escapeRegExp(s) {
 }
 
 /** Replace tokens inside the given pattern using values from row/index map */
-function renderName(pattern, row, tokenCols) {
+function renderName(pattern, row, tokenCols, emailColIdx) {
     var name = pattern;
     for (var ph in tokenCols) {
         var idx = tokenCols[ph];
         name = name.replace(new RegExp('{{\\s*' + escapeRegExp(ph) + '\\s*}}', 'g'), (row[idx] || ''));
+    }
+
+    if (typeof emailColIdx === 'number' && emailColIdx >= 0) {
+        var emailVal = row[emailColIdx] || '';
+        name = name.replace(/{{\s*email\s*}}/gi, emailVal);
+        name = name.replace(/{{\s*__email\s*}}/gi, emailVal);
     }
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';

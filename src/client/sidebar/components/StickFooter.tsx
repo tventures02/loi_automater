@@ -1,5 +1,6 @@
 import { Tooltip } from "@mui/material";
 import React, { forwardRef, useMemo } from "react";
+import { PaperAirplaneIcon } from "@heroicons/react/24/outline";
 
 type Progress = { current: number; total: number };
 
@@ -23,7 +24,7 @@ type Props = {
     progress?: Progress;
 
     /** Optional helper line above actions */
-    helperText?: string;
+    helperText?: string | React.ReactNode;
 
     /** Current step */
     currentStep?: string;
@@ -86,10 +87,12 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
             tooltipTitle = "";
     }
 
+    const isFinalStep = primaryLabel?.toLowerCase().includes("send...");
+
     return (
         <div
             ref={ref}
-            className={`sticky ${mode === "build" && currentStep === "send" && fixYPos ? "bottom-[-9px]" : "bottom-0"} z-40 border-t border-gray-200 bg-white backdrop-blur supports-[backdrop-filter]:bg-white`}
+            className={`sticky ${mode === "build" && currentStep === "send" && fixYPos ? "bottom-[-9px]" : "bottom-[-.23em]"} z-40 border-t border-gray-200 bg-white backdrop-blur supports-[backdrop-filter]:bg-white`}
             aria-label="LOI Builder actions"
         >
             {/* Helper text (optional) */}
@@ -147,7 +150,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                                             {primaryLoading ? (
                                                 <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden="true" />
                                             ) : null}
-                                            <span className="truncate">{primaryLabel}</span>
+                                            <span className={`truncate`}>{isFinalStep ? <PaperAirplaneIcon className="w-4 h-4 inline-block" /> : null} {primaryLabel}</span>
                                         </div>
                                     </div>
                                 </span>

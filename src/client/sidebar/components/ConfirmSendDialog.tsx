@@ -170,7 +170,7 @@ export default function ConfirmSendDialog({
                                             onClick={() => setStopOnError((v) => !v)}
                                             className={`ml-3 inline-flex h-5 w-9 items-center rounded-full ${stopOnError ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
                                         >
-                                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${stopOnError ? "translate-x-4" : ""}`} />
+                                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${stopOnError ? "translate-x-3.5" : ""}`} />
                                         </span>
                                     </label>
                                 </div>

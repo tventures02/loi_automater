@@ -236,7 +236,6 @@ export default function SendCenterScreen({
     let primaryLabel = "Send...";
     if (sending) primaryLabel = "Sending…";
     else if (queuedTotal === 0) primaryLabel = "Open Builder";
-    else primaryLabel = `Send...`;
 
     const primaryDisabled = queuedTotal === 0 ? loading : (!canSend || sending || loading);
     const canLoadMore = visibleCount < filtered.length;
@@ -422,7 +421,7 @@ export default function SendCenterScreen({
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
-                helperText={loading ? null : queuedTotal === 0 ? "No queued items to send. Generate some LOIs first." : undefined}
+                helperText={loading ? null : queuedTotal === 0 ? <span className="text-amber-600">⚠ No queued items to send. Generate some LOIs first.</span> : undefined}
                 currentStep="send"
                 mode={mode}
                 fixYPos={true}
@@ -565,12 +564,4 @@ function StatusDropdownGlobal({
         </>
     );
     return createPortal(body, document.body);
-}
-
-/* Helpers */
-async function safeCall<T>(fn: () => Promise<T>): Promise<T | null> {
-    try { return await fn(); } catch { return null; }
-}
-function cryptoId() {
-    try { return crypto.randomUUID(); } catch { return String(Date.now() + Math.random()); }
 }
