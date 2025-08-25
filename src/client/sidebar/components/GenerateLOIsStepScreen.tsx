@@ -47,6 +47,7 @@ type GenerateSummary = {
     skippedInvalid: number;
     failed: number;
     statuses: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
+    duplicates: number;
   };
 
 const DEFAULT_PATTERN = "LOI - {{email}}";
@@ -195,6 +196,7 @@ export default function GenerateLOIsStepScreen({
         const raw = renderPreviewTemplate(pattern, mapping, previewValues);
         const sample = raw.replace(/[\/\\:*?"<>|]/g, " ").trim(); // mimic server sanitization
         setPreflight(prev => prev ? { ...prev, sampleFileName: sample } : prev);
+        setSummary(null)
     }, [pattern]);
 
     /* Build email preview from first row values (same approach as LOI preview) */
@@ -213,9 +215,14 @@ export default function GenerateLOIsStepScreen({
                 if (!cancelled) setEmailPreview(null);
             }
         })();
+        setSummary(null);
 
         return () => { cancelled = true; };
     }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders, previewValues]);
+
+    useEffect(() => {
+        setSummary(null);
+    }, [attachPdf]);
 
     const runGenerate = async () => {
         if (!preflight?.ok) return;
@@ -580,7 +587,8 @@ export default function GenerateLOIsStepScreen({
                     <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-800">
                         <div className="font-medium text-gray-900 mb-1">Generation summary</div>
                         <div>Created: {summary.created}</div>
-                        <div>Skipped: {summary.skippedInvalid}</div>
+                        <div>Skipped (invalid): {summary.skippedInvalid}</div>
+                        <div>Skipped (duplicates): {summary.duplicates}</div>
                         <div>Failed: {summary.failed}</div>
                         <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
                             target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 hover:underline">Open Docs in Drive</a></div>

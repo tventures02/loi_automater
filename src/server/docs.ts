@@ -65,7 +65,16 @@ function normValForKey(v) {
     return String(v).replace(/\r\n?/g, '\n').trim(); // normalize newlines + trim
 }
 
-function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
+function makeContentKey(
+    row, 
+    tokenCols, 
+    emailIndex, 
+    templateId, 
+    mapVersion,
+    filenamePattern = '',
+    emailSubjectTpl = '',
+    attachPdf = false,
+) {
     var parts = ['v1', String(templateId || ''), String(mapVersion || '')];
 
     // normalize email
@@ -81,7 +90,17 @@ function makeContentKey(row, tokenCols, emailIndex, templateId, mapVersion) {
         // name=value keeps semantic clarity before hashing
         parts.push(name + '=' + val);
     }
+    if (filenamePattern) {
+        parts.push(filenamePattern);
+    }
+    if (emailSubjectTpl) {
+        parts.push(emailSubjectTpl);
+    }
+    if (attachPdf) {
+        parts.push(attachPdf ? 'true' : 'false');
+    }
 
+    // Uncomment to check the raw key
     // console.log('KEY_RAW:', JSON.stringify(parts));
 
     var raw = parts.join('\u241F'); // unit separator to avoid collisions
@@ -291,7 +310,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
         const lastRow = source.getLastRow();
         const lastCol = source.getLastColumn();
         if (lastRow < 1) {
-            return { created: 0, skippedInvalid: 0, failed: 0, statuses: [] };
+            return { created: 0, skippedInvalid: 0, failed: 0, statuses: [], duplicates: 0 };
         }
 
         // Ensure central queue exists (source of truth for sending)
@@ -328,7 +347,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
         // Email column index
         const emailColLetter = payload.emailColumn || mapping.__email;
         if (!emailColLetter) {
-            return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })) };
+            return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })), duplicates: 0 };
         }
         const eIdx = colToNumber(emailColLetter) - 1;
 
@@ -340,13 +359,13 @@ export const generateLOIsAndWriteSheet = (payload) => {
 
         const statuses = [];
         const queueBatch = [];
-        let created = 0, skippedInvalid = 0, failed = 0;
+        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0;
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const sourceSheetName = source.getName();
         const mapVersion = mappingVersion(mapping);
         const templateId = payload.templateDocId;
-
+        const filenamePattern = payload.pattern || "LOI";
         const outFolderId = loiEnsureOutputFolder();
 
 
@@ -355,11 +374,11 @@ export const generateLOIsAndWriteSheet = (payload) => {
             const email = (row[eIdx] || '').toString().trim();
 
             // Build deterministic content key as the queue ID
-            const id = makeContentKey(row, tokenCols, eIdx, templateId, mapVersion);
+            const id = makeContentKey(row, tokenCols, eIdx, templateId, mapVersion, filenamePattern, emailSubjectTpl, attachPdf);
 
             // Skip duplicates already present in Sender Queue
             if (existingIds.has(id)) {
-                skippedInvalid++;
+                duplicates++;
                 statuses.push({ row: r + 1, status: 'skipped', message: 'Duplicate (already queued/sent with same content)' });
                 continue;
             }
@@ -377,7 +396,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
 
                 // Compute Doc name from pattern
-                const fileName = renderName(payload.pattern || "LOI", row, tokenCols, eIdx);
+                const fileName = renderName(filenamePattern, row, tokenCols, eIdx);
 
                 // Create a Doc from template and replace tokens
                 const docInfo = generateLOIDocFromTemplate(templateId, {
@@ -446,7 +465,8 @@ export const generateLOIsAndWriteSheet = (payload) => {
             created,
             skippedInvalid,
             failed,
-            statuses
+            statuses,
+            duplicates,
         };
     } catch (error) {
         console.error(`Error generating LOIs: ${error.toString()}`);

@@ -348,41 +348,42 @@ export default function SendCenterScreen({
                         ) : (
                             <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
-                                    {visibleItems.map((item, index) => (
-                                        <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="text-gray-900 truncate">{item.recipient}</div>
-                                                <div className="text-[11px] text-gray-600 truncate flex">
-                                                    <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
-                                                        {item.subject || "(no subject)"}
-                                                    </span>
-                                                    <span className="w-[10%] text-right">
-                                                        <Tooltip title="Has attached PDF">
-                                                            {item.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
-                                                        </Tooltip>
-                                                    </span>
+                                    {visibleItems.map((item, index) => {
+                                        return (
+                                            <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-gray-900 truncate">{item.recipient}</div>
+                                                    <div className="text-[11px] text-gray-600 truncate flex">
+                                                        <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
+                                                            {item.subject || "(no subject)"}
+                                                        </span>
+                                                        <span className="w-[10%] text-right">
+                                                            {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-gray-600 text-[11px]">Queue tab row: {item.queueTabRow}</div>
+                                                    <div className="text-[11px] text-gray-600 truncate">
+                                                        {item.docUrl ? (
+                                                            <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
+                                                                Open doc
+                                                            </a>
+                                                        ) : (
+                                                            "No doc"
+                                                        )}
+                                                    </div>
+                                                    {item.status === "failed" && item.lastError ? (
+                                                        <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
+                                                    ) : null}
                                                 </div>
-                                                <div className="text-gray-600 text-[11px]">Queue tab row: {item.queueTabRow}</div>
-                                                <div className="text-[11px] text-gray-600 truncate">
-                                                    {item.docUrl ? (
-                                                        <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                            Open doc
-                                                        </a>
-                                                    ) : (
-                                                        "No doc"
-                                                    )}
-                                                </div>
-                                                {item.status === "failed" && item.lastError ? (
-                                                    <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
-                                                ) : null}
-                                            </div>
-                                            <StatusPill
-                                                status={item.status as any}
-                                                loading={pendingId === item.id}
-                                                onClick={(e) => onStatusPillClick(e, item)}
-                                            />
-                                        </li>
-                                    ))}
+                                                <StatusPill
+                                                    status={item.status as any}
+                                                    loading={pendingId === item.id}
+                                                    onClick={(e) => onStatusPillClick(e, item)}
+                                                />
+                                            </li>
+                                        )
+                                    }
+                                    )}
                                 </ul>
 
                                 {/* Showing X of Y */}

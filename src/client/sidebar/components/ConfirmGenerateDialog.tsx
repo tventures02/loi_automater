@@ -70,7 +70,7 @@ export default function ConfirmGenerateDialog({
                                 Generate LOI documents?
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-gray-600">
-                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in a folder in your Drive and add them to the Sender queue. Don't worry, you can review them before sending.
+                                This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in a folder in your Drive and adds them to the Sender queue. You can review before sending.
                             </p>
 
                             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700 space-y-1">
