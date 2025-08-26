@@ -30,7 +30,6 @@ export default function ConfirmSendDialog({
 }: Props) {
     const [sampleCount, setSampleCount] = useState(defaultSampleCount);
     const [advancedOpen, setAdvancedOpen] = useState(false);
-    const [attachPolicy, setAttachPolicy] = useState<"respect" | "forceOn" | "forceOff">("respect");
     const [stopOnError, setStopOnError] = useState<boolean>(false);
     const maxReal = Math.max(0, Math.min(remaining ?? 0, queued ?? 0));
     const [count, setCount] = useState<number>(maxReal);
@@ -39,11 +38,10 @@ export default function ConfirmSendDialog({
     useEffect(() => {
         if (!open) return;
         setAdvancedOpen(false);
-        setAttachPolicy("respect");
         setCount(Math.max(0, Math.min(remaining ?? 0, queued ?? 0)));
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") onCancel();
-            if (e.key === "Enter") onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError });
+            if (e.key === "Enter") onConfirm(variant === "test" ? { sampleCount } : { count, stopOnError });
         };
         window.addEventListener("keydown", onKey);
         setTimeout(() => primaryRef.current?.focus(), 0);
@@ -149,19 +147,6 @@ export default function ConfirmSendDialog({
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-gray-600">Attach PDF</span>
-                                        <select
-                                            value={attachPolicy}
-                                            onChange={(e) => setAttachPolicy(e.target.value as any)}
-                                            className="ml-3 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800"
-                                        >
-                                            <option value="respect">Respect per-row setting</option>
-                                            <option value="forceOn">Force attach</option>
-                                            <option value="forceOff">Don’t attach</option>
-                                        </select>
-                                    </div>
-
                                     <label className="flex items-center justify-between">
                                         <span className="text-gray-600">Stop on first error</span>
                                         <span
@@ -194,7 +179,7 @@ export default function ConfirmSendDialog({
                             tabIndex={0}
                             ref={primaryRef}
                             aria-disabled={isSubmitting}
-                            onClick={!isSubmitting ? () => onConfirm(variant === "test" ? { sampleCount } : { count, attachPolicy, stopOnError }) : undefined}
+                            onClick={!isSubmitting ? () => onConfirm(variant === "test" ? { sampleCount } : { count, stopOnError }) : undefined}
                             className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : 
                                 "bg-green-600 hover:bg-green-700 shadow-sm transition-colors focus:outline-none cursor-pointer"}`}
                         >

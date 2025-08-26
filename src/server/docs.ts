@@ -66,10 +66,10 @@ function normValForKey(v) {
 }
 
 function makeContentKey(
-    row, 
-    tokenCols, 
-    emailIndex, 
-    templateId, 
+    row,
+    tokenCols,
+    emailIndex,
+    templateId,
     mapVersion,
     filenamePattern = '',
     emailSubjectTpl = '',
@@ -141,7 +141,7 @@ export const createGoogleDoc = (docTitle: string, templatesFolderId?: string) =>
         const doc = DocumentApp.openById(file.id);
         const body = doc.getBody();
         body.clear(); // ensure empty body
-        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
+        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing_date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
         body.appendParagraph(content);
         doc.saveAndClose();
 
@@ -212,14 +212,14 @@ export const preflightGenerateLOIs = (payload) => {
     const mapping = payload.mapping || {};
     const emailColLetter = payload.emailColumn || mapping.__email;
     if (!emailColLetter) {
-        return { 
-            ok: false, 
-            totalRows: values.length, 
-            eligibleRows: 0, 
-            invalidEmails: 0, 
-            missingValuesRows: 0, 
-            sampleFileName: '', 
-            queueExists: queueExistsFlag, 
+        return {
+            ok: false,
+            totalRows: values.length,
+            eligibleRows: 0,
+            invalidEmails: 0,
+            missingValuesRows: 0,
+            sampleFileName: '',
+            queueExists: queueExistsFlag,
             outputFolderId,
         };
     }
@@ -323,7 +323,7 @@ export const generateLOIChunk = (payload) => {
 
         const lastRow = source.getLastRow();
         const lastCol = source.getLastColumn();
-        const outFolderId = loiEnsureOutputFolder();
+        const outFolderId = attachPdf ? loiEnsureOutputFolder() : '';
         if (lastRow < 2) {
             return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId };
         }
@@ -384,8 +384,14 @@ export const generateLOIChunk = (payload) => {
         const mapVersion = mappingVersion(mapping);
         const templateId = templateDocId;
         const filenamePattern = pattern;
-
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        // If we need to use the LOI text as the email body *without* creating a Doc,
+        // cache the template doc's body text once and do token replacement per row.
+        const templateBodyPlain =
+            (useLOIAsBody && !attachPdf && templateId)
+                ? (DocumentApp.openById(templateId).getBody().getText() || '')
+                : '';
 
         let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0;
         const statuses = [];
@@ -418,28 +424,37 @@ export const generateLOIChunk = (payload) => {
                 const placeholders = {};
                 for (const ph in tokenCols) placeholders[ph] = row[tokenCols[ph]] || '';
 
-                // Compute Doc name from pattern
-                const fileName = renderName(filenamePattern, row, tokenCols, eIdx);
-
-                // Create a Doc from template and replace tokens
-                const docInfo = generateLOIDocFromTemplate(templateId, {
-                    fileName,
-                    placeholders,
-                    outFolderId: outFolderId
-                });
+                // Only create a Doc if we're going to attach a PDF
+                let docInfo = { fileId: '', fileUrl: '' };
+                if (attachPdf) {
+                    const fileName = renderName(filenamePattern, row, tokenCols, eIdx);
+                    docInfo = generateLOIDocFromTemplate(templateId, {
+                        fileName,
+                        placeholders,
+                        outFolderId,
+                    });
+                }
 
                 // Compute SUBJECT and BODY now (so future sends don’t depend on changed templates)
                 const subjectResolved = renderStringTpl_(emailSubjectTpl, row, tokenCols);
 
                 let bodyResolved = '';
                 if (useLOIAsBody) {
-                    // Use the final generated Doc text (already token-replaced)
-                    try {
-                        const body = DocumentApp.openById(docInfo.fileId).getBody().getText() || '';
-                        bodyResolved = body;
-                    } catch (e) {
-                        // Fallback: render from placeholders (plain text)
-                        bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
+                    if (attachPdf && docInfo.fileId) {
+                        // If we created a Doc, use its final text
+                        try {
+                            const body = DocumentApp.openById(docInfo.fileId).getBody().getText() || '';
+                            bodyResolved = body;
+                        } catch (e) {
+                            // Fallback to string template
+                            bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
+                        }
+                    } else {
+                        // No Doc created: render from the *template* Doc body directly
+                        // by running token replacement on the template's plain text
+                        bodyResolved = templateBodyPlain
+                            ? renderStringTpl_(templateBodyPlain, row, tokenCols)
+                            : renderStringTpl_(emailBodyTpl, row, tokenCols);
                     }
                 } else {
                     // Use the plain text template the user provided
@@ -453,8 +468,8 @@ export const generateLOIChunk = (payload) => {
                     sourceSheet: sourceSheetName,
                     sourceRow,
                     email,
-                    docId: docInfo.fileId || '',
-                    docUrl: docInfo.fileUrl || '',
+                    docId: attachPdf ? (docInfo.fileId || '') : '',
+                    docUrl: attachPdf ? (docInfo.fileUrl || '') : '',
                     templateId: templateId || '',
                     mappingVersion: mapVersion,
                     status: 'queued',
@@ -743,7 +758,6 @@ export const sendNextBatch = (payload) => {
     if (lastRow <= 1) return { sent: 0, failed: 0, attempted: 0 };
 
     // Normalize controls
-    const attachPolicy = String(payload?.attachPolicy || 'respect').toLowerCase(); // 'respect' | 'forceon' | 'forceoff'
     const stopOnError = !!payload?.stopOnError;
 
     const lock = LockService.getDocumentLock();
@@ -841,20 +855,13 @@ export const sendNextBatch = (payload) => {
                 // Test mode: send previews to the user; Real mode: send to recipient
                 const to = testMode ? previewTo : item.email;
 
-                // ATTACHMENTS with attachPolicy
-                // - 'respect': use per-row attachPdf flag
-                // - 'forceon': always attach if docId present
-                // - 'forceoff': never attach
-                const policy = attachPolicy;
-                const wantAttach =
-                    policy === 'forceoff' ? false :
-                        policy === 'forceon' ? !!item.docId :
-                            (item.attachPdf && !!item.docId);
+                // ATTACHMENTS
+                const wantAttach = item.attachPdf && !!item.docId;
 
                 let attachments = null;
                 if (wantAttach) {
                     try {
-                        const pdf = generateLOIPDF(item.docId, item.docId);
+                        const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
                         if (pdf) attachments = [pdf];
                     } catch (_) {
                         // fail soft: skip attachment if PDF generation fails
@@ -1187,3 +1194,105 @@ export const loiEnsureOutputFolder = (): string => {
     }
     return id;
 }
+
+
+/**
+ * Collect all docIds from the "Sender Queue" sheet and delete the Docs.
+ * - Default behavior: move files to Trash (safer, reversible).
+ * - Optionally: permanently delete (requires Advanced Service: Drive API enabled).
+ * - Dedupe docIds so the same Doc gets deleted only once.
+ */
+export const queueDeleteDocsSimple = (opts?: {
+    sheetName?: string;              // default: LOI_QUEUE_NAME
+    statuses?: string[] | null;      // e.g. ["queued","failed"]; default = null (no filter)
+    permanentDelete?: boolean;       // default: false (Trash instead of permanent)
+    throttleEvery?: number;          // default: 10 (sleep every N deletes)
+    sleepMs?: number;                // default: 600ms (to be gentle on quotas)
+}) => {
+    const {
+        sheetName = LOI_QUEUE_NAME,
+        statuses = null,
+        permanentDelete = false,
+        throttleEvery = 50,
+        sleepMs = 600,
+    } = opts || {};
+
+    const DOC_ID = "docId";
+    const STATUS = "status";
+    const perIterSleepMs = 20;
+
+    const { sh } = queueEnsureSheet(); // your existing helper; ensure it returns { sh }
+    if (sh.getName() !== sheetName) {
+        const target = SpreadsheetApp.getActive().getSheetByName(sheetName);
+        if (!target) throw new Error(`Sheet "${sheetName}" not found`);
+    }
+
+    const lock = LockService.getDocumentLock();
+    if (!lock.tryLock(10_000)) throw new Error("Another operation is in progress. Try again soon.");
+
+    try {
+        const lastRow = sh.getLastRow();
+        const lastCol = sh.getLastColumn();
+        if (lastRow < 2) return { deleted: 0, trashed: 0, candidates: 0, missing: 0 };
+
+        const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(v => String(v || "").trim());
+        const idxOf = (h: string) => {
+            const i = headers.indexOf(h);
+            return i >= 0 ? i : null;
+        };
+
+        const docIdIdx = idxOf(DOC_ID);
+        const statusIdx = idxOf(STATUS);
+        if (docIdIdx == null) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
+
+        const rows = lastRow - 1;
+        const data = sh.getRange(2, 1, rows, lastCol).getValues(); // raw values
+        const ids: string[] = [];
+        const idToRows = new Map<string, number[]>();
+
+        // Collect candidates (optionally filter by status)
+        for (let r = 0; r < data.length; r++) {
+            const docId = String(data[r][docIdIdx] || "").trim();
+            if (!docId) continue;
+
+            if (statuses && statusIdx != null) {
+                const st = String(data[r][statusIdx] || "").trim().toLowerCase();
+                if (!statuses.map(s => s.toLowerCase()).includes(st)) continue;
+            }
+
+            if (!idToRows.has(docId)) {
+                idToRows.set(docId, [r + 2]); // sheet row
+                ids.push(docId);
+            } else {
+                idToRows.get(docId)!.push(r + 2);
+            }
+        }
+
+        // Delete (Trash by default)
+        let trashed = 0, deleted = 0, missing = 0;  
+        ids.forEach((id, i) => {
+            Utilities.sleep(perIterSleepMs);
+            try {
+                if (permanentDelete) {
+                    // Requires Advanced Service: Drive enabled in Apps Script project
+                    // @ts-ignore
+                    Drive.Files.remove(id);
+                    deleted++;
+                } else {
+                    Drive.Files.trash(id);
+                    trashed++;
+                }
+            } catch (e) {
+                // File might be gone, in another user's drive, or permission denied
+                missing++;
+            }
+
+            // Gentle throttling to avoid hitting short-term quotas
+            if ((i + 1) % throttleEvery === 0) Utilities.sleep(sleepMs);
+        });
+
+        return { deleted, trashed, missing, candidates: ids.length };
+    } finally {
+        lock.releaseLock();
+    }
+};

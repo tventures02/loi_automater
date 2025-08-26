@@ -4,7 +4,7 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
-import { DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { Alert, Snackbar, Tooltip } from "@mui/material";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
@@ -58,7 +58,6 @@ export type GenerateSummary = {
 
 const DEFAULT_PATTERN = "LOI - {{email}}";
 const DEFAULT_BATCH_SIZE = 50;
-const LARGE_DATASET_THRESHOLD = 200;
 
 /* ---------- helpers ---------- */
 function extractPlaceholders(text: string, mapping?: Record<string, string>): string[] {
@@ -117,6 +116,7 @@ export default function GenerateLOIsStepScreen({
     const [checksOpen, setChecksOpen] = useState(false);
     const [emailSettingsHovered, setEmailSettingsHovered] = useState<boolean>(false);
     const placeholders = useMemo(() => extractPlaceholders(templateContent, mapping), [templateContent, mapping]);
+    const [showPlaceholders, setShowPlaceholders] = useState<boolean>(false);
     const [previewValues, setPreviewValues] = useState<Record<string, any> | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [autoContinue, setAutoContinue] = useState(true);
@@ -159,13 +159,14 @@ export default function GenerateLOIsStepScreen({
         getPreviewValues();
     }, []);
 
-    function startFakeInnerProgress(cap = 92, currentBatchSize: number) {
+    function startFakeInnerProgress(cap = 92, currentBatchSize: number, fastProgress: boolean = false) {
         stopFakeInnerProgress();              // ensure no leaked timers
         setInnerPct(0);
 
+        const gain = fastProgress ? .035 : 2.5;
         const bs = Math.min(100, Math.max(1, currentBatchSize)); // clamp 1..100
         // Target ≈80s when batchSize = 100; scale linearly with batch size
-        const durationSec = 2.5 * bs; //0.8 was 100 batch size
+        const durationSec = gain * bs; //0.8 was 100 batch size
 
         const intervalMs = 100;
         const steps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
@@ -283,10 +284,18 @@ export default function GenerateLOIsStepScreen({
     }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders, previewValues]);
 
     useEffect(() => {
+        if (!attachPdf) setBatchSize(100);
+        else setBatchSize(DEFAULT_BATCH_SIZE);
         setSummary(null);
     }, [attachPdf]);
 
     useEffect(() => {
+        if (isGenerating) {
+            const container = containerRef.current;
+            if (container) {
+                container.scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+        }
         setDisablePrimary(isGenerating);
     }, [isGenerating]);
 
@@ -317,26 +326,13 @@ export default function GenerateLOIsStepScreen({
             console.log('summary.nextOffset', summary?.nextOffset)
             console.log('batch', batch)
         }
+        let created = 0;
         try {
-            let res = { 
-                nextOffset: 0, 
-                created: 0, 
-                skippedInvalid: 0, 
-                failed: 0, 
-                duplicates: 0,
-                done: false,
-                totalRows: 0
-            };
-            if (summary?.nextOffset && summary.nextOffset > 0) {
-                res.nextOffset = summary.nextOffset;
-            }
-            let prevOffset = 0;
+            let res;
             do {
                 // Calculate fake progress bar params
-                const currentBatchSize = res.nextOffset ? res.nextOffset - prevOffset : batchSize;
-                prevOffset = res.nextOffset || 0;
                 const percentageCap = Math.floor(Math.random() * 10) + 95; // 95-100%
-                startFakeInnerProgress(percentageCap, currentBatchSize);
+                startFakeInnerProgress(percentageCap, batchSize, !attachPdf);
                 const progressBarText = runInBatches ? `Creating LOIs… ${Math.min(99, Math.round((offset / Math.max(1, totalEligible)) * 100))}% (batch ${batch})` : "Creating LOIs…";
                 setProgressText(progressBarText);
                 
@@ -403,6 +399,8 @@ export default function GenerateLOIsStepScreen({
                 done,
             } : null);
 
+            created = totals.created;
+
             onValidChange?.("lois", true);
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
@@ -415,8 +413,9 @@ export default function GenerateLOIsStepScreen({
             setIsGenerating(false);
             setProgressText("");
             refreshSendData(true);
-            setSnackbar({ open: true, message: "LOIs created successfully. Continue to send.", severity: "success" });
+            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. Continue to send.`, severity: "success" });
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
+            setAutoContinue(true);
         }
     };
 
@@ -454,33 +453,23 @@ export default function GenerateLOIsStepScreen({
                 isSubmitting={isGenerating}
                 attachPdf={attachPdf}
                 useLOIAsBody={useLOIAsBody}
+                emailPreview={emailPreview}
             />
 
             <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
 
             <div className="mt-0 text-[11px] text-gray-500">
-                Placeholders you can use:{" "}
-                {placeholdersWithEmail.length
-                    ? placeholdersWithEmail.map((t, i) => (
-                        <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholdersWithEmail.length - 1 ? "," : ""}</code>
-                    ))
-                    : <span className="italic">none</span>}
+                Placeholders you can use:{showPlaceholders ?
+                    <code className="text-gray-800 hover:underline cursor-pointer ml-1 text-[10px]" onClick={() => setShowPlaceholders(false)}>Hide placeholders</code> :
+                    <code className="text-gray-800 hover:underline cursor-pointer ml-1 text-[10px]" onClick={() => setShowPlaceholders(true)}>Show placeholders</code>}
+                {showPlaceholders && <div className="mt-1">
+                    {placeholdersWithEmail.length
+                        ? placeholdersWithEmail.map((t, i) => (
+                            <code key={t} className="rounded bg-gray-100 px-1 py-[1px]">{`{{${t}}}`}{i < placeholdersWithEmail.length - 1 ? "," : ""}</code>
+                        ))
+                        : <span className="italic">none</span>}
+                </div>}
             </div>
-
-            {/* File naming pattern */}
-            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
-                <div className="text-xs font-medium text-gray-900"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File name pattern</div>
-                <input
-                    value={pattern}
-                    onChange={(e) => setPattern(e.target.value)}
-                    className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
-                    placeholder={DEFAULT_PATTERN}
-                />
-                {preflight?.sampleFileName && (
-                    <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>
-                )}
-            </div>
-
 
             {/* Email settings */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-2" onMouseEnter={() => setEmailSettingsHovered(true)} onMouseLeave={() => setEmailSettingsHovered(false)}>
@@ -558,12 +547,16 @@ export default function GenerateLOIsStepScreen({
                                 <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed"><b>Subject:</b> {emailPreview.subject}</div>
                             </div>
                             <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed mt-3 bg-gray-50"><b>Body:</b></div>
-                            {useLOIAsBody ? (
-                                <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
-                            ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                                <div>{emailPreview.body}</div>
-                                {attachPdf && <div className="flex items-center gap-1 mt-2"><PaperClipIcon className="w-4 h-4 inline-block" />LOI PDF Attached</div>}
-                            </div>}
+                            <div>
+                                {useLOIAsBody ? (
+                                    <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}} `}
+                                        <ArrowTopRightOnSquareIcon className="w-3 h-3 inline-block cursor-pointer ml-1" onClick={() => window.open(`https://docs.google.com/document/d/${templateDocId}/edit`, '_blank')} />
+                                    </div>
+                                ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                    <div>{emailPreview.body}</div>
+                                </div>}
+                                {attachPdf && <div className="flex items-center gap-1 mt-3 text-xs text-gray-800 whitespace-pre-wrap"><PaperClipIcon className="w-3 h-3 inline-block" />LOI PDF Attached</div>}
+                            </div>
                         </div>
                         <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
                     </>
@@ -573,6 +566,21 @@ export default function GenerateLOIsStepScreen({
                     </>
                 )}
             </div>
+
+            {/* File naming pattern */}
+            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+                <div className="text-xs font-medium text-gray-900"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Filename pattern</div>
+                <input
+                    value={pattern}
+                    onChange={(e) => setPattern(e.target.value)}
+                    className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
+                    placeholder={DEFAULT_PATTERN}
+                />
+                {preflight?.sampleFileName && (
+                    <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>
+                )}
+            </div>
+
 
             {/* Preflight (summary row + collapsible details) */}
             <div className="rounded-xl border border-gray-200">
@@ -715,50 +723,27 @@ export default function GenerateLOIsStepScreen({
                     </div>
                 </div>
 
-                {/* Large dataset notice & controls */}
-                {preflight?.eligibleRows > LARGE_DATASET_THRESHOLD && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
-                        <div className="font-medium mb-1">Large dataset detected</div>
-                        <div className="mb-2">
-                            We’ll create docs in batches of {batchSize} to avoid timeouts. You can pause after any batch and resume later. If starting from scratch, already created docs will be skipped.
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/* Auto-continue toggle */}
-                            <label className="flex items-center gap-2">
-                                <span className="text-gray-700">Auto-continue</span>
-                                <span
-                                    role="switch"
-                                    aria-checked={autoContinue}
-                                    onClick={() => setAutoContinue(!autoContinue)}
-                                    className={`inline-flex h-5 w-9 items-center rounded-full ${autoContinue ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
-                                >
-                                    <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${autoContinue ? "translate-x-3.5" : ""}`} />
-                                </span>
-                            </label>
+                {/* Long-running generation notice & controls */}
+                {attachPdf && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 w-fit">
+                        <div className="font-medium flex items-center gap-1">Creates Docs in batches of {batchSize}
+                            <Tooltip title={<><div className="mb-1">Creating LOI Docs for PDF attachments may take some time. To avoid timeouts, we'll create them in batches of {batchSize}.</div>
+                                <div className="mb-1">You can pause after any batch and resume later; existing docs will be skipped.</div>
+                                <div className="mb-1">Toggle "Attach LOI as PDF" to turn this off.</div></>}>
+                                <QuestionMarkCircleIcon className="w-4 h-4 inline-block cursor-pointer text-amber-800" />
+                            </Tooltip>
                         </div>
                     </div>
                 )}
 
-                {isGenerating && autoContinue && (
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setAutoContinue(false)}
-                        className="inline-block select-none rounded-md border border-gray-200 px-3 py-2 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer mr-2"
-                    >
-                        Pause after this batch
-                    </div>
-                )}
-
-
-                {summary && !summary.done ? (
+                {summary && !summary.done && !isGenerating ? (
                     <div
                         role="button"
                         tabIndex={0}
                         onClick={() => runGenerate(true)}
                         className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer mr-1
                             ${!canGenerate || isGenerating
-                                ? "bg-gray-300 text-white cursor-not-allowed"
+                                ? "bg-gray-300 text-white !cursor-not-allowed"
                                 : "bg-gray-900 text-white hover:bg-gray-800"
                             }`}
                     >
@@ -774,7 +759,7 @@ export default function GenerateLOIsStepScreen({
                             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
                             className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
             ${!canGenerate || isGenerating
-                                    ? "bg-gray-300 text-white cursor-not-allowed"
+                                    ? "bg-gray-300 text-white !cursor-not-allowed"
                                     : "bg-gray-900 text-white hover:bg-gray-800"
                                 }`}
                         >
@@ -787,25 +772,39 @@ export default function GenerateLOIsStepScreen({
 
                 {/* Progress / results */}
                 {isGenerating && (
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-xs text-gray-600 min-w-[150px]">
-                                <InlineSpinner /> {progressText || "Working…"}
-                            </div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded">
-                                <div
-                                    className="h-1.5 bg-indigo-500 rounded transition-[width] duration-200"
-                                    style={{ width: `${innerPct}%` }}
-                                />
-                            </div>
-                            <div className="text-[10px] text-gray-500">{Math.round(innerPct)}% of current batch</div>
+                    <div className="flex text-xs text-gray-600 rounded-md flex-col border border-gray-200 p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-gray-600 min-w-[150px]">
+                            <InlineSpinner /> {progressText || "Working…"}
                         </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded">
+                            <div
+                                className="h-1.5 bg-indigo-500 rounded transition-[width] duration-200"
+                                style={{ width: `${innerPct}%` }}
+                            />
+                        </div>
+                        <div className="text-[10px] text-gray-500">{Math.min(99, Math.round(innerPct))}% of current batch</div>
+                        {autoContinue ? (
+                            <div className="flex items-center justify-end w-full mt-3">
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => setAutoContinue(false)}
+                                    className="inline-block select-none rounded-md border border-red-200 px-3 py-2 text-[11px] bg-red-50 text-red-500 hover:bg-red-100 cursor-pointer w-fit"
+                                >
+                                    Pause after this batch
+                                </div>
+                            </div>
+                        ) : <div className="flex items-center justify-end w-full mt-3">
+                            <div className="inline-block select-none rounded-md border border-gray-200 px-3 py-2 text-[11px] text-gray-700 w-fit">
+                                Stopping after this batch...
+                            </div>
+                        </div>}
                     </div>
                 )}
 
                 {summary && (
                     <div className="text-[11px] text-gray-600">
-                        Processed: {summary.nextOffset ?? 0} / {summary.totalRows ?? 0} rows in <b>{sheetNameShort}</b>
+                        Processed {summary.nextOffset ?? 0} / {summary.totalRows ?? 0} rows in <b>{sheetNameShort}</b>
                     </div>
                 )}
 

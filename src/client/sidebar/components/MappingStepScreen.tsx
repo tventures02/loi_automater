@@ -87,6 +87,7 @@ export default function MappingStepScreen({
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [firstRowEmail, setFirstRowEmail] = useState<string | null>(null);
     const [onMapperHover, setOnMapperHover] = useState<boolean>(false);
+    const [showPreview, setShowPreview] = useState<boolean>(false);
 
     useEffect(() => {
         setMapping({});
@@ -110,7 +111,7 @@ export default function MappingStepScreen({
     // Report changes upward + validity
     useEffect(() => {
         onMappingChange?.({ ...mapping, __email: emailColumn });
-        
+
         const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
         const valid = hasAtLeastOneMapped && !!emailColumn;
 
@@ -237,22 +238,22 @@ export default function MappingStepScreen({
                                 </React.Fragment>
                             );
                         })}
-                        </div>
-
-                        {/* Small helper footer */}
-                        <div className="mt-3 flex items-center justify-between">
-                            <div className="text-[11px] text-gray-600">
-                                {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
-                            </div>
-                            {
-                                onMapperHover && (
-                                    <div className="text-[11px] text-gray-600 flex items-center justify-end gap-1">
-                                        <span onClick={() => setCurrentStep("template")} className="cursor-pointer hover:underline">Change template</span>
-                                    </div>
-                                )
-                            }
-                        </div>
                     </div>
+
+                    {/* Small helper footer */}
+                    <div className="mt-3 flex items-center justify-between">
+                        <div className="text-[11px] text-gray-600">
+                            {Object.values(mapping).filter(Boolean).length} of {placeholders.length} mapped
+                        </div>
+                        {
+                            onMapperHover && (
+                                <div className="text-[11px] text-gray-600 flex items-center justify-end gap-1">
+                                    <span onClick={() => setCurrentStep("template")} className="cursor-pointer hover:underline">Change template</span>
+                                </div>
+                            )
+                        }
+                    </div>
+                </div>
             )}
 
             {/* Delivery email column (separate card for clarity) */}
@@ -294,35 +295,41 @@ export default function MappingStepScreen({
             </div>
 
             {/* Preview */}
-            {allMapped ? (
-                <div className="rounded-lg border border-gray-200 bg-gray-50">
-                    {previewState === "loading" && (
-                        <div className="p-3 text-xs text-gray-500 flex items-center gap-2">
-                            <InlineSpinner /> Building preview…
-                        </div>
-                    )}
-                    {previewState === "error" && (
-                        <div className="p-3 text-xs text-red-600">
-                            {previewError || "Preview failed."}
-                        </div>
-                    )}
-                    {previewState === "ready" && (
-                        <>
-                            <div className="p-3 pb-1 text-xs font-semibold text-gray-500 underline">
-                                👀 LOI Preview 👀
+            {allMapped && showPreview ? (
+                <>
+                    <div className={`text-[11px] text-gray-600 hover:underline cursor-pointer flex justify-end`} onClick={() => setShowPreview(false)}>Hide LOI preview</div>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50">
+                        {previewState === "loading" && (
+                            <div className="p-3 text-xs text-gray-500 flex items-center gap-2">
+                                <InlineSpinner /> Building preview…
                             </div>
-                            <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                                {previewText}
+                        )}
+                        {previewState === "error" && (
+                            <div className="p-3 text-xs text-red-600">
+                                {previewError || "Preview failed."}
                             </div>
-                        </>
-                    )}
-                </div>
-            ) : (
-                <div className="rounded-lg border border-gray-200 bg-gray-50">
-                    <div className="p-3 text-xs text-gray-700">
-                        An example of the LOI text will appear after all columns are mapped.
+                        )}
+                        {previewState === "ready" && (
+                            <>
+                                <div className="p-3 pb-1 text-xs font-semibold text-gray-500 underline">
+                                    👀 LOI Preview 👀
+                                </div>
+                                <div className="p-3 text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                    {previewText}
+                                </div>
+                            </>
+                        )}
                     </div>
-                </div>
+                </>
+
+            ) : (
+                <>
+                    {
+                        allMapped && (
+                            <div className={`text-[11px] text-gray-600  hover:underline cursor-pointer flex justify-end`} onClick={() => setShowPreview(true)}>👀 Show LOI preview</div>
+                        )
+                    }
+                </>
             )}
         </div>
     );

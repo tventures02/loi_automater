@@ -33,6 +33,7 @@ import {
     highlightQueueRow,
     loiEnsureRootFolder,
     loiEnsureFolders,
+    queueDeleteDocsSimple,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -65,4 +66,5 @@ export {
     highlightQueueRow,
     loiEnsureRootFolder,
     loiEnsureFolders,
+    queueDeleteDocsSimple,
 };

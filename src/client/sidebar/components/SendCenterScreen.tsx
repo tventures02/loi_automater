@@ -92,7 +92,6 @@ export default function SendCenterScreen({
     // keep your existing logic but move the entry points:
     const confirmRealSend = async (
         count: number,
-        attachPolicy: "respect" | "forceOn" | "forceOff" = 'respect',
         stopOnError: boolean = false,
     ) => {
         if (!(summary?.remaining && queuedTotal)) return;
@@ -105,7 +104,6 @@ export default function SendCenterScreen({
             const numEmailsToSend = count;
             const res = await serverFunctions.sendNextBatch({
                 count: numEmailsToSend,
-                attachPolicy,
                 stopOnError,
             });
             const sent = res?.sent ?? numEmailsToSend;
@@ -184,10 +182,15 @@ export default function SendCenterScreen({
         }
     };
 
-    const handleClearQueue = async () => {
+    const handleClearQueue = async (deleteDocs: boolean = false) => {
         if (clearing) return;
         setClearing(true);
         try {
+            if (deleteDocs) {
+                const deleteRes = await serverFunctions.queueDeleteDocsSimple();
+                console.log('deleteRes', deleteRes);
+            }
+
             await serverFunctions.queueClearAll();
             // Optimistic local reset; also call onRefresh to re-pull counts
             setSendData(s => ({ ...s, items: [] }));
@@ -196,8 +199,10 @@ export default function SendCenterScreen({
                 summary: s.summary ? { ...s.summary, queued: 0 } : s.summary
             }));
             onRefresh?.();
+
             setSnackbar({ open: true, message: "Queue cleared.", severity: "success" });
-        } catch {
+        } catch (e) {
+            console.error('Failed to clear queue', e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
         } finally {
             setClearing(false);
@@ -447,7 +452,7 @@ export default function SendCenterScreen({
                 variant={dialog.variant}
                 onCancel={() => setDialog({ open: false, variant: "real" })}
                 onConfirm={dialog.variant === "real" ?
-                    ({ count, attachPolicy, stopOnError } = { count: 1, attachPolicy: "respect", stopOnError: false }) => confirmRealSend(count, attachPolicy, stopOnError) :
+                    ({ count, stopOnError } = { count: 1, stopOnError: false }) => confirmRealSend(count, stopOnError) :
                     ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
                 remaining={summary?.remaining}
                 queued={summary?.queued ?? 0}
@@ -461,7 +466,7 @@ export default function SendCenterScreen({
                     count={queueTotal}
                     clearing={clearing}
                     onCancel={() => { if (!clearing) { setOpenClear(false); } }}
-                    onConfirm={handleClearQueue}
+                    onConfirm={(deleteDocs) => handleClearQueue(deleteDocs)}
                 />
             )}
 
