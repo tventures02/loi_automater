@@ -301,7 +301,21 @@ function renderStringTpl_(tpl, row, tokenCols) {
 }
 
 
-export const generateLOIsAndWriteSheet = (payload) => {
+export const generateLOIChunk = (payload) => {
+
+    const {
+        mapping = {},
+        pattern = "LOI",
+        templateDocId,
+        emailSubjectTpl = "Letter of Intent",
+        emailBodyTpl = "",
+        useLOIAsBody = false,
+        attachPdf = true,
+        offset = 0,                  // 0-based data offset (row 2 == offset 0)
+        limit = 100,                 // batch size
+        includeStatuses = false,     // optional: return per-row statuses (can be large)
+    } = payload || {};
+
     try {
         const ss = SpreadsheetApp.getActive();
         const source = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
@@ -309,8 +323,9 @@ export const generateLOIsAndWriteSheet = (payload) => {
 
         const lastRow = source.getLastRow();
         const lastCol = source.getLastColumn();
-        if (lastRow < 1) {
-            return { created: 0, skippedInvalid: 0, failed: 0, statuses: [], duplicates: 0 };
+        const outFolderId = loiEnsureOutputFolder();
+        if (lastRow < 2) {
+            return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId };
         }
 
         // Ensure central queue exists (source of truth for sending)
@@ -331,9 +346,7 @@ export const generateLOIsAndWriteSheet = (payload) => {
         }
 
         const width = Math.min(lastCol, 8); // A..H only
-        const data = source.getRange(1, 1, lastRow, width).getDisplayValues();
 
-        const mapping = payload.mapping || {};
         // Build token -> column index map
         const tokenCols = {};
         Object.keys(mapping).forEach(ph => {
@@ -347,30 +360,40 @@ export const generateLOIsAndWriteSheet = (payload) => {
         // Email column index
         const emailColLetter = payload.emailColumn || mapping.__email;
         if (!emailColLetter) {
-            return { created: 0, skippedInvalid: data.length, failed: 0, statuses: data.map((_, i) => ({ row: i + 1, status: 'skipped', message: 'No email column mapped' })), duplicates: 0 };
+            return {
+                created: 0, skippedInvalid: 0, failed: 0, duplicates: 0,
+                nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId
+            };
         }
         const eIdx = colToNumber(emailColLetter) - 1;
 
-        // Email settings
-        const emailSubjectTpl = payload.emailSubjectTpl || 'Letter of Intent';
-        const emailBodyTpl = payload.emailBodyTpl || '';
-        const useLOIAsBody = !!payload.useLOIAsBody;
-        const attachPdf = !!payload.attachPdf; // stored for later send step
+        // Row math for the chunk
+        const totalRows = lastRow;
+        const startRow = 1 + offset;                          // 1-based row in sheet
+        const remaining = (lastRow - startRow + 1);
+        const take = Math.max(0, Math.min(limit, remaining));
+        if (take <= 0) {
+            return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows, outputFolderId: outFolderId };
+        }
 
-        const statuses = [];
-        const queueBatch = [];
-        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0;
+        // const data = source.getRange(1, 1, lastRow, width).getDisplayValues(); //old
+        const data = source.getRange(startRow, 1, take, width).getDisplayValues();
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        // Email settings, template, folder
         const sourceSheetName = source.getName();
         const mapVersion = mappingVersion(mapping);
-        const templateId = payload.templateDocId;
-        const filenamePattern = payload.pattern || "LOI";
-        const outFolderId = loiEnsureOutputFolder();
+        const templateId = templateDocId;
+        const filenamePattern = pattern;
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        for (let r = 0; r < data.length; r++) {
-            const row = data[r];
+        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0;
+        const statuses = [];
+        const queueBatch = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const sourceRow = startRow + i;
             const email = (row[eIdx] || '').toString().trim();
 
             // Build deterministic content key as the queue ID
@@ -379,14 +402,14 @@ export const generateLOIsAndWriteSheet = (payload) => {
             // Skip duplicates already present in Sender Queue
             if (existingIds.has(id)) {
                 duplicates++;
-                statuses.push({ row: r + 1, status: 'skipped', message: 'Duplicate (already queued/sent with same content)' });
+                if (includeStatuses) statuses.push({ row: sourceRow, status: "skipped", message: "Duplicate (already queued/sent with same content)" });
                 continue;
             }
 
             // Validate email
             if (!email || !emailRegex.test(email)) {
                 skippedInvalid++;
-                statuses.push({ row: r + 1, status: 'skipped', message: 'Invalid or empty email' });
+                if (includeStatuses) statuses.push({ row: sourceRow, status: "skipped", message: "Invalid or empty email" });
                 continue;
             }
 
@@ -426,10 +449,10 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 // Queue row in Sender Queue
                 const now = new Date();
                 queueBatch.push({
-                    id: id,
+                    id,
                     sourceSheet: sourceSheetName,
-                    sourceRow: r + 1,                // 1-based position in source sheet (no headers)
-                    email: email,
+                    sourceRow,
+                    email,
                     docId: docInfo.fileId || '',
                     docUrl: docInfo.fileUrl || '',
                     templateId: templateId || '',
@@ -451,15 +474,18 @@ export const generateLOIsAndWriteSheet = (payload) => {
                 existingIds.add(id);
 
                 created++;
-                statuses.push({ row: r + 1, status: 'ok', docUrl: docInfo.fileUrl });
+                if (includeStatuses) statuses.push({ row: sourceRow, status: "ok", docUrl: docInfo.fileUrl });
             } catch (e) {
                 failed++;
-                statuses.push({ row: r + 1, status: 'failed', message: String(e) });
+                if (includeStatuses) statuses.push({ row: sourceRow, status: "failed", message: String(e) });
             }
         }
 
         // Bulk append to Sender Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
+
+        const nextOffset = offset + data.length;
+        const done = nextOffset >= totalRows;
 
         return {
             created,
@@ -467,6 +493,11 @@ export const generateLOIsAndWriteSheet = (payload) => {
             failed,
             statuses,
             duplicates,
+            nextOffset,
+            done,
+            totalRows,
+            outputFolderId: outFolderId,
+            ...(includeStatuses ? { statuses } : {}),
         };
     } catch (error) {
         console.error(`Error generating LOIs: ${error.toString()}`);

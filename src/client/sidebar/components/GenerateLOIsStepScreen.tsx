@@ -4,8 +4,8 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
-import { DocumentIcon, EnvelopeIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
-import { Tooltip } from "@mui/material";
+import { DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { Alert, Snackbar, Tooltip } from "@mui/material";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 type Props = {
@@ -29,6 +29,8 @@ type Props = {
     queueStatus: QueueStatus;
 
     refreshSendData: (force?: boolean) => void;
+    /** Signal parent whether to disable primary button */
+    setDisablePrimary: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 type PreflightResult = {
@@ -42,15 +44,21 @@ type PreflightResult = {
     outputFolderId: string;
 };
 
-type GenerateSummary = {
+export type GenerateSummary = {
     created: number;
     skippedInvalid: number;
     failed: number;
-    statuses: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
     duplicates: number;
-  };
+    nextOffset: number;
+    done: boolean;
+    totalRows: number;
+    outputFolderId: string;
+    statuses?: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
+};
 
 const DEFAULT_PATTERN = "LOI - {{email}}";
+const DEFAULT_BATCH_SIZE = 50;
+const LARGE_DATASET_THRESHOLD = 200;
 
 /* ---------- helpers ---------- */
 function extractPlaceholders(text: string, mapping?: Record<string, string>): string[] {
@@ -98,6 +106,7 @@ export default function GenerateLOIsStepScreen({
     setQueueStatus,
     queueStatus,
     refreshSendData,
+    setDisablePrimary,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -105,15 +114,23 @@ export default function GenerateLOIsStepScreen({
     const [isGenerating, setIsGenerating] = useState(false);
     const [progressText, setProgressText] = useState<string>("");
     const [summary, setSummary] = useState<GenerateSummary | null>(null);
-    const [toast, setToast] = useState<string>("");
     const [checksOpen, setChecksOpen] = useState(false);
     const [emailSettingsHovered, setEmailSettingsHovered] = useState<boolean>(false);
     const placeholders = useMemo(() => extractPlaceholders(templateContent, mapping), [templateContent, mapping]);
     const [previewValues, setPreviewValues] = useState<Record<string, any> | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [autoContinue, setAutoContinue] = useState(true);
+    const [batchSize, setBatchSize] = useState(DEFAULT_BATCH_SIZE);
+    const [failStopThreshold, setFailStopThreshold] = useState<number>(5); // 0 = ignore
+    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
     const emailColumn = mapping?.__email || "";
     const outputFolderId = preflight?.outputFolderId || "";
     const containerRef = useRef<HTMLDivElement>(null);
+    const [innerPct, setInnerPct] = useState(0);
+    const innerTimerRef = useRef<number | null>(null);
+
+    const autoContinueRef = useRef(autoContinue);
+    const failStopThresholdRef = useRef(failStopThreshold);
 
     /* -------- Email settings state -------- */
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
@@ -142,6 +159,48 @@ export default function GenerateLOIsStepScreen({
         getPreviewValues();
     }, []);
 
+    function startFakeInnerProgress(cap = 92, currentBatchSize: number) {
+        stopFakeInnerProgress();              // ensure no leaked timers
+        setInnerPct(0);
+
+        const bs = Math.min(100, Math.max(1, currentBatchSize)); // clamp 1..100
+        // Target ≈80s when batchSize = 100; scale linearly with batch size
+        const durationSec = 2.5 * bs; //0.8 was 100 batch size
+
+        const intervalMs = 100;
+        const steps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
+        const inc = cap / steps;
+
+        innerTimerRef.current = window.setInterval(() => {
+            setInnerPct(p => {
+                const next = p + inc;
+                if (next >= cap) {
+                    window.clearInterval(innerTimerRef.current!);
+                    innerTimerRef.current = null;
+                    return cap;
+                }
+                return next;
+            });
+        }, intervalMs);
+    }
+
+    function stopFakeInnerProgress(complete = true) {
+        if (innerTimerRef.current != null) {
+            clearInterval(innerTimerRef.current);
+            innerTimerRef.current = null;
+        }
+        if (complete) {
+            setInnerPct(100);
+            // brief victory fill, then reset ready for next batch
+            setTimeout(() => setInnerPct(0), 300);
+        } else {
+            setInnerPct(0);
+        }
+    }
+
+    // safety: clear if component unmounts mid-batch
+    useEffect(() => () => stopFakeInnerProgress(false), []);
+
     // Auto-preflight when pre-conditions are met
     useEffect(() => {
         const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
@@ -168,7 +227,7 @@ export default function GenerateLOIsStepScreen({
                     const status = await serverFunctions.queueStatus();
                     setQueueStatus(status);
                 }
-            } catch(error: any) {
+            } catch (error: any) {
                 console.log('error', error)
                 if (!cancelled) {
                     setPreflight({
@@ -199,6 +258,9 @@ export default function GenerateLOIsStepScreen({
         setSummary(null)
     }, [pattern]);
 
+    useEffect(() => { autoContinueRef.current = autoContinue; }, [autoContinue]);
+    useEffect(() => { failStopThresholdRef.current = failStopThreshold; }, [failStopThreshold]);
+
     /* Build email preview from first row values (same approach as LOI preview) */
     useEffect(() => {
         const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
@@ -224,54 +286,137 @@ export default function GenerateLOIsStepScreen({
         setSummary(null);
     }, [attachPdf]);
 
-    const runGenerate = async () => {
+    useEffect(() => {
+        setDisablePrimary(isGenerating);
+    }, [isGenerating]);
+
+    const runGenerate = async (resume = false) => {
         if (!preflight?.ok) return;
         setIsGenerating(true);
         setSummary(null);
-        setProgressText("Preparing run sheet and files…");
+        setProgressText("Preparing…");
+
+        let offset = resume && summary ? summary.nextOffset || 0 : 0;
+        let totals = resume && summary
+            ? { created: summary.created, skippedInvalid: summary.skippedInvalid, failed: summary.failed, duplicates: summary.duplicates }
+            : { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0 };
+        let totalEligible = preflight?.eligibleRows ?? 0;
+        let done = false;
+
+        const runInBatches = preflight?.totalRows && preflight.totalRows > batchSize;
 
         const container = containerRef.current;
         if (container) {
             container.scrollIntoView({ behavior: "smooth", block: "end" });
         }
 
-        // lightweight progress while server runs
-        let pct = 5;
-        const t = setInterval(() => {
-            pct = Math.min(95, pct + 3);
-            setProgressText(`Generating LOIs… ${pct}%`);
-        }, 500);
-
+        let batch = resume && summary ? Math.floor(summary.nextOffset / batchSize) + 1 : 1;
+        if (isDev) {
+            console.clear();
+            console.log('resume', resume)
+            console.log('summary.nextOffset', summary?.nextOffset)
+            console.log('batch', batch)
+        }
         try {
-            const result: GenerateSummary = await serverFunctions.generateLOIsAndWriteSheet({
-                mapping,
-                emailColumn,
-                pattern,
-                templateDocId,
-                sheetName: sheetName || null,
+            let res = { 
+                nextOffset: 0, 
+                created: 0, 
+                skippedInvalid: 0, 
+                failed: 0, 
+                duplicates: 0,
+                done: false,
+                totalRows: 0
+            };
+            if (summary?.nextOffset && summary.nextOffset > 0) {
+                res.nextOffset = summary.nextOffset;
+            }
+            let prevOffset = 0;
+            do {
+                // Calculate fake progress bar params
+                const currentBatchSize = res.nextOffset ? res.nextOffset - prevOffset : batchSize;
+                prevOffset = res.nextOffset || 0;
+                const percentageCap = Math.floor(Math.random() * 10) + 95; // 95-100%
+                startFakeInnerProgress(percentageCap, currentBatchSize);
+                const progressBarText = runInBatches ? `Creating LOIs… ${Math.min(99, Math.round((offset / Math.max(1, totalEligible)) * 100))}% (batch ${batch})` : "Creating LOIs…";
+                setProgressText(progressBarText);
+                
+                // Generate LOIs
+                res = await serverFunctions.generateLOIChunk({
+                    mapping,
+                    emailColumn,
+                    pattern,
+                    templateDocId,
+                    sheetName: sheetName || null,
+                    emailSubjectTpl,
+                    emailBodyTpl,
+                    useLOIAsBody,
+                    attachPdf,
+                    offset,
+                    limit: batchSize,
+                }).finally(() => {
+                    stopFakeInnerProgress(true);                 // snap to 100% and reset
+                });
 
-                emailSubjectTpl,
-                emailBodyTpl,
-                useLOIAsBody,
-                attachPdf,
-            });
-            if (isDev) console.log('result', result)
-            clearInterval(t);
+                totals.created += res.created;
+                totals.skippedInvalid += res.skippedInvalid;
+                totals.failed += res.failed;
+                totals.duplicates += res.duplicates;
+
+                offset = res.nextOffset;
+                done = !!res.done;
+
+                batch++;
+
+                // Update on-screen partial summary if you like:
+                setSummary({
+                    created: totals.created,
+                    skippedInvalid: totals.skippedInvalid,
+                    failed: totals.failed,
+                    duplicates: totals.duplicates,
+                    nextOffset: offset,
+                    done: done,
+                    outputFolderId: outputFolderId,
+                    statuses: [],
+                    totalRows: res.totalRows,
+                });
+
+                // stop if too many failures in the last batch
+                if (failStopThresholdRef.current > 0 && res.failed >= failStopThresholdRef.current) {
+                    setAutoContinue(false);
+                    setSnackbar({ open: true, message: `Paused: ${res.failed} failures in last batch (threshold ${failStopThresholdRef.current}).`, severity: "error" });
+                    break;
+                }
+
+                // Pause after one batch if auto-continue is off
+                if (!autoContinueRef.current) break;
+            } while (!done);
+
             setProgressText("Finalizing…");
-            setSummary(result);
-            onValidChange?.("lois", true);
+            // final snapshot
+            setSummary((prev) => prev ? {
+                ...prev,
+                created: totals.created,
+                skippedInvalid: totals.skippedInvalid,
+                failed: totals.failed,
+                duplicates: totals.duplicates,
+                nextOffset: offset,
+                done,
+            } : null);
 
+            onValidChange?.("lois", true);
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
+
         } catch (e) {
-            clearInterval(t);
-            setToast("Generation failed. Please try again.");
+            console.log('error', e)
+            setSnackbar({ open: true, message: "Creation failed. Please try again.", severity: "error" });
             onValidChange?.("lois", false);
         } finally {
             setIsGenerating(false);
             setProgressText("");
-            setTimeout(() => setToast(""), 8000);
             refreshSendData(true);
+            setSnackbar({ open: true, message: "LOIs created successfully. Continue to send.", severity: "success" });
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
         }
     };
 
@@ -375,7 +520,7 @@ export default function GenerateLOIsStepScreen({
 
                             {/* Toggle */}
                             <div className={`relative inline-flex items-center gap-1`}>
-                            <span className="text-[11px] text-gray-700 select-none">Use LOI as body:</span>
+                                <span className="text-[11px] text-gray-700 select-none">Use LOI as body:</span>
                                 <span
                                     role="switch"
                                     aria-checked={useLOIAsBody}
@@ -417,9 +562,10 @@ export default function GenerateLOIsStepScreen({
                                 <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">{`{{LOI document text}}`}</div>
                             ) : <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
                                 <div>{emailPreview.body}</div>
+                                {attachPdf && <div className="flex items-center gap-1 mt-2"><PaperClipIcon className="w-4 h-4 inline-block" />LOI PDF Attached</div>}
                             </div>}
                         </div>
-                        <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`}onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
+                        <div className={`text-[11px] ${emailSettingsHovered ? 'text-gray-800' : 'text-white'} hover:underline cursor-pointer flex justify-end`} onClick={() => setShowEmailPreview(false)}>Hide email preview</div>
                     </>
                 ) : (
                     <>
@@ -477,11 +623,11 @@ export default function GenerateLOIsStepScreen({
                                     <Tooltip title="Please map all placeholders to a valid column.">
                                         <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
                                     </Tooltip>
-                                    </span>}
+                                </span>}
                             </div>
 
                             <div className="text-gray-600">Email column mapped</div>
-                            <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` : 
+                            <div className="text-gray-900">{emailOk ? `✓ (${mapping.__email})` :
                                 <span className="text-amber-600">
                                     ⚠ email column not mapped
                                     <Tooltip title="Please map the email column to valid email addresses in the source data sheet.">
@@ -541,6 +687,7 @@ export default function GenerateLOIsStepScreen({
                                         setQueueStatus({ ...queueStatus, exists: res.queueExists });
                                     } finally {
                                         setIsPreflighting(false);
+                                        setSummary(null);
                                     }
                                 })();
                             }}
@@ -568,33 +715,104 @@ export default function GenerateLOIsStepScreen({
                     </div>
                 </div>
 
-                <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : !canGenerate ? "Create LOIs in your Drive" : !isGenerating ? "" : ""}>
+                {/* Large dataset notice & controls */}
+                {preflight?.eligibleRows > LARGE_DATASET_THRESHOLD && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+                        <div className="font-medium mb-1">Large dataset detected</div>
+                        <div className="mb-2">
+                            We’ll create docs in batches of {batchSize} to avoid timeouts. You can pause after any batch and resume later. If starting from scratch, already created docs will be skipped.
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* Auto-continue toggle */}
+                            <label className="flex items-center gap-2">
+                                <span className="text-gray-700">Auto-continue</span>
+                                <span
+                                    role="switch"
+                                    aria-checked={autoContinue}
+                                    onClick={() => setAutoContinue(!autoContinue)}
+                                    className={`inline-flex h-5 w-9 items-center rounded-full ${autoContinue ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                                >
+                                    <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${autoContinue ? "translate-x-3.5" : ""}`} />
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {isGenerating && autoContinue && (
                     <div
                         role="button"
                         tabIndex={0}
-                        aria-disabled={!canGenerate || isGenerating}
-                        onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
-                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
-                        className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
-            ${!canGenerate || isGenerating
+                        onClick={() => setAutoContinue(false)}
+                        className="inline-block select-none rounded-md border border-gray-200 px-3 py-2 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer mr-2"
+                    >
+                        Pause after this batch
+                    </div>
+                )}
+
+
+                {summary && !summary.done ? (
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => runGenerate(true)}
+                        className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer mr-1
+                            ${!canGenerate || isGenerating
                                 ? "bg-gray-300 text-white cursor-not-allowed"
                                 : "bg-gray-900 text-white hover:bg-gray-800"
                             }`}
                     >
-                        {isGenerating ? "Generating…" : `Generate LOIs${preflight?.eligibleRows ? ` (${preflight.eligibleRows})` : ""}`}
+                        Continue next {batchSize}
                     </div>
-                </Tooltip>
+                ) : (
+                    <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : !canGenerate ? "Create LOIs in your Drive" : !isGenerating ? "" : ""}>
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            aria-disabled={!canGenerate || isGenerating}
+                            onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
+                            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
+                            className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
+            ${!canGenerate || isGenerating
+                                    ? "bg-gray-300 text-white cursor-not-allowed"
+                                    : "bg-gray-900 text-white hover:bg-gray-800"
+                                }`}
+                        >
+                            {isGenerating ? "Creating..." : `Create LOIs${preflight?.eligibleRows ? ` (${preflight.eligibleRows})` : ""}`}
+                        </div>
+                    </Tooltip>
+                )}
+
+
 
                 {/* Progress / results */}
                 {isGenerating && (
                     <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <InlineSpinner /> {progressText || "Working…"}
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-xs text-gray-600 min-w-[150px]">
+                                <InlineSpinner /> {progressText || "Working…"}
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-200 rounded">
+                                <div
+                                    className="h-1.5 bg-indigo-500 rounded transition-[width] duration-200"
+                                    style={{ width: `${innerPct}%` }}
+                                />
+                            </div>
+                            <div className="text-[10px] text-gray-500">{Math.round(innerPct)}% of current batch</div>
+                        </div>
                     </div>
                 )}
 
                 {summary && (
+                    <div className="text-[11px] text-gray-600">
+                        Processed: {summary.nextOffset ?? 0} / {summary.totalRows ?? 0} rows in <b>{sheetNameShort}</b>
+                    </div>
+                )}
+
+
+                {summary && (
                     <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-800">
-                        <div className="font-medium text-gray-900 mb-1">Generation summary</div>
+                        <div className="text-gray-900 mb-1 !font-bold">Creation Summary</div>
                         <div>Created: {summary.created}</div>
                         <div>Skipped (invalid): {summary.skippedInvalid}</div>
                         <div>Skipped (duplicates): {summary.duplicates}</div>
@@ -605,11 +823,11 @@ export default function GenerateLOIsStepScreen({
                 )}
             </div>
 
-            {/* Tiny toast */}
-            {toast && (
-                <div className="fixed bottom-3 right-3 z-50 rounded-md bg-blue-500 px-3 py-2 text-xs text-white shadow">
-                    {toast}
-                </div>
+            {/* Snackbar */}
+            {snackbar.open && (
+                <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                    <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+                </Snackbar>
             )}
         </div>
     );

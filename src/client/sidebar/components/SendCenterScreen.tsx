@@ -9,7 +9,7 @@ import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
 import { ArrowPathIcon, LinkIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { Alert, Link, Tooltip } from "@mui/material";
+import { Alert, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 

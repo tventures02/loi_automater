@@ -34,6 +34,9 @@ type Props = {
 
     /** Whether to fix the Y position */
     fixYPos?: boolean;
+
+    /** Whether to force the primary button to be disabled */
+    forcePrimaryDisabled?: boolean;
 };
 
 function cx(...cls: (string | false | null | undefined)[]) {
@@ -54,6 +57,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
         currentStep,
         mode = "send",
         fixYPos = false,
+        forcePrimaryDisabled = false,
     },
     ref
 ) {
@@ -88,6 +92,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
     }
 
     const isFinalStep = primaryLabel?.toLowerCase().includes("send...");
+    const primaryControlDisabled = forcePrimaryDisabled || primaryDisabled;
 
     return (
         <div
@@ -130,21 +135,21 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
 
                     {
                         onPrimary && (
-                            <Tooltip title={primaryDisabled ? tooltipTitle : ""} arrow>
+                            <Tooltip title={primaryControlDisabled ? tooltipTitle : ""} arrow>
                                 <span className="inline-block">
                                     <div
                                         role="button"
-                                        tabIndex={primaryDisabled ? -1 : 0}
+                                        tabIndex={primaryControlDisabled ? -1 : 0}
                                         aria-label={primaryLabel}
-                                        aria-disabled={primaryDisabled}
+                                        aria-disabled={primaryControlDisabled}
                                         className={cx(
                                             "!cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
                                             `${isFinalStep ? `bg-green-600 hover:bg-green-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500` :
                                                 `bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900`}`,
-                                            primaryDisabled && "opacity-50 pointer-events-none"
+                                            primaryControlDisabled && "opacity-50 pointer-events-none"
                                         )}
-                                        onClick={handleActivate(onPrimary, primaryDisabled)}
-                                        onKeyDown={handleActivate(onPrimary, primaryDisabled)}
+                                        onClick={handleActivate(onPrimary, primaryControlDisabled)}
+                                        onKeyDown={handleActivate(onPrimary, primaryControlDisabled)}
                                     >
 
                                         <div className="flex items-center gap-2">

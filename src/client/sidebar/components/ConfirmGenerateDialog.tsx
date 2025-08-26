@@ -67,7 +67,7 @@ export default function ConfirmGenerateDialog({
 
                         <div className="min-w-0">
                             <h3 id="gen-title" className="text-sm font-semibold text-gray-900">
-                                Generate LOI documents?
+                                Create LOI documents?
                             </h3>
                             <p className="mt-1 text-xs leading-5 text-gray-600">
                                 This will create {eligibleCount ?? "—"} Google Doc{(eligibleCount ?? 0) === 1 ? "" : "s"} in a folder in your Drive and adds them to the Sender queue. You can review before sending.
@@ -153,7 +153,7 @@ export default function ConfirmGenerateDialog({
                                         aria-hidden="true"
                                     />
                                 ) : null}
-                                <span>{isSubmitting ? "Generating…" : "Yes, generate"}</span>
+                                <span>{isSubmitting ? "Creating…" : "Yes, create"}</span>
                             </div>
                         </div>
                     </div>

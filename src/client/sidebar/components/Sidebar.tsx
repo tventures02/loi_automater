@@ -4,7 +4,6 @@ import LoadingAnimation from "../../utils/LoadingAnimation";
 import { backendCall } from '../../utils/server-calls';
 import { Grid } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
-import CTAWidget from './CTASideBar';
 import { sendToAmplitude } from "../../utils/amplitude";
 import { generateDataToServer } from '../../utils/misc';
 import { User } from '../../utils/types';
@@ -88,6 +87,7 @@ const SidebarContainer = () => {
     const [queueStatus, setQueueStatus] = useState<QueueStatus>({ exists: false, empty: true });
     const [creatingQueue, setCreatingQueue] = useState<boolean>(false);
     const [queueError, setQueueError] = useState<string | null>(null);
+    const [disablePrimary, setDisablePrimary] = useState<boolean>(false);
 
     const headerRef = useRef(null);
     const footerRef = useRef<HTMLDivElement>(null);
@@ -480,7 +480,8 @@ const SidebarContainer = () => {
         helperText={undefined}
         leftSlot={null}
         currentStep={currentStep}
-        mode={mode} 
+        mode={mode}
+        forcePrimaryDisabled={disablePrimary}
     />;
 
     const helpButton = (<div
@@ -629,6 +630,7 @@ const SidebarContainer = () => {
                                 setQueueStatus={setQueueStatus}
                                 sheetName={dataSheet || undefined}
                                 refreshSendData={refreshSendData}
+                                setDisablePrimary={setDisablePrimary}
                             />
                         )}
 
