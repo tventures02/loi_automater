@@ -177,4 +177,4 @@ function checkTokenExpiration(idToken) {
 }
 
 
-export const colLabel = (n) => { let s = ''; while (n) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / CONSTANTS.MAX_LETTER_NUMBER); } return s; };
+export const colLabel = (n) => { let s = ''; while (n) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / CONSTANTS.MAX_COL_NUMBER); } return s; };

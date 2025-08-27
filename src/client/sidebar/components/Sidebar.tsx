@@ -659,6 +659,8 @@ const SidebarContainer = () => {
                                 refreshSendData={refreshSendData}
                                 setDisablePrimary={setDisablePrimary}
                                 user={user}
+                                settings={settings}
+                                onUpgradeClick={onUpgradeClick}
                             />
                         )}
 

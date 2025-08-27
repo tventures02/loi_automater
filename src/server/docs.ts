@@ -1,4 +1,5 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
+import CONSTANTS from "../client/utils/constants";
 
 var LOI_QUEUE_NAME = 'Sender Queue';
 var LOI_QUEUE_HEADERS = [
@@ -311,7 +312,6 @@ function renderStringTpl_(tpl, row, tokenCols) {
     return out;
 }
 
-
 export const generateLOIChunk = (payload) => {
 
     const {
@@ -326,11 +326,15 @@ export const generateLOIChunk = (payload) => {
         limit = 100,                 // batch size
         includeStatuses = false,     // optional: return per-row statuses (can be large)
         user,
+        sheetName,
+        maxColCharNumber,
     } = payload || {};
+
+    const isPremium = user.subscriptionStatusActive;
 
     try {
         const ss = SpreadsheetApp.getActive();
-        const source = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
+        const source = sheetName ? ss.getSheetByName(sheetName) : null;
         if (!source) throw new Error('Sheet not found');
 
         const lastRow = source.getLastRow();
@@ -340,11 +344,11 @@ export const generateLOIChunk = (payload) => {
             return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId };
         }
 
-        if (!user.subscriptionStatusActive) {
+        if (!isPremium) {
             const emailColLetter = payload.emailColumn || (payload.mapping || {}).__email;
             const blocked = columnsOverFree(payload.mapping || {}, emailColLetter);
             if (blocked.length) {
-                throw new Error('PLAN_LIMIT|' + JSON.stringify({ blocked, allowedMaxLetter: 'D' }));
+                throw new Error('PLAN_LIMIT|' + JSON.stringify({ blocked, allowedMaxLetter: CONSTANTS.FREE_MAX_LETTER }));
             }
         }
 
@@ -365,7 +369,8 @@ export const generateLOIChunk = (payload) => {
             }
         }
 
-        const width = Math.min(lastCol, 8); // A..H only
+        const width = Math.min(lastCol, maxColCharNumber || (isPremium ? CONSTANTS.MAX_COL_NUMBER : CONSTANTS.FREE_MAX_COL_NUMBER));
+        console.log('width', width);
 
         // Build token -> column index map
         const tokenCols = {};
@@ -389,7 +394,7 @@ export const generateLOIChunk = (payload) => {
 
         // Row math for the chunk
         const totalRows = lastRow;
-        const startRow = 1 + offset;                          // 1-based row in sheet
+        const startRow = isPremium ? 1 + offset : 1;
         const remaining = (lastRow - startRow + 1);
         const take = Math.max(0, Math.min(limit, remaining));
         if (take <= 0) {
@@ -413,12 +418,13 @@ export const generateLOIChunk = (payload) => {
                 ? (DocumentApp.openById(templateId).getBody().getText() || '')
                 : '';
 
-        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0;
+        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0, eligible = 0, rowsProcessed = 0;
         const statuses = [];
         const queueBatch = [];
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
+            rowsProcessed++;
             const sourceRow = startRow + i;
             const email = (row[eIdx] || '').toString().trim();
 
@@ -428,6 +434,10 @@ export const generateLOIChunk = (payload) => {
             // Skip duplicates already present in Sender Queue
             if (existingIds.has(id)) {
                 duplicates++;
+                if (!isPremium) eligible++;
+                if (eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET) {
+                    break;
+                }
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "skipped", message: "Duplicate (already queued/sent with same content)" });
                 continue;
             }
@@ -510,6 +520,12 @@ export const generateLOIChunk = (payload) => {
 
                 created++;
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "ok", docUrl: docInfo.fileUrl });
+
+                if (!isPremium) eligible++;
+                if (eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET) {
+                    break;
+                }
+                
             } catch (e) {
                 failed++;
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "failed", message: String(e) });
@@ -519,8 +535,8 @@ export const generateLOIChunk = (payload) => {
         // Bulk append to Sender Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
 
-        const nextOffset = offset + data.length;
-        const done = nextOffset >= totalRows;
+        const nextOffset = isPremium ? offset + data.length : rowsProcessed;
+        const done = isPremium ? nextOffset >= totalRows : eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET;
 
         return {
             created,
@@ -1323,5 +1339,5 @@ function columnsOverFree(mapping, emailColumn) {
         .concat(emailColumn || [])
         .filter(Boolean);
     const uniq = Array.from(new Set(letters.map(String)));
-    return uniq.filter(L => colToNumber(L) > 4); // > D
+    return uniq.filter(L => colToNumber(L) > CONSTANTS.FREE_MAX_COL_NUMBER); // > D
 }

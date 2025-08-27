@@ -6,12 +6,14 @@ import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
 import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { Alert, Snackbar, Tooltip } from "@mui/material";
-import { User } from "../../utils/types";
+import { Settings, User } from "../../utils/types";
+import CONSTANTS from "../../utils/constants";
+import CtaCard from "./CtaCard";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
 // Helpers
-const FREE_MAX_LETTER = 'D';
+const FREE_MAX_LETTER = CONSTANTS.FREE_MAX_LETTER;
 const colToNum = (L?: string) => L ? L.trim().toUpperCase().charCodeAt(0) - 64 : 0;
 const overFree = (L?: string) => colToNum(L) > colToNum(FREE_MAX_LETTER);
 
@@ -40,6 +42,10 @@ type Props = {
     setDisablePrimary: React.Dispatch<React.SetStateAction<boolean>>;
 
     user: User;
+
+    settings: Settings;
+
+    onUpgradeClick: () => void;
 };
 
 type PreflightResult = {
@@ -118,6 +124,8 @@ export default function GenerateLOIsStepScreen({
     refreshSendData,
     setDisablePrimary,
     user,
+    settings,
+    onUpgradeClick,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -135,12 +143,14 @@ export default function GenerateLOIsStepScreen({
     const [batchSize, setBatchSize] = useState(DEFAULT_BATCH_SIZE);
     const [failStopThreshold, setFailStopThreshold] = useState<number>(5); // 0 = ignore
     const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
+    const [innerPct, setInnerPct] = useState(0);
+
+    const isPremium = user.subscriptionStatusActive;
     const emailColumn = mapping?.__email || "";
     const outputFolderId = preflight?.outputFolderId || "";
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [innerPct, setInnerPct] = useState(0);
-    const innerTimerRef = useRef<number | null>(null);
 
+    const containerRef = useRef<HTMLDivElement>(null);
+    const innerTimerRef = useRef<number | null>(null);
     const autoContinueRef = useRef(autoContinue);
     const failStopThresholdRef = useRef(failStopThreshold);
 
@@ -376,6 +386,8 @@ export default function GenerateLOIsStepScreen({
                     attachPdf,
                     offset,
                     limit: batchSize,
+                    user,
+                    maxColCharNumber: isPremium ? settings.maxColCharNumber : Math.min(settings.maxColCharNumber, CONSTANTS.FREE_MAX_COL_NUMBER),
                 }).finally(() => {
                     stopFakeInnerProgress(true);                 // snap to 100% and reset
                 });
@@ -387,7 +399,6 @@ export default function GenerateLOIsStepScreen({
 
                 offset = res.nextOffset;
                 done = !!res.done;
-
                 batch++;
 
                 // Update on-screen partial summary if you like:
@@ -408,6 +419,22 @@ export default function GenerateLOIsStepScreen({
                     setAutoContinue(false);
                     setSnackbar({ open: true, message: `Paused: ${res.failed} failures in last batch (threshold ${failStopThresholdRef.current}).`, severity: "error" });
                     break;
+                }
+
+                if (!isPremium) {   
+                    if (totals.created >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET ||
+                        totals.duplicates >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET
+                    ) {
+                        done = true;
+                        break;
+                    }
+                    else if (totals.created === preflight?.eligibleRows ||
+                        totals.duplicates === preflight?.eligibleRows
+                    ) {
+                        done = true;
+                        break;
+                    }
+                    // TODO: maybe show snackbar                    
                 }
 
                 // Pause after one batch if auto-continue is off
@@ -431,7 +458,7 @@ export default function GenerateLOIsStepScreen({
             onValidChange?.("lois", true);
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
-
+            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. Continue to send.`, severity: "success" });
         } catch (e) {
             console.log('error', e)
             setSnackbar({ open: true, message: "Creation failed. Please try again.", severity: "error" });
@@ -440,7 +467,6 @@ export default function GenerateLOIsStepScreen({
             setIsGenerating(false);
             setProgressText("");
             refreshSendData(true);
-            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. Continue to send.`, severity: "success" });
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
             setAutoContinue(true);
         }
@@ -756,7 +782,7 @@ export default function GenerateLOIsStepScreen({
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 w-fit">
                         <div className="font-medium flex items-center gap-1">Creates Docs in batches of {batchSize}
                             <Tooltip title={<><div className="mb-1">Creating LOI Docs for PDF attachments may take some time. To avoid timeouts, we'll create them in batches of {batchSize}.</div>
-                                <div className="mb-1">You can pause after any batch and resume later; existing docs will be skipped.</div>
+                                <div className="mb-1">You can pause after any batch and resume later; existing Docs will be skipped.</div>
                                 <div className="mb-1">Toggle "Attach LOI as PDF" to turn this off.</div></>}>
                                 <QuestionMarkCircleIcon className="w-4 h-4 inline-block cursor-pointer text-amber-800" />
                             </Tooltip>
@@ -785,7 +811,7 @@ export default function GenerateLOIsStepScreen({
                             aria-disabled={!canGenerate || isGenerating}
                             onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
                             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
-                            className={`inline-block select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer
+                            className={`select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer flex items-center !justify-center w-full
             ${!canGenerate || isGenerating
                                     ? "bg-gray-300 text-white !cursor-not-allowed"
                                     : "bg-gray-900 text-white hover:bg-gray-800"
@@ -836,7 +862,6 @@ export default function GenerateLOIsStepScreen({
                     </div>
                 )}
 
-
                 {summary && (
                     <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-800">
                         <div className="text-gray-900 mb-1 !font-bold">Creation Summary</div>
@@ -849,6 +874,14 @@ export default function GenerateLOIsStepScreen({
                     </div>
                 )}
             </div>
+
+            {!isPremium && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
+                <Tooltip title={`This free version limits creating ${CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET} LOIs per sheet tab. Switch to a different sheet to create more (see step 1).`}>
+                    <div>
+                        <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to create unlimited LOIs!" />
+                    </div>
+                </Tooltip>
+            )}
 
             {/* Snackbar */}
             {snackbar.open && (

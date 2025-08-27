@@ -90,12 +90,12 @@ export default function ConfirmGenerateDialog({
                                 {willCreateDocs ? (
                                     <>
                                         This will create <b>{count || "—"}</b> {docNoun} in your Drive subfolder 
-                                        for PDF attachments, and jobs will be added to the Sender Queue. You can review before sending.
+                                        for PDF attachments, and jobs will be added to the <b>Sender Queue</b> using data from <b>{sheetNameShort}</b>. You can review before sending.
                                     </>
                                 ) : (
                                     <>
-                                        Adding <b>{itemNoun}</b> to the <b>Sender Queue</b> with the
-                                        email body text resolved {emailBodySourceText}. You can review before sending.
+                                        This will create and add <b>{itemNoun}</b> to the <b>Sender Queue</b> with the
+                                        LOI email body text resolved {emailBodySourceText} using data from <b>{sheetNameShort}</b>. You can review before sending.
                                     </>
                                 )}
                             </p>

@@ -1,6 +1,6 @@
 // SettingsDialog.tsx
 import React, { useState } from "react";
-import CONSTANTS, { MAX_LETTER_NUMBER } from "../../utils/constants";
+import CONSTANTS, { MAX_COL_NUMBER } from "../../utils/constants";
 import { colLabel } from "../../utils/misc";
 import useLocalStorage from 'use-local-storage';
 import { Settings } from "../../utils/types";
@@ -12,7 +12,7 @@ type Props = {
     settings: Settings;
     setSettings: (settings: Settings) => void;
 };
-const COLUMN_OPTIONS = Array.from({ length: MAX_LETTER_NUMBER }, (_, i) => colLabel(i + 1)); // A..CV (100 cols)
+const COLUMN_OPTIONS = Array.from({ length: MAX_COL_NUMBER }, (_, i) => colLabel(i + 1)); // A..CV (100 cols)
 
 export default function SettingsDialog({
     open,

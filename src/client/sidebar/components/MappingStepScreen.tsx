@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { serverFunctions } from '../../utils/serverFunctions';
 import InlineSpinner from "../../utils/components/InlineSpinner";
-import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { Settings, User } from "../../utils/types";
 import { colLabel } from "../../utils/misc";
-import MappingCta from "./MappingCta";
+import CtaCard from "./CtaCard";
+import CONSTANTS from "../../utils/constants";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -56,7 +56,7 @@ function extractPlaceholders(text: string): string[] {
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-const FREE_MAX_INDEX = 3;
+const FREE_MAX_INDEX = CONSTANTS.FREE_MAX_COL_NUMBER - 1;
 export const MAX_SHEET_NAME_LENGTH = 20;
 
 function escapeRegExp(s: string) {
@@ -219,7 +219,8 @@ export default function MappingStepScreen({
 
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
     const allMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
-    const maxLetter = isPremium ? COLUMN_OPTIONS[COLUMN_OPTIONS.length - 1] : "D";
+    const maxLetter = isPremium ? COLUMN_OPTIONS[COLUMN_OPTIONS.length - 1] : CONSTANTS.FREE_MAX_LETTER;
+    const totalColsToMap = placeholders.length + (emailColumn ? 1 : 0);
 
     return (
         <div className="space-y-3">
@@ -295,8 +296,8 @@ export default function MappingStepScreen({
                 </div>
             )}
 
-            {!isPremium && (
-                <MappingCta onUpgradeClick={onUpgradeClick} />
+            {!isPremium && totalColsToMap > CONSTANTS.FREE_MAX_COL_NUMBER && (
+                <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to unlock more columns!" />
             )}
 
             {/* Delivery email column (separate card for clarity) */}

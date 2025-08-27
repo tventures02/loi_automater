@@ -208,6 +208,7 @@ export default function SendCenterScreen({
             setClearing(false);
             setOpenClear(false);
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
+            setQueueOpen(false);
         }
     };
 
@@ -258,7 +259,7 @@ export default function SendCenterScreen({
                 {loading ? <div className="text-xs text-gray-500 flex items-center gap-2"><InlineSpinner /> Loading...</div> :
                     <>
                         <div className="flex items-center justify-between mb-3">
-                            <div className="text-xs font-medium text-gray-900">Summary</div>
+                            <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
                             <Tooltip title={`Open Sender Queue tab`}>
                                 <LinkIcon className="w-3 h-3 cursor-pointer" onClick={() => serverFunctions.showSendQueueTab()} />
                             </Tooltip>

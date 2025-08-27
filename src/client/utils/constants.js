@@ -32,8 +32,11 @@ module.exports = {
         FULL_FUNC: 1,
         FULL_FUNC_SUB: 2,
     },
-    MAX_LETTER_NUMBER: 26,
+    MAX_COL_NUMBER: 26,
     LS_KEYS: {
         SETTINGS: 'settings_LOI_v1',
     },
+    FREE_LOI_GEN_CAP_PER_SHEET: 100,
+    FREE_MAX_COL_NUMBER: 4,
+    FREE_MAX_LETTER: 'D',
 }

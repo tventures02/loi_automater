@@ -1,7 +1,13 @@
 import React from "react";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 
-export default function MappingCta({ onUpgradeClick }: { onUpgradeClick: () => void }) {
+export default function CtaCard ({ 
+    onUpgradeClick,
+    message,    
+}: {
+    onUpgradeClick: () => void;
+    message: string;
+}) {
     return (
         <div
             role="button"
@@ -28,7 +34,7 @@ px-3 py-2
                 {/* left: message + tiny attention beacon (no extra copy) */}
                 <div className="flex items-center gap-2">
                     <div className="text-[10px] text-amber-900">
-                        Upgrade to unlock more columns!
+                        {message}
                     </div>
                 </div>
 
