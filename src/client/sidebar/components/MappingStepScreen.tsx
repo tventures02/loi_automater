@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { serverFunctions } from '../../utils/serverFunctions';
 import InlineSpinner from "../../utils/components/InlineSpinner";
-import { PencilIcon } from "node_modules/@heroicons/react/24/outline";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { User } from "../../utils/types";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -21,6 +22,10 @@ type Props = {
 
     /** Set current step */
     setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
+
+    user: User;
+
+    onUpgradeClick: () => void;
 };
 
 function normalizeNewlines(s: string) {
@@ -33,7 +38,6 @@ function normalizeNewlines(s: string) {
     out = out.replace(/\u2028|\u2029/g, "\n");
     return out;
 }
-
 
 /** Extract {{ Placeholder }} names; trims whitespace; returns unique, sorted */
 function extractPlaceholders(text: string): string[] {
@@ -48,7 +52,10 @@ function extractPlaceholders(text: string): string[] {
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-const COLUMN_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+const FREE_MAX_INDEX = 3;
+const isLockedCol = (col: string, subscriptionStatusActive: boolean) => !subscriptionStatusActive && COLUMN_OPTIONS.indexOf(col) > FREE_MAX_INDEX;
+const colLabel = (n:number) => { let s=''; while(n){ n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n/26);} return s; };
+const COLUMN_OPTIONS = Array.from({ length: 26 }, (_, i) => colLabel(i + 1)); // A..CV (100 cols)
 export const MAX_SHEET_NAME_LENGTH = 20;
 
 function escapeRegExp(s: string) {
@@ -76,6 +83,8 @@ export default function MappingStepScreen({
     onValidChange,
     sheetName,
     setCurrentStep,
+    user,
+    onUpgradeClick,
 }: Props) {
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
 
@@ -88,6 +97,7 @@ export default function MappingStepScreen({
     const [firstRowEmail, setFirstRowEmail] = useState<string | null>(null);
     const [onMapperHover, setOnMapperHover] = useState<boolean>(false);
     const [showPreview, setShowPreview] = useState<boolean>(false);
+    const isPremium = user.subscriptionStatusActive;
 
     useEffect(() => {
         setMapping({});
@@ -107,6 +117,23 @@ export default function MappingStepScreen({
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [placeholders.join("|")]);
+
+    // Enforce free-tier limit client-side: reset any locked selections
+    useEffect(() => {
+        if (isPremium) return;
+        setMapping((prev) => {
+            let changed = false;
+            const next = { ...prev };
+            for (const [ph, col] of Object.entries(prev)) {
+                if (col && isLockedCol(col, false)) {
+                    next[ph] = "";
+                    changed = true;
+                }
+            }
+            return changed ? next : prev;
+        });
+        setEmailColumn((prev) => (prev && isLockedCol(prev, false) ? "" : prev));
+    }, [isPremium]);
 
     // Report changes upward + validity
     useEffect(() => {
@@ -187,18 +214,19 @@ export default function MappingStepScreen({
 
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
     const allMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping[ph]);
+    const maxLetter = isPremium ? COLUMN_OPTIONS[COLUMN_OPTIONS.length - 1] : "D";
 
     return (
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Map placeholders</h2>
             <p className="text-xs text-gray-600">
-                Select columns (A–H) from {sheetName ? <b>{sheetNameShort}</b> : "your spreadsheet"} for placeholders in your LOI template.
+                Select columns (A–{maxLetter}) from {sheetName ? <b>{sheetNameShort}</b> : "your spreadsheet"} for placeholders in your LOI template.
             </p>
 
             {/* Empty-state if no placeholders */}
             {placeholders.length === 0 ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-                    No placeholders detected. Add tokens like <span className="font-mono">{`{{Address}}`}</span> to your template,
+                    No placeholders detected. Add tokens like <span className="font-mono">{`{{address}}`}</span> to your template,
                     then refresh in the previous step.
                 </div>
             ) : (
@@ -224,12 +252,18 @@ export default function MappingStepScreen({
                         bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900
                       `}
                                         >
-                                            <option value="">{`— Select (A–H) —`}</option>
-                                            {COLUMN_OPTIONS.map((col) => {
+                                            <option value="">{`— Select (A–${maxLetter}) —`}</option>
+                                            {COLUMN_OPTIONS.map((col, idx) => {
+                                                const locked = isLockedCol(col, isPremium);
                                                 const isTakenElsewhere = taken.has(col) && mapping[ph] !== col;
+                                                const disabled = locked || isTakenElsewhere;
+                                                const label =
+                                                    `Column ${col}` +
+                                                    (isTakenElsewhere ? " (in use)" : "") +
+                                                    (locked ? "  🔒 Pro" : "");
                                                 return (
-                                                    <option key={col} value={col} disabled={isTakenElsewhere}>
-                                                        {`Column ${col}`}{isTakenElsewhere ? " (in use)" : ""}
+                                                    <option key={col} value={locked ? "" : col} disabled={disabled} title={locked ? "Upgrade to map columns beyond D" : ""}>
+                                                        {label}
                                                     </option>
                                                 );
                                             })}
@@ -253,6 +287,25 @@ export default function MappingStepScreen({
                             )
                         }
                     </div>
+
+
+                        <>
+                            {!isPremium && (
+                                <div className="mt-2 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-2 py-2">
+                                    <div className="text-[11px] text-amber-800">
+                                        Free plan: columns <b>A–D</b> available. Columns <b>E+</b> are locked.
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={onUpgradeClick}
+                                        className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-[11px] text-white hover:bg-gray-800"
+                                    >
+                                        <LockClosedIcon className="h-3.5 w-3.5" />
+                                        Upgrade
+                                    </button>
+                                </div>
+                            )}
+                        </>
                 </div>
             )}
 
@@ -281,12 +334,18 @@ export default function MappingStepScreen({
               ${emailColumn ? "border-gray-200" : "border-amber-300"}
             `}
                     >
-                        <option value="">{`— Select (A–H) —`}</option>
+                        <option value="">{`— Select (A–${maxLetter}) —`}</option>
                         {COLUMN_OPTIONS.map((col) => {
-                            const disabled = taken.has(col) && emailColumn !== col;
+                            const locked = isLockedCol(col, isPremium);
+                            const inUse = taken.has(col) && emailColumn !== col;
+                            const disabled = locked || inUse;
+                            const label =
+                                `Column ${col}` +
+                                (inUse ? " (in use)" : "") +
+                                (locked ? "  🔒 Pro" : "");
                             return (
-                                <option key={col} value={col} disabled={disabled}>
-                                    {`Column ${col}`}{disabled ? " (in use)" : ""}
+                                <option key={col} value={locked ? "" : col} disabled={disabled} title={locked ? "Upgrade to unlock email column beyond D" : ""}>
+                                    {label}
                                 </option>
                             );
                         })}

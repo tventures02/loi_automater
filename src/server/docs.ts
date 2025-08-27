@@ -190,7 +190,12 @@ export const preflightGenerateLOIs = (payload) => {
     if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
     const outputFolderId = loiEnsureOutputFolder();
+    const {
+        user
+    } = payload;
+    
 
+    const blocked = user.subscriptionStatusActive ? [] : columnsOverFree(payload.mapping || {}, payload.emailColumn || (payload.mapping||{}).__email);
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     if (lastRow < 1) {
@@ -203,6 +208,8 @@ export const preflightGenerateLOIs = (payload) => {
             sampleFileName: '',
             queueExists: queueExistsFlag,
             outputFolderId,
+            blocked,
+            limitedByPlan: blocked.length > 0,
         };
     }
 
@@ -221,6 +228,8 @@ export const preflightGenerateLOIs = (payload) => {
             sampleFileName: '',
             queueExists: queueExistsFlag,
             outputFolderId,
+            blocked,
+            limitedByPlan: blocked.length > 0,
         };
     }
     const emailIndex = colToNumber(emailColLetter) - 1;
@@ -269,6 +278,8 @@ export const preflightGenerateLOIs = (payload) => {
         sampleFileName: sampleName,
         queueExists: queueExistsFlag,
         outputFolderId,
+        blocked,
+        limitedByPlan: blocked.length > 0,
     };
 };
 
@@ -314,6 +325,7 @@ export const generateLOIChunk = (payload) => {
         offset = 0,                  // 0-based data offset (row 2 == offset 0)
         limit = 100,                 // batch size
         includeStatuses = false,     // optional: return per-row statuses (can be large)
+        user,
     } = payload || {};
 
     try {
@@ -326,6 +338,14 @@ export const generateLOIChunk = (payload) => {
         const outFolderId = attachPdf ? loiEnsureOutputFolder() : '';
         if (lastRow < 2) {
             return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId };
+        }
+
+        if (!user.subscriptionStatusActive) {
+            const emailColLetter = payload.emailColumn || (payload.mapping || {}).__email;
+            const blocked = columnsOverFree(payload.mapping || {}, emailColLetter);
+            if (blocked.length) {
+                throw new Error('PLAN_LIMIT|' + JSON.stringify({ blocked, allowedMaxLetter: 'D' }));
+            }
         }
 
         // Ensure central queue exists (source of truth for sending)
@@ -1296,3 +1316,12 @@ export const queueDeleteDocsSimple = (opts?: {
         lock.releaseLock();
     }
 };
+
+function columnsOverFree(mapping, emailColumn) {
+    const letters = []
+        .concat(Object.values(mapping || {}))
+        .concat(emailColumn || [])
+        .filter(Boolean);
+    const uniq = Array.from(new Set(letters.map(String)));
+    return uniq.filter(L => colToNumber(L) > 4); // > D
+}

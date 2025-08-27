@@ -17,6 +17,7 @@ import { DocInfo } from 'src/server/docs';
 import SendCenterScreen, { QUEUE_DISPLAY_LIMIT } from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
 import DataSourcePicker from './DataSourcePicker';
+import { generatePricingPageUrl } from '../../utils/misc';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
@@ -328,6 +329,20 @@ const SidebarContainer = () => {
         }
     };
 
+    const onUpgradeClick = async () => {
+        try {
+            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
+            if (isDev) {
+                console.log(url);
+                console.log(user.email)
+                console.log(user.idToken)
+            }
+            window.open(url, '_blank');
+        } catch (error) {
+            if (isDev) console.log(error);
+        }
+    }
+
     const handleChangeDataSheet = (name: string) => {
         setDataSheet(name);
         localStorage.setItem("loi:dataSheet", name);
@@ -495,7 +510,7 @@ const SidebarContainer = () => {
 
     console.log('sidebar render-------------------')
     console.log('mode', mode)
-    console.log('dataSheet', dataSheet)
+    console.log('user', user)
 
     return (
         < div className='container' >
@@ -616,6 +631,8 @@ const SidebarContainer = () => {
                                 onValidChange={(key, ok) => setCanContinue({ ...canContinue, [key]: ok })}
                                 sheetName={dataSheet || undefined}
                                 setCurrentStep={setCurrentStep}
+                                user={user}
+                                onUpgradeClick={onUpgradeClick}
                             />
                         )}
 
@@ -631,6 +648,7 @@ const SidebarContainer = () => {
                                 sheetName={dataSheet || undefined}
                                 refreshSendData={refreshSendData}
                                 setDisablePrimary={setDisablePrimary}
+                                user={user}
                             />
                         )}
 

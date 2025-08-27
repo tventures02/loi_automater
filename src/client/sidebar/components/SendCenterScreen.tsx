@@ -266,10 +266,10 @@ export default function SendCenterScreen({
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
-                                <Badge label={`To be sent: ${summary?.queued ?? "—"}`} />
+                                <Badge label={`Left to send: ${summary?.queued ?? "—"}`} />
                                 <Badge label={`Sent: ${summary?.sent ?? "—"}`} />
                                 <Badge label={`Failed: ${summary?.failed ?? "—"}`} />
-                                <Badge label={`All queue items: ${summary?.total ?? "—"}`} />
+                                <Badge label={`Total jobs: ${summary?.total ?? "—"}`} />
                             </div>
                         </div>
                     </>

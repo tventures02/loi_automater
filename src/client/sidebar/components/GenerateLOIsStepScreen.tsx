@@ -6,8 +6,15 @@ import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
 import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { Alert, Snackbar, Tooltip } from "@mui/material";
+import { User } from "../../utils/types";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
+
+// Helpers
+const FREE_MAX_LETTER = 'D';
+const colToNum = (L?: string) => L ? L.trim().toUpperCase().charCodeAt(0) - 64 : 0;
+const overFree = (L?: string) => colToNum(L) > colToNum(FREE_MAX_LETTER);
+
 type Props = {
     /** Placeholder -> column letter map. Must include __email for recipient column */
     mapping: Record<string, string>; // e.g., { Address: "A", AgentName: "B", Offer: "C", __email: "H" }
@@ -31,6 +38,8 @@ type Props = {
     refreshSendData: (force?: boolean) => void;
     /** Signal parent whether to disable primary button */
     setDisablePrimary: React.Dispatch<React.SetStateAction<boolean>>;
+
+    user: User;
 };
 
 type PreflightResult = {
@@ -42,6 +51,8 @@ type PreflightResult = {
     sampleFileName: string;
     queueExists: boolean;   // true if Sender Queue exists
     outputFolderId: string;
+    limitedByPlan: boolean;
+    blocked: string[];
 };
 
 export type GenerateSummary = {
@@ -106,6 +117,7 @@ export default function GenerateLOIsStepScreen({
     queueStatus,
     refreshSendData,
     setDisablePrimary,
+    user,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -220,6 +232,7 @@ export default function GenerateLOIsStepScreen({
                     emailColumn,
                     pattern,
                     sheetName: sheetName || null,
+                    user,
                 });
                 if (!cancelled) {
                     setPreflight(res);
@@ -240,6 +253,8 @@ export default function GenerateLOIsStepScreen({
                         sampleFileName: "",
                         queueExists: false,
                         outputFolderId: "",
+                        limitedByPlan: true,
+                        blocked: lettersUsed.filter(overFree),
                     });
                     onValidChange?.("lois", false);
                 }
@@ -250,6 +265,18 @@ export default function GenerateLOIsStepScreen({
 
         return () => { cancelled = true; };
     }, [templateDocId, emailColumn, JSON.stringify(mapping), sheetName, placeholders, onValidChange]);
+
+    const lettersUsed = useMemo(() => {
+        const set = new Set<string>();
+        Object.values(mapping || {}).forEach((L) => L && set.add(String(L)));
+        if (emailColumn) set.add(String(emailColumn));
+        return Array.from(set);
+    }, [mapping, emailColumn]);
+
+    const blockedColumns = useMemo(
+        () => (user.subscriptionStatusActive ? [] : lettersUsed.filter(overFree)),
+        [lettersUsed, user.subscriptionStatusActive]
+    );
 
     useEffect(() => {
         if (!preflight) return;
@@ -427,6 +454,7 @@ export default function GenerateLOIsStepScreen({
         }
     }, [summary]);
 
+    const limitedByPlan = blockedColumns.length > 0;
     const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
     const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
     const templateOk = !!templateDocId;
