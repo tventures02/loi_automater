@@ -6,7 +6,7 @@ import { Grid } from '@mui/material';
 import CONSTANTS from '../../utils/constants';
 import { sendToAmplitude } from "../../utils/amplitude";
 import { generateDataToServer } from '../../utils/misc';
-import { User } from '../../utils/types';
+import { Settings, User } from '../../utils/types';
 import StickyHeaderStepper, { Step } from './StickyHeaderStepper';
 import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
@@ -18,6 +18,9 @@ import SendCenterScreen, { QUEUE_DISPLAY_LIMIT } from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
 import DataSourcePicker from './DataSourcePicker';
 import { generatePricingPageUrl } from '../../utils/misc';
+import SettingsDialog from './SettingsDialog';
+import useLocalStorage from 'use-local-storage';
+import { INIT_SETTINGS } from '../../utils/initVals';
 
 const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
@@ -114,7 +117,9 @@ const SidebarContainer = () => {
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [currentStep, setCurrentStep] = useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
-
+    const [showSettings, setShowSettings] = useState(false);
+    const [settingsLS] = useLocalStorage<Settings>(CONSTANTS.LS_KEYS.SETTINGS, INIT_SETTINGS);
+    const [settings, setSettings] = useState<Settings>(settingsLS);
     const [headerHeight, setHeaderHeight] = useState(0);
     const [footerHeight, setFooterHeight] = useState(0);
 
@@ -171,6 +176,7 @@ const SidebarContainer = () => {
                         subscriptionStatusActive: subStatusResp.subscriptionStatusActive,
                         userHasPaid,
                     };
+                    console.log('user', localUser)
                     setUser(localUser);
                     if (isDev) console.log(localUser)
 
@@ -509,8 +515,7 @@ const SidebarContainer = () => {
     </div>);
 
     console.log('sidebar render-------------------')
-    console.log('mode', mode)
-    console.log('user', user)
+    console.log('settings', settings)
 
     return (
         < div className='container' >
@@ -537,6 +542,7 @@ const SidebarContainer = () => {
                             </div>
                         }
                         mode={mode}
+                        setShowSettings={setShowSettings}
                     />
                 ) : (
                     // Minimal header bar for Sender
@@ -559,6 +565,9 @@ const SidebarContainer = () => {
                 )
                 }
             </div >
+
+            {/* Dialogs */}
+            {showSettings && <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} settings={settings} setSettings={setSettings} />}
 
             {/* Body */}
             < div style={{ height: middleHeight }} className='overflow-y-auto p-2 overflow-x-hidden' >
@@ -633,6 +642,7 @@ const SidebarContainer = () => {
                                 setCurrentStep={setCurrentStep}
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
+                                settings={settings}
                             />
                         )}
 

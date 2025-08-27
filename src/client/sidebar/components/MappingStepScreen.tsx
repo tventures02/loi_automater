@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { serverFunctions } from '../../utils/serverFunctions';
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
-import { User } from "../../utils/types";
+import { Settings, User } from "../../utils/types";
+import { colLabel } from "../../utils/misc";
+import MappingCta from "./MappingCta";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -26,6 +28,8 @@ type Props = {
     user: User;
 
     onUpgradeClick: () => void;
+
+    settings: Settings;
 };
 
 function normalizeNewlines(s: string) {
@@ -53,9 +57,6 @@ function extractPlaceholders(text: string): string[] {
 }
 
 const FREE_MAX_INDEX = 3;
-const isLockedCol = (col: string, subscriptionStatusActive: boolean) => !subscriptionStatusActive && COLUMN_OPTIONS.indexOf(col) > FREE_MAX_INDEX;
-const colLabel = (n:number) => { let s=''; while(n){ n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n/26);} return s; };
-const COLUMN_OPTIONS = Array.from({ length: 26 }, (_, i) => colLabel(i + 1)); // A..CV (100 cols)
 export const MAX_SHEET_NAME_LENGTH = 20;
 
 function escapeRegExp(s: string) {
@@ -85,6 +86,7 @@ export default function MappingStepScreen({
     setCurrentStep,
     user,
     onUpgradeClick,
+    settings,
 }: Props) {
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
 
@@ -97,6 +99,9 @@ export default function MappingStepScreen({
     const [firstRowEmail, setFirstRowEmail] = useState<string | null>(null);
     const [onMapperHover, setOnMapperHover] = useState<boolean>(false);
     const [showPreview, setShowPreview] = useState<boolean>(false);
+
+    const COLUMN_OPTIONS = useMemo(() => Array.from({ length: settings.maxColCharNumber }, (_, i) => colLabel(i + 1)), [settings.maxColCharNumber]); // A..CV (100 cols)
+    const isLockedCol = useCallback((col: string, subscriptionStatusActive: boolean) => !subscriptionStatusActive && COLUMN_OPTIONS.indexOf(col) > FREE_MAX_INDEX, [settings.maxColCharNumber, COLUMN_OPTIONS]);
     const isPremium = user.subscriptionStatusActive;
 
     useEffect(() => {
@@ -287,26 +292,11 @@ export default function MappingStepScreen({
                             )
                         }
                     </div>
-
-
-                        <>
-                            {!isPremium && (
-                                <div className="mt-2 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-2 py-2">
-                                    <div className="text-[11px] text-amber-800">
-                                        Free plan: columns <b>A–D</b> available. Columns <b>E+</b> are locked.
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={onUpgradeClick}
-                                        className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-[11px] text-white hover:bg-gray-800"
-                                    >
-                                        <LockClosedIcon className="h-3.5 w-3.5" />
-                                        Upgrade
-                                    </button>
-                                </div>
-                            )}
-                        </>
                 </div>
+            )}
+
+            {!isPremium && (
+                <MappingCta onUpgradeClick={onUpgradeClick} />
             )}
 
             {/* Delivery email column (separate card for clarity) */}

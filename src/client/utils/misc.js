@@ -175,3 +175,6 @@ function checkTokenExpiration(idToken) {
     // Check if the token is expired
     return decodedToken.exp <= currentTime; // Returns true if expired
 }
+
+
+export const colLabel = (n) => { let s = ''; while (n) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / CONSTANTS.MAX_LETTER_NUMBER); } return s; };

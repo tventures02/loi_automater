@@ -1,4 +1,5 @@
-import React, { forwardRef, useMemo } from "react";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import React, { forwardRef, useMemo, useState } from "react";
 
 export type Step = { key: string; label: string };
 
@@ -13,6 +14,8 @@ type Props = {
     rightSlot?: React.ReactNode;
     /** Mode */
     mode: "build" | "send";
+
+    setShowSettings: (show: boolean) => void;
 };
 
 const DEFAULT_STEPS: Step[] = [
@@ -27,7 +30,7 @@ function cx(...c: (string | false | null | undefined)[]) {
 }
 
 const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHeaderStepper(
-    { steps = DEFAULT_STEPS, current, onStepChange, rightSlot, mode },
+    { steps = DEFAULT_STEPS, current, onStepChange, rightSlot, mode, setShowSettings },
     ref
 ) {
     const order = useMemo(() => steps.map(s => s.key), [steps]);
@@ -40,7 +43,6 @@ const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHea
             role="navigation"
             aria-label="LOI Builder steps"
         >
-
             <div className="flex items-center">
                 {mode === "build" && (
                     <div className="text-sm font-semibold text-gray-900 justify-start px-3">Builder</div>
@@ -48,6 +50,7 @@ const StickyHeaderStepper = forwardRef<HTMLDivElement, Props>(function StickyHea
                 {/* Optional actions row */}
                 <div className="w-full flex items-center justify-end px-3 pt-2 pb-2">
                     {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
+                    <Cog6ToothIcon className="w-5 h-5 ml-2 cursor-pointer hover:opacity-90 text-gray-500" onClick={() => setShowSettings(true)}/>
                 </div>
             </div>
 

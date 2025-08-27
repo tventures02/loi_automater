@@ -141,7 +141,7 @@ export const createGoogleDoc = (docTitle: string, templatesFolderId?: string) =>
         const doc = DocumentApp.openById(file.id);
         const body = doc.getBody();
         body.clear(); // ensure empty body
-        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close around {{closing_date}}, pending agreement on final terms.\n\nBest,\n{{buyer_name}}\n\n`;
+        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close within 30 days, pending agreement on final terms.\n\nBest,\nJohn Smith\n\n`;
         body.appendParagraph(content);
         doc.saveAndClose();
 
