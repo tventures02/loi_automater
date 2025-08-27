@@ -80,6 +80,10 @@ const SidebarContainer = () => {
         send: false,
     });
 
+    // States for generate LOIs step
+    const [attachPdf, setAttachPdf] = useState<boolean>(true);
+    const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
+
     // States for send screen
     const [sendData, setSendData] = useState<{
         summary: SendSummary | null;
@@ -661,6 +665,10 @@ const SidebarContainer = () => {
                                 user={user}
                                 settings={settings}
                                 onUpgradeClick={onUpgradeClick}
+                                attachPdf={attachPdf}
+                                setAttachPdf={setAttachPdf}
+                                useLOIAsBody={useLOIAsBody}
+                                setUseLOIAsBody={setUseLOIAsBody}
                             />
                         )}
 

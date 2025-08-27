@@ -46,6 +46,11 @@ type Props = {
     settings: Settings;
 
     onUpgradeClick: () => void;
+
+    attachPdf: boolean;
+    setAttachPdf: React.Dispatch<React.SetStateAction<boolean>>;
+    useLOIAsBody: boolean;
+    setUseLOIAsBody: React.Dispatch<React.SetStateAction<boolean>>; 
 };
 
 type PreflightResult = {
@@ -57,8 +62,6 @@ type PreflightResult = {
     sampleFileName: string;
     queueExists: boolean;   // true if Sender Queue exists
     outputFolderId: string;
-    limitedByPlan: boolean;
-    blocked: string[];
 };
 
 export type GenerateSummary = {
@@ -126,6 +129,10 @@ export default function GenerateLOIsStepScreen({
     user,
     settings,
     onUpgradeClick,
+    attachPdf,
+    setAttachPdf,
+    useLOIAsBody,
+    setUseLOIAsBody,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -158,8 +165,6 @@ export default function GenerateLOIsStepScreen({
     const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
     const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\n{{buyer_name}}");
     const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
-    const [attachPdf, setAttachPdf] = useState<boolean>(true);
-    const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
     const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
     /* -------- /Email settings state -------- */
 
@@ -263,8 +268,6 @@ export default function GenerateLOIsStepScreen({
                         sampleFileName: "",
                         queueExists: false,
                         outputFolderId: "",
-                        limitedByPlan: true,
-                        blocked: lettersUsed.filter(overFree),
                     });
                     onValidChange?.("lois", false);
                 }
@@ -275,18 +278,6 @@ export default function GenerateLOIsStepScreen({
 
         return () => { cancelled = true; };
     }, [templateDocId, emailColumn, JSON.stringify(mapping), sheetName, placeholders, onValidChange]);
-
-    const lettersUsed = useMemo(() => {
-        const set = new Set<string>();
-        Object.values(mapping || {}).forEach((L) => L && set.add(String(L)));
-        if (emailColumn) set.add(String(emailColumn));
-        return Array.from(set);
-    }, [mapping, emailColumn]);
-
-    const blockedColumns = useMemo(
-        () => (user.subscriptionStatusActive ? [] : lettersUsed.filter(overFree)),
-        [lettersUsed, user.subscriptionStatusActive]
-    );
 
     useEffect(() => {
         if (!preflight) return;
@@ -480,7 +471,6 @@ export default function GenerateLOIsStepScreen({
         }
     }, [summary]);
 
-    const limitedByPlan = blockedColumns.length > 0;
     const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
     const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
     const templateOk = !!templateDocId;
@@ -804,7 +794,9 @@ export default function GenerateLOIsStepScreen({
                         Continue next {batchSize}
                     </div>
                 ) : (
-                    <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : !canGenerate ? "Create LOIs in your Drive" : !isGenerating ? "" : ""}>
+                    <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : isGenerating ? ""
+                        : !isPremium && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET ?
+                            `This free version limits creating ${CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET} LOIs per sheet tab.` : ""}>
                         <div
                             role="button"
                             tabIndex={0}
@@ -876,11 +868,7 @@ export default function GenerateLOIsStepScreen({
             </div>
 
             {!isPremium && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
-                <Tooltip title={`This free version limits creating ${CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET} LOIs per sheet tab. Switch to a different sheet to create more (see step 1).`}>
-                    <div>
-                        <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to create unlimited LOIs!" />
-                    </div>
-                </Tooltip>
+                <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to create unlimited LOIs!" />
             )}
 
             {/* Snackbar */}
