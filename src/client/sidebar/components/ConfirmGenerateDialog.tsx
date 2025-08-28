@@ -1,7 +1,9 @@
 // ConfirmGenerateDialog.tsx
-import { ArrowTopRightOnSquareIcon, InformationCircleIcon, PaperClipIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, PaperClipIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
+import CONSTANTS from "../../utils/constants";
+
 
 type Props = {
     open: boolean;
@@ -16,6 +18,8 @@ type Props = {
     attachPdf: boolean;
     useLOIAsBody: boolean;
     emailPreview: { subject: string; body: string } | null;
+    isPremium: boolean;
+    onUpgradeClick: () => void;
 };
 
 export default function ConfirmGenerateDialog({
@@ -30,6 +34,8 @@ export default function ConfirmGenerateDialog({
     useLOIAsBody,
     isSubmitting = false,
     emailPreview,
+    isPremium,
+    onUpgradeClick,
 }: Props) {
     const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
     const [showCreationSummary, setShowCreationSummary] = useState<boolean>(false);
@@ -55,11 +61,13 @@ export default function ConfirmGenerateDialog({
     if (!open) return null;
 
     const sheetNameShort = sheetName?.length > 20 ? sheetName.slice(0, 20) + "..." : sheetName;
-    const count = eligibleCount ?? 0;
+    const count = isPremium ? eligibleCount ?? 0 : Math.min(eligibleCount ?? 0, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET);
     const willCreateDocs = !!attachPdf; // with new server behavior, we only create Docs when attaching PDFs
     const docNoun = `Google Doc${count === 1 ? "" : "s"}`;
     const itemNoun = `${count} job${count === 1 ? "" : "s"}`;
     const emailBodySourceText = useLOIAsBody ? "from your LOI doc template" : "from your text template";
+
+
 
     return (
         <div
@@ -85,6 +93,12 @@ export default function ConfirmGenerateDialog({
                                 {willCreateDocs ? "Create LOIs?" : "Create LOIs?"}
                             </h3>
 
+                            {!isPremium && eligibleCount > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
+                                <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 w-fit mt-2 mb-2">
+                                    You can create up to {CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET} LOIs <b>per sheet</b> on the free plan. <span className="underline cursor-pointer text-amber-900" onClick={onUpgradeClick}>Upgrade</span> for unlimited.
+                                </div>
+                            )}
+
                             {/* Primary explainer */}
                             <p className="mt-1 text-xs leading-5 text-gray-600">
                                 {willCreateDocs ? (
@@ -103,7 +117,7 @@ export default function ConfirmGenerateDialog({
                             {/* Links / meta */}
                             <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-[11px] text-gray-700 space-y-1">
                                 <div className={`text-gray-800 font-semibold ${showCreationSummary ? "mb-2" : "mb-0"} block w-full`}>
-                                    <div className="inline-block">Create Summary</div>
+                                    <div className="inline-block">Summary</div>
                                     <div className="float-right cursor-pointer select-none" onClick={() => setShowCreationSummary(!showCreationSummary)}>
                                         <svg
                                             className={`h-4 w-4 text-gray-500 transition-transform ${showCreationSummary ? "rotate-180" : ""}`}
@@ -165,7 +179,7 @@ export default function ConfirmGenerateDialog({
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-gray-500">
-                                                Files to be created
+                                                Google Docs to be created
                                             </span>
                                             <code className="rounded bg-white px-1 py-[1px]">
                                                 {willCreateDocs ? `${count || "—"}` : "None"}

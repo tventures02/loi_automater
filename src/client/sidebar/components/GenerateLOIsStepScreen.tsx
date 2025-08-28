@@ -53,7 +53,7 @@ type Props = {
     setUseLOIAsBody: React.Dispatch<React.SetStateAction<boolean>>; 
 };
 
-type PreflightResult = {
+export type PreflightResult = {
     ok: boolean;
     totalRows: number;
     eligibleRows: number;
@@ -62,6 +62,8 @@ type PreflightResult = {
     sampleFileName: string;
     queueExists: boolean;   // true if Sender Queue exists
     outputFolderId: string;
+    freeRemainingForSheet: number;
+    sheetQueueCount: number;
 };
 
 export type GenerateSummary = {
@@ -71,13 +73,14 @@ export type GenerateSummary = {
     duplicates: number;
     nextOffset: number;
     done: boolean;
-    totalRows: number;
     outputFolderId: string;
+    totalRowsProcessed: number;
     statuses?: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
 };
 
 const DEFAULT_PATTERN = "LOI - {{email}}";
-const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 50;
+const DEFAULT_BATCH_SIZE = 100;
 
 /* ---------- helpers ---------- */
 function extractPlaceholders(text: string, mapping?: Record<string, string>): string[] {
@@ -268,6 +271,8 @@ export default function GenerateLOIsStepScreen({
                         sampleFileName: "",
                         queueExists: false,
                         outputFolderId: "",
+                        freeRemainingForSheet: 0,
+                        sheetQueueCount: 0,
                     });
                     onValidChange?.("lois", false);
                 }
@@ -312,8 +317,8 @@ export default function GenerateLOIsStepScreen({
     }, [JSON.stringify(mapping), emailSubjectTpl, emailBodyTpl, emailColumn, sheetName, placeholders, previewValues]);
 
     useEffect(() => {
-        if (!attachPdf) setBatchSize(100);
-        else setBatchSize(DEFAULT_BATCH_SIZE);
+        if (!attachPdf) setBatchSize(DEFAULT_BATCH_SIZE);
+        else setBatchSize(DEFAULT_BATCH_SIZE_WITH_DOC_CREATION);
         setSummary(null);
     }, [attachPdf]);
 
@@ -335,8 +340,8 @@ export default function GenerateLOIsStepScreen({
 
         let offset = resume && summary ? summary.nextOffset || 0 : 0;
         let totals = resume && summary
-            ? { created: summary.created, skippedInvalid: summary.skippedInvalid, failed: summary.failed, duplicates: summary.duplicates }
-            : { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0 };
+            ? { created: summary.created, skippedInvalid: summary.skippedInvalid, failed: summary.failed, duplicates: summary.duplicates, totalRowsProcessed: 0 }
+            : { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, totalRowsProcessed: 0 };
         let totalEligible = preflight?.eligibleRows ?? 0;
         let done = false;
 
@@ -353,33 +358,44 @@ export default function GenerateLOIsStepScreen({
             console.log('resume', resume)
             console.log('summary.nextOffset', summary?.nextOffset)
             console.log('batch', batch)
+            console.log('batchSize', batchSize)
         }
         let created = 0;
         try {
             let res;
+            let freeRemainingForSheet;
+
+            let generateArgs = {
+                mapping,
+                emailColumn,
+                pattern,
+                templateDocId,
+                sheetName: sheetName || null,
+                emailSubjectTpl,
+                emailBodyTpl,
+                useLOIAsBody,
+                attachPdf,
+                offset,
+                limit: batchSize,
+                user,
+                maxColCharNumber: isPremium ? settings.maxColCharNumber : Math.min(settings.maxColCharNumber, CONSTANTS.FREE_MAX_COL_NUMBER),
+            };
+            const maxEligible = isPremium ? totalEligible : Math.min(totalEligible, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET);
+
             do {
                 // Calculate fake progress bar params
                 const percentageCap = Math.floor(Math.random() * 10) + 95; // 95-100%
                 startFakeInnerProgress(percentageCap, batchSize, !attachPdf);
-                const progressBarText = runInBatches ? `Creating LOIs… ${Math.min(99, Math.round((offset / Math.max(1, totalEligible)) * 100))}% (batch ${batch})` : "Creating LOIs…";
+                const progressBarText = runInBatches ? `Creating LOIs… ${Math.min(99, Math.round((offset / Math.max(1, maxEligible)) * 100))}% (batch ${batch})` : "Creating LOIs…";
                 setProgressText(progressBarText);
+
+                if (!isPremium) {
+                    //@ts-ignore
+                    generateArgs.freeRemainingForSheet_ = freeRemainingForSheet;
+                }
                 
                 // Generate LOIs
-                res = await serverFunctions.generateLOIChunk({
-                    mapping,
-                    emailColumn,
-                    pattern,
-                    templateDocId,
-                    sheetName: sheetName || null,
-                    emailSubjectTpl,
-                    emailBodyTpl,
-                    useLOIAsBody,
-                    attachPdf,
-                    offset,
-                    limit: batchSize,
-                    user,
-                    maxColCharNumber: isPremium ? settings.maxColCharNumber : Math.min(settings.maxColCharNumber, CONSTANTS.FREE_MAX_COL_NUMBER),
-                }).finally(() => {
+                res = await serverFunctions.generateLOIChunk(generateArgs).finally(() => {
                     stopFakeInnerProgress(true);                 // snap to 100% and reset
                 });
 
@@ -387,10 +403,16 @@ export default function GenerateLOIsStepScreen({
                 totals.skippedInvalid += res.skippedInvalid;
                 totals.failed += res.failed;
                 totals.duplicates += res.duplicates;
+                totals.totalRowsProcessed += res.totalRowsProcessed;
 
                 offset = res.nextOffset;
+                generateArgs.offset = offset;
                 done = !!res.done;
                 batch++;
+
+                if (!isPremium) {
+                    freeRemainingForSheet = res.freeRemainingForSheet;
+                }
 
                 // Update on-screen partial summary if you like:
                 setSummary({
@@ -402,7 +424,7 @@ export default function GenerateLOIsStepScreen({
                     done: done,
                     outputFolderId: outputFolderId,
                     statuses: [],
-                    totalRows: res.totalRows,
+                    totalRowsProcessed: totals.totalRowsProcessed,
                 });
 
                 // stop if too many failures in the last batch
@@ -410,22 +432,6 @@ export default function GenerateLOIsStepScreen({
                     setAutoContinue(false);
                     setSnackbar({ open: true, message: `Paused: ${res.failed} failures in last batch (threshold ${failStopThresholdRef.current}).`, severity: "error" });
                     break;
-                }
-
-                if (!isPremium) {   
-                    if (totals.created >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET ||
-                        totals.duplicates >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET
-                    ) {
-                        done = true;
-                        break;
-                    }
-                    else if (totals.created === preflight?.eligibleRows ||
-                        totals.duplicates === preflight?.eligibleRows
-                    ) {
-                        done = true;
-                        break;
-                    }
-                    // TODO: maybe show snackbar                    
                 }
 
                 // Pause after one batch if auto-continue is off
@@ -441,6 +447,7 @@ export default function GenerateLOIsStepScreen({
                 failed: totals.failed,
                 duplicates: totals.duplicates,
                 nextOffset: offset,
+                totalRowsProcessed: totals.totalRowsProcessed,
                 done,
             } : null);
 
@@ -449,7 +456,7 @@ export default function GenerateLOIsStepScreen({
             onValidChange?.("lois", true);
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
-            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. Continue to send.`, severity: "success" });
+            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. ${!isPremium && created === 0 ? `Upgrade to create unlimited LOIs. ` : ''}Continue to send.`, severity: "success" });
         } catch (e) {
             console.log('error', e)
             setSnackbar({ open: true, message: "Creation failed. Please try again.", severity: "error" });
@@ -498,6 +505,8 @@ export default function GenerateLOIsStepScreen({
                 attachPdf={attachPdf}
                 useLOIAsBody={useLOIAsBody}
                 emailPreview={emailPreview}
+                isPremium={isPremium}
+                onUpgradeClick={onUpgradeClick}
             />
 
             <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
@@ -553,7 +562,7 @@ export default function GenerateLOIsStepScreen({
 
                             {/* Toggle */}
                             <div className={`relative inline-flex items-center gap-1`}>
-                                <span className="text-[11px] text-gray-700 select-none">Use LOI as body:</span>
+                                <span className="text-[11px] text-gray-700 select-none">Use LOI as body</span>
                                 <span
                                     role="switch"
                                     aria-checked={useLOIAsBody}
@@ -794,9 +803,7 @@ export default function GenerateLOIsStepScreen({
                         Continue next {batchSize}
                     </div>
                 ) : (
-                    <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : isGenerating ? ""
-                        : !isPremium && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET ?
-                            `This free version limits creating ${CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET} LOIs per sheet tab.` : ""}>
+                    <Tooltip title={!checksOk ? "Please check your mapping and data (steps 1 and 2)." : ""}>
                         <div
                             role="button"
                             tabIndex={0}
@@ -804,12 +811,12 @@ export default function GenerateLOIsStepScreen({
                             onClick={canGenerate && !isGenerating ? () => setConfirmOpen(true) : undefined}
                             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && canGenerate && !isGenerating && setConfirmOpen(true)}
                             className={`select-none rounded-md px-3 py-2 text-xs font-medium cursor-pointer flex items-center !justify-center w-full
-            ${!canGenerate || isGenerating
+            ${!canGenerate || isGenerating || isPreflighting
                                     ? "bg-gray-300 text-white !cursor-not-allowed"
                                     : "bg-gray-900 text-white hover:bg-gray-800"
                                 }`}
                         >
-                            {isGenerating ? "Creating..." : `Create LOIs${preflight?.eligibleRows ? ` (${preflight.eligibleRows})` : ""}`}
+                            {isGenerating ? "Creating..." : `Create LOIs & Add to Queue`}
                         </div>
                     </Tooltip>
                 )}
@@ -850,7 +857,7 @@ export default function GenerateLOIsStepScreen({
 
                 {summary && (
                     <div className="text-[11px] text-gray-600">
-                        Processed {summary.nextOffset ?? 0} / {summary.totalRows ?? 0} rows in <b>{sheetNameShort}</b>
+                        Processed {summary.totalRowsProcessed ?? 0} / {preflight?.totalRows ?? 0} rows in <b>{sheetNameShort}</b>
                     </div>
                 )}
 
@@ -874,7 +881,7 @@ export default function GenerateLOIsStepScreen({
             {/* Snackbar */}
             {snackbar.open && (
                 <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
-                    <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+                    <Alert severity={snackbar.severity}><span className="text-xs">{snackbar.message}</span></Alert>
                 </Snackbar>
             )}
         </div>

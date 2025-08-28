@@ -415,7 +415,7 @@ export default function SendCenterScreen({
             {/* Snackbar */}
             {snackbar.open && (
                 <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
-                    <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+                    <Alert severity={snackbar.severity}><span className="text-xs">{snackbar.message}</span></Alert>
                 </Snackbar>
             )}
 

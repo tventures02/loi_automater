@@ -64,10 +64,6 @@ export default function SendCenterSetup({
                         </div>
                 }
 
-
-                {/* <div className="mt-2 text-[11px] text-gray-500">
-                    Tip: this is created automatically the first time you generate LOIs.
-                </div> */}
             </div>
         </div>
     );

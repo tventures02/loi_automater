@@ -186,17 +186,22 @@ export const getPreviewRowValues = (payload) => {
  */
 export const preflightGenerateLOIs = (payload) => {
     const ss = SpreadsheetApp.getActive();
-    const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : ss.getActiveSheet();
+    const {
+        user,
+        sheetName
+    } = payload;
+
+    const sheet = sheetName ? ss.getSheetByName(sheetName) : null;
     if (!sheet) throw new Error('Sheet not found');
     if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
     const outputFolderId = loiEnsureOutputFolder();
-    const {
-        user
-    } = payload;
     
+    const FREE_CAP = CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET || 100; // safety
+    const isPremium = !!(user?.subscriptionStatusActive);
+    const existingForSheet = countQueueForSheet(sheetName) || 0;
+    const freeRemainingForSheet = isPremium ? Number.MAX_SAFE_INTEGER : Math.max(0, FREE_CAP - existingForSheet);
 
-    const blocked = user.subscriptionStatusActive ? [] : columnsOverFree(payload.mapping || {}, payload.emailColumn || (payload.mapping||{}).__email);
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     if (lastRow < 1) {
@@ -209,8 +214,8 @@ export const preflightGenerateLOIs = (payload) => {
             sampleFileName: '',
             queueExists: queueExistsFlag,
             outputFolderId,
-            blocked,
-            limitedByPlan: blocked.length > 0,
+            freeRemainingForSheet,                       // how many more rows this sheet can still create on free
+            sheetQueueCount: 0,
         };
     }
 
@@ -229,8 +234,8 @@ export const preflightGenerateLOIs = (payload) => {
             sampleFileName: '',
             queueExists: queueExistsFlag,
             outputFolderId,
-            blocked,
-            limitedByPlan: blocked.length > 0,
+            freeRemainingForSheet,                       // how many more rows this sheet can still create on free
+            sheetQueueCount: 0,
         };
     }
     const emailIndex = colToNumber(emailColLetter) - 1;
@@ -279,8 +284,8 @@ export const preflightGenerateLOIs = (payload) => {
         sampleFileName: sampleName,
         queueExists: queueExistsFlag,
         outputFolderId,
-        blocked,
-        limitedByPlan: blocked.length > 0,
+        freeRemainingForSheet,                       // how many more rows this sheet can still create on free
+        sheetQueueCount: existingForSheet,
     };
 };
 
@@ -312,6 +317,22 @@ function renderStringTpl_(tpl, row, tokenCols) {
     return out;
 }
 
+
+function countQueueForSheet(sheetName: string) {
+    if (!sheetName) return 0;
+    const { sh } = queueEnsureSheet();
+    const head = headerIndexMap(sh);
+    const colIdx = head['sourceSheet'];
+    const last = sh.getLastRow();
+    if (colIdx == null || last < 2) return 0;
+    const vals = sh.getRange(2, colIdx + 1, last - 1, 1).getValues();
+    let n = 0;
+    for (let i = 0; i < vals.length; i++) {
+        if (String(vals[i][0] || '') === String(sheetName || '')) n++;
+    }
+    return n;
+}
+
 export const generateLOIChunk = (payload) => {
 
     const {
@@ -323,14 +344,15 @@ export const generateLOIChunk = (payload) => {
         useLOIAsBody = false,
         attachPdf = true,
         offset = 0,                  // 0-based data offset (row 2 == offset 0)
-        limit = 100,                 // batch size
+        limit,                       // batch size
         includeStatuses = false,     // optional: return per-row statuses (can be large)
         user,
         sheetName,
         maxColCharNumber,
+        freeRemainingForSheet_ = undefined,
     } = payload || {};
 
-    const isPremium = user.subscriptionStatusActive;
+    const isPremium = !!(user && user.subscriptionStatusActive);
 
     try {
         const ss = SpreadsheetApp.getActive();
@@ -352,6 +374,11 @@ export const generateLOIChunk = (payload) => {
             }
         }
 
+        const existingForSheet = !isPremium ? countQueueForSheet(sheetName) || 0 : 0;
+        const freeRemainingForSheet = !isPremium ? freeRemainingForSheet_ || Math.max(0, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET - existingForSheet) : Number.MAX_SAFE_INTEGER;
+        const initialRemaining = freeRemainingForSheet; // keep original remaining for this run
+        const hitHardStop = !isPremium && freeRemainingForSheet <= 0;
+
         // Ensure central queue exists (source of truth for sending)
         const qSheetRes = queueEnsureSheet();
         const qSheet = qSheetRes.sh;
@@ -370,7 +397,7 @@ export const generateLOIChunk = (payload) => {
         }
 
         const width = Math.min(lastCol, maxColCharNumber || (isPremium ? CONSTANTS.MAX_COL_NUMBER : CONSTANTS.FREE_MAX_COL_NUMBER));
-        console.log('width', width);
+        // console.log('width', width);
 
         // Build token -> column index map
         const tokenCols = {};
@@ -394,11 +421,37 @@ export const generateLOIChunk = (payload) => {
 
         // Row math for the chunk
         const totalRows = lastRow;
-        const startRow = isPremium ? 1 + offset : 1;
+        const startRow = 1 + offset;
         const remaining = (lastRow - startRow + 1);
-        const take = Math.max(0, Math.min(limit, remaining));
+        let take = Math.max(0, Math.min(limit, remaining));
+        // console.log('take', take);
+        // console.log('startRow', startRow);
+        // console.log('lastRow', lastRow);
+        // console.log('remaining', remaining);
+
+        // Early exit if free cap already hit
+        if (hitHardStop) {
+            return {
+                created: 0, skippedInvalid: 0, failed: 0, duplicates: 0,
+                nextOffset: offset, done: true, totalRows, outputFolderId: outFolderId,
+                freeRemainingForSheet: 0,
+                freeCapReached: true,
+            };
+        }
+
+        let baseResult = {
+            created: 0,
+            skippedInvalid: 0,
+            failed: 0,
+            duplicates: 0,
+            nextOffset: offset,
+            done: true,
+            totalRows,
+            outputFolderId: outFolderId,
+        };
+
         if (take <= 0) {
-            return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows, outputFolderId: outFolderId };
+            return baseResult;
         }
 
         // const data = source.getRange(1, 1, lastRow, width).getDisplayValues(); //old
@@ -418,11 +471,13 @@ export const generateLOIChunk = (payload) => {
                 ? (DocumentApp.openById(templateId).getBody().getText() || '')
                 : '';
 
-        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0, eligible = 0, rowsProcessed = 0;
+        let created = 0, skippedInvalid = 0, failed = 0, duplicates = 0, rowsProcessed = 0;
+        let quotaConsumed = 0;
         const statuses = [];
         const queueBatch = [];
 
         for (let i = 0; i < data.length; i++) {
+            if (!isPremium && quotaConsumed >= initialRemaining) break;
             const row = data[i];
             rowsProcessed++;
             const sourceRow = startRow + i;
@@ -434,10 +489,7 @@ export const generateLOIChunk = (payload) => {
             // Skip duplicates already present in Sender Queue
             if (existingIds.has(id)) {
                 duplicates++;
-                if (!isPremium) eligible++;
-                if (eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET) {
-                    break;
-                }
+                if (!isPremium) quotaConsumed++;
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "skipped", message: "Duplicate (already queued/sent with same content)" });
                 continue;
             }
@@ -507,8 +559,6 @@ export const generateLOIChunk = (payload) => {
                     attempts: 0,
                     lastError: '',
                     createdAt: now,
-
-                    // NEW email fields
                     subject: subjectResolved,
                     body: bodyResolved,
                     useLOIAsBody: useLOIAsBody ? 'TRUE' : 'FALSE', // store as strings for Sheets
@@ -519,13 +569,8 @@ export const generateLOIChunk = (payload) => {
                 existingIds.add(id);
 
                 created++;
+                if (!isPremium) quotaConsumed++;
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "ok", docUrl: docInfo.fileUrl });
-
-                if (!isPremium) eligible++;
-                if (eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET) {
-                    break;
-                }
-                
             } catch (e) {
                 failed++;
                 if (includeStatuses) statuses.push({ row: sourceRow, status: "failed", message: String(e) });
@@ -535,8 +580,11 @@ export const generateLOIChunk = (payload) => {
         // Bulk append to Sender Queue
         if (queueBatch.length) queueAppendItems(queueBatch);
 
-        const nextOffset = isPremium ? offset + data.length : rowsProcessed;
-        const done = isPremium ? nextOffset >= totalRows : eligible >= CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET;
+        const nextOffset = offset + rowsProcessed;
+        const capHitThisRun = !isPremium && quotaConsumed >= initialRemaining;
+        const done = nextOffset >= totalRows || capHitThisRun;
+
+        // console.log('quotaConsumed', quotaConsumed);
 
         return {
             created,
@@ -548,6 +596,9 @@ export const generateLOIChunk = (payload) => {
             done,
             totalRows,
             outputFolderId: outFolderId,
+            freeRemainingForSheet: !isPremium ? Math.max(0, initialRemaining - quotaConsumed) : Number.MAX_SAFE_INTEGER,
+            freeCapReached: capHitThisRun,
+            totalRowsProcessed: rowsProcessed,
             ...(includeStatuses ? { statuses } : {}),
         };
     } catch (error) {
@@ -668,7 +719,6 @@ export const queueEnsureSheet = () => {
 export const queueAppendItems = (items) => {
     if (!items || !items.length) return 0;
     var { sh } = queueEnsureSheet();
-    var headerRow = sh.getRange(1, 1, 1, LOI_QUEUE_HEADERS.length).getValues()[0];
     var rows = items.map(function (it) {
         return LOI_QUEUE_HEADERS.map(function (h) { return it[h] == null ? '' : it[h]; });
     });
