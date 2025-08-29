@@ -6,14 +6,12 @@ module.exports = {
     LIGHT_GREEN: "#93c47d",
     DARK_RED_BERRY: "#5f2120",
     SETTINGS_SHEETNAME: `Settings`,
-    ANA_RESULTS_SHEETNAME: String.fromCodePoint(0x1F4CB) + 'Analysis results',
     PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-calc-gsheets-addon-privacy-policy',
     SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations.',
     ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',
     STRIPE_BADGE: "https://s3.amazonaws.com/blueplanit.co/stripebadge.png",
     SUPPORT_PAGE: "https://tidisventures.com/support?app=z-real-estate-calculator-support",
     TERMS: "https://tidisventures.com/terms-and-conditions?app=z-real-estate-calculator-terms",
-    DEFAULT_LABELS: ['Price', 'Address'],
     HEADERS_RANGE: 'A1:B1',
     AMPLITUDE: {
         OPEN_SIDEBAR: "ZRE_CALC: Opened sidebar",
@@ -39,4 +37,5 @@ module.exports = {
     FREE_LOI_GEN_CAP_PER_SHEET: 100,
     FREE_MAX_COL_NUMBER: 4,
     FREE_MAX_LETTER: 'D',
+    DEFAULT_FREE_DAILY_SEND_CAP: 10,
 }

@@ -34,6 +34,8 @@ import {
     loiEnsureRootFolder,
     loiEnsureFolders,
     queueDeleteDocsSimple,
+    resetLoiUserPropsDev,
+    getLoiUserPropsDev,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -67,4 +69,6 @@ export {
     loiEnsureRootFolder,
     loiEnsureFolders,
     queueDeleteDocsSimple,
+    resetLoiUserPropsDev,
+    getLoiUserPropsDev,
 };

@@ -108,6 +108,11 @@ export default function SendCenterScreen({
             });
             const sent = res?.sent ?? numEmailsToSend;
 
+            if (isDev) {
+                console.log('real send results')
+                console.log('res', res);
+            }
+
             // Optimistic local counters; the list itself will be refreshed after
             setSendData(s => ({
                 ...s,
@@ -165,11 +170,16 @@ export default function SendCenterScreen({
         setSending(true);
         try {
             const numEmailsToSend = Math.min(sampleCount, queuedTotal, 5);
-            await serverFunctions.sendNextBatch({
+            const res = await serverFunctions.sendNextBatch({
                 count: numEmailsToSend,
                 testMode: true,
                 previewTo: sendData?.summary?.userEmail, // fallback handled server-side
             });
+
+            if (isDev) {
+                console.log('test send results')
+                console.log('res', res);
+            }
 
             setSnackbar({ open: true, message: `Sent ${numEmailsToSend} test email${numEmailsToSend > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
         } catch {

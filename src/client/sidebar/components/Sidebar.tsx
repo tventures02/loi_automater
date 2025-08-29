@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { serverFunctions } from '../../utils/serverFunctions';
 import LoadingAnimation from "../../utils/LoadingAnimation";
 import { backendCall } from '../../utils/server-calls';
@@ -42,7 +42,7 @@ export type QueueItem = {
 };
 
 export type SendSummary = {
-    remaining: number;      // MailApp.getRemainingDailyQuota()
+    remaining: number;
     queued: number;
     sent: number;
     failed: number;
@@ -91,7 +91,7 @@ const SidebarContainer = () => {
         lastFetched: number;
         loading: boolean;
         error?: string | null;
-    }>({ summary: null, items: [], lastFetched: 0, loading: false, error: null });
+    }>({ summary: null, items: [], lastFetched: 0, loading: true, error: null });
     const [queueStatus, setQueueStatus] = useState<QueueStatus>({ exists: false, empty: true });
     const [creatingQueue, setCreatingQueue] = useState<boolean>(false);
     const [queueError, setQueueError] = useState<string | null>(null);
@@ -180,9 +180,11 @@ const SidebarContainer = () => {
                         subscriptionStatusActive: subStatusResp.subscriptionStatusActive,
                         userHasPaid,
                     };
-                    console.log('user', localUser)
                     setUser(localUser);
-                    if (isDev) console.log(localUser)
+                    getQueueData(localUser);
+                    if (isDev) {
+                        console.log('user', localUser)
+                    }
 
                     if (localUser?.items?.loi?.docIds?.length > 0) {
                         setSelectedTemplate(localUser?.items?.loi?.docIds[0]);
@@ -210,7 +212,9 @@ const SidebarContainer = () => {
                         if (status.exists) {
                             setQueueStatus(status);
                         }
-                    } catch (error) { }
+                    } catch (error) {
+                        console.log('error', error)
+                    }
                     loadSheets(true);
                 }
             };
@@ -248,19 +252,21 @@ const SidebarContainer = () => {
                         await backendCall(dataToServer, 'loiApi/syncDocTemplates', user.idToken);
                     }
                 } catch (err: any) {
+                    console.log('error', err)
                     handleError(err?.message || 'Error loading templates.');
                 } finally {
                     setIsGettingTemplates(false);
                 }
             }
 
-            const getQueueData = async () => {
+            const getQueueData = async (user: User) => {
+                console.log('getQueueData')
                 if (await serverFunctions.queueExists()) {
-                    refreshSendData(true);
+                    console.log('refreshSendData')
+                    refreshSendData(true, user);
                 }
             }
 
-            getQueueData();
             getData();
         }
         catch (e) {
@@ -415,20 +421,22 @@ const SidebarContainer = () => {
         });
     }
 
-    const refreshSendData = async (force = false) => {
-        if (sendData.loading) return;
+    const refreshSendData = useCallback(async (force = false, user_: User = user) => {
         const now = Date.now();
         const isStale = now - sendData.lastFetched > SEND_TTL_MS;
         if (!force && !isStale && sendData.summary) return; // cache hit
+        const isPremium = user_.subscriptionStatusActive;
+        const freeDailyCap = CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP;
 
         setSendData(s => ({ ...s, loading: true, error: null }));
         try {
             const [s, q] = await Promise.all([
-                serverFunctions.getSendSummary(),
+                serverFunctions.getSendSummary(isPremium, freeDailyCap),
                 serverFunctions.queueList({ status: "all", limit: QUEUE_DISPLAY_LIMIT })
             ]);
 
-            if (s?.remaining) {
+            // if (s?.remaining) {
+            console.log('s', s);
                 setSendData(prev => ({
                     ...prev,
                     summary: {
@@ -444,15 +452,16 @@ const SidebarContainer = () => {
                     loading: false,
                     error: null
                 }));
-            }
+            // }
         } catch (e: any) {
             console.log('e', e)
             setSendData(s => ({ ...s, loading: false, error: e?.message || "Failed to load queue" }));
         }
         finally {
+            console.log('send data done loading')
             setSendData(s => ({ ...s, loading: false }));
         }
-    };
+    }, [user]);
 
     // Example CTA labels by step
     const primaryLabelByStep: Record<string, string> = {
@@ -569,6 +578,10 @@ const SidebarContainer = () => {
                 )
                 }
             </div >
+            <div className='flex gap-2 text-[10px] justify-center'>
+                <span onClick={() => serverFunctions.resetLoiUserPropsDev()} className='text-gray-500 cursor-pointer hover:underline'>reset</span>
+                <span onClick={async () => console.log(await serverFunctions.getLoiUserPropsDev())} className='text-gray-500 cursor-pointer hover:underline'>get</span>
+            </div>
 
             {/* Dialogs */}
             {showSettings && <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} settings={settings} setSettings={setSettings} />}

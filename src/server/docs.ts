@@ -1,5 +1,11 @@
 import { QueueItem } from "../client/sidebar/components/Sidebar";
 import CONSTANTS from "../client/utils/constants";
+import {
+    _commitCredits_,
+    _reserveCredits_,
+    DEFAULT_FREE_DAILY_SEND_CAP,
+    getSendCreditsLeft
+} from "./send_credits_management";
 
 var LOI_QUEUE_NAME = 'Sender Queue';
 var LOI_QUEUE_HEADERS = [
@@ -15,6 +21,31 @@ const QUEUE_DISPLAY_LIMIT = 500;
 const ROOT_FOLDER_NAME = 'LOI Mailer';
 const TEMPLATES_FOLDER_NAME = 'LOI Templates';
 const OUTPUT_FOLDER_NAME = 'LOIs';
+
+
+// Dev functions--------------------------------
+// Clears ONLY the LOI quota props for the current user
+export function resetLoiUserPropsDev() {
+    const up = PropertiesService.getUserProperties();
+    ['loi.dateKey', 'loi.used', 'loi.reserved', 'loi.reservedTs'].forEach(k => up.deleteProperty(k));
+}
+
+// Returns current LOI quota props for client-side logging
+export function getLoiUserPropsDev() {
+    const up = PropertiesService.getUserProperties();
+    const dateKey = up.getProperty('loi.dateKey') || '';
+    const used = Number(up.getProperty('loi.used') || 0);
+    const reserved = Number(up.getProperty('loi.reserved') || 0);
+    const reservedTs = Number(up.getProperty('loi.reservedTs') || 0);
+    return {
+        dateKey,
+        used,
+        reserved,
+        reservedTs,
+        reservedAt: reservedTs ? JSON.stringify(new Date(reservedTs)) : null,
+    };
+}
+// Dev functions--------------------------------
 
 /**
  * Gets the names of multiple Google Docs given an array of their file IDs.
@@ -755,7 +786,7 @@ export const queueStatus = () => {
 }
 
 /** Return basic counters for Sender from Sender Queue. */
-export const getSendSummary = () => {
+export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number = DEFAULT_FREE_DAILY_SEND_CAP) => {
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
@@ -778,8 +809,8 @@ export const getSendSummary = () => {
             }
         }
     }
-
-    const remaining = MailApp.getRemainingDailyQuota();
+    const creditsObj = getSendCreditsLeft({ isPremium, freeDailyCap });
+    const remaining = creditsObj.creditsLeft;
     return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
 };
 
@@ -837,6 +868,13 @@ export const queueList = (payload) => {
 
 
 export const sendNextBatch = (payload) => {
+    if (!payload?.count) {
+        throw new Error('No number of emails to send provided.');
+    }
+    else if (!isFinite(payload.count)) {
+        throw new Error('Invalid number of emails to send provided.');
+    }
+
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
@@ -845,20 +883,16 @@ export const sendNextBatch = (payload) => {
 
     // Normalize controls
     const stopOnError = !!payload?.stopOnError;
+    const testMode = !!payload?.testMode;          // test mode now consumes credits
+    const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
+    const isPremium = !!payload?.isPremium;         // from client
+    const freeDailyCap = Number(payload?.freeDailyCap ?? DEFAULT_FREE_DAILY_SEND_CAP);
+    const gmailRemaining = MailApp.getRemainingDailyQuota();
+    // console.log('gmailRemaining', gmailRemaining);
+    // console.log('isPremium', isPremium);
+    // console.log('freeDailyCap', freeDailyCap);
 
-    const lock = LockService.getDocumentLock();
     try {
-        if (!lock.tryLock(10 * 1000)) throw new Error('Another send is in progress, try again soon.');
-
-        const remaining = MailApp.getRemainingDailyQuota();
-        const requestedRaw = Number(payload?.count ?? 100);
-        const requested = Math.max(1, Math.min(1000, isFinite(requestedRaw) ? requestedRaw : 100));
-        const testMode = !!payload?.testMode;
-        const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
-        // Cap by remaining quota in both modes (avoid quota errors)
-        const effectiveMax = Math.min(requested, remaining);
-        if (effectiveMax <= 0) return { sent: 0, failed: 0, attempted: 0, testMode };
-
         // Indices (0-based). Some may be undefined if columns don't exist.
         const iId = head[normHeader('id')];
         const iEmail = head[normHeader('email')];
@@ -881,43 +915,99 @@ export const sendNextBatch = (payload) => {
 
         // Read all data rows
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-
-        // Build list of queued rows (oldest first)
-        const queued = [];
+        let queuedCount = 0;
         for (let r = 0; r < vals.length; r++) {
-            const row = vals[r];
-            const status = String(safeAt(row, iStatus) || '').toLowerCase();
-            if (status !== 'queued') continue;
-
-            queued.push({
-                r,
-                rowIndex: r + 2,
-                email: String(safeAt(row, iEmail) || ''),
-                docId: String(safeAt(row, iDocId) || ''),
-                docUrl: String(safeAt(row, iDocUrl) || ''),
-                subject: String(safeAt(row, iSubject) || ''), // may be empty
-                body: String(safeAt(row, iBody) || ''),       // may be empty
-                attempts: Number(safeAt(row, iAttempts) || 0),
-                createdAt: safeAt(row, iCreatedAt) ? new Date(safeAt(row, iCreatedAt)) : new Date(0),
-                attachPdf: asBool(safeAt(row, iAttachPdf) || false),
-                useDocBody: asBool(safeAt(row, iUseDocBody) || false),
-                lastError: String(safeAt(row, iLastError) || '')
-            });
+          if (String(safeAt(vals[r], iStatus) || '').toLowerCase() === 'queued') queuedCount++;
         }
-        // queued.sort((a, b) => (a.createdAt - b.createdAt) || (a.rowIndex - b.rowIndex));
 
-        const batch = queued.slice(0, effectiveMax);
+        // Determine requested/ask
+        const requestedRaw = Number(payload.count);
+        const requested = Math.max(1, Math.min(1000, requestedRaw));
+        const ask = Math.min(requested, gmailRemaining, queuedCount);
+
+        // console.log('ask', ask);
+        // console.log('requested', requested);
+        // console.log('queuedCount', queuedCount);
+
+        // Reserve credits (test mode included; we’ll commit after)
+        const { plan, used, granted } = _reserveCredits_({ ask, isPremium, freeDailyCap });
+        const dailyCap = isPremium ? gmailRemaining : freeDailyCap; // only used for client display
+
+        // console.log('granted', granted);
+        // console.log('dailyCap', dailyCap);
+        // console.log('used', used);
+        if (granted <= 0) {
+            return {
+                sent: 0, failed: 0, attempted: 0, testMode,
+                creditsLeft: Math.min(gmailRemaining, Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - used)),
+                plan, dailyCap, sentToday: used,
+            };
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // DOCUMENT LOCK #1: pick and mark rows as 'processing'
+        // ─────────────────────────────────────────────────────────────
+        let batch = []; // { rowIndex, email, docId, docUrl, subject, body, attempts, attachPdf, useDocBody }
+        (function selectAndMarkProcessing() {
+            const dlock = LockService.getDocumentLock();
+            if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
+            try {
+                const queuedRows = [];
+                for (let r = 0; r < vals.length; r++) {
+                    const row = vals[r];
+                    if (String(safeAt(row, iStatus) || '').toLowerCase() !== 'queued') continue;
+                    const rowIndex = r + 2;
+                    queuedRows.push({
+                        rowIndex,
+                        email: String(safeAt(row, iEmail) || ''),
+                        docId: String(safeAt(row, iDocId) || ''),
+                        docUrl: String(safeAt(row, iDocUrl) || ''),
+                        subject: String(safeAt(row, iSubject) || ''),
+                        body: String(safeAt(row, iBody) || ''),
+                        attempts: Number(safeAt(row, iAttempts) || 0),
+                        attachPdf: asBool(safeAt(row, iAttachPdf) || false),
+                        useDocBody: asBool(safeAt(row, iUseDocBody) || false),
+                    });
+                    if (queuedRows.length >= granted) break; // only need up to grant
+                }
+
+                batch = queuedRows;
+
+                // Batch mark as processing
+                if (!testMode && iStatus != null && batch.length) {
+                    const colL = _colLetter_(iStatus + 1);
+                    const a1s = batch.map(it => `${colL}${it.rowIndex}`);
+                    sh.getRangeList(a1s).setValue('processing');
+                    SpreadsheetApp.flush();
+                }
+            } catch (error) {
+                console.log('error', error);
+                throw error;
+            } finally {
+                dlock.releaseLock();
+            }
+        })();
+
+        if (batch.length === 0) {
+            // No rows left by the time we tried to mark them
+            const { used: usedNow } = _commitCredits_({ granted, sent: 0 });
+            return {
+                sent: 0, failed: 0, attempted: 0, testMode,
+                creditsLeft: Math.min(MailApp.getRemainingDailyQuota(), Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow)),
+                plan, dailyCap, sentToday: usedNow,
+            };
+        }
+
+        // Send loop (no locks held)
 
         // Fallbacks in case subject/body not present
         const defaultSubject = String(payload?.subject || 'Letter of Intent');
-        const defaultBodyMaker = (docUrl) =>
-            String(payload?.bodyTemplate ||
-                `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
-
-        // Cache Doc body text to avoid re-open for same docId
-        const docBodyCache = Object.create(null);
+        const defaultBodyMaker = (docUrl) => String(payload?.bodyTemplate || `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
+        const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
+        const activeUserEmail = Session.getActiveUser().getEmail();
 
         let sent = 0, failed = 0, attempted = 0;
+        const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
         for (let k = 0; k < batch.length; k++) {
             const item = batch[k];
             const now = new Date();
@@ -939,7 +1029,7 @@ export const sendNextBatch = (payload) => {
                 if (!rowBody) rowBody = defaultBodyMaker(item.docUrl || "");
 
                 // Test mode: send previews to the user; Real mode: send to recipient
-                const to = testMode ? previewTo : item.email;
+                const to = testMode ? previewTo || activeUserEmail : item.email;
 
                 // ATTACHMENTS
                 const wantAttach = item.attachPdf && !!item.docId;
@@ -956,40 +1046,101 @@ export const sendNextBatch = (payload) => {
 
                 MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
-                if (!testMode) {
-                    // Update status -> sent; attempts +1; clear lastError; set sentAt
-                    if (iStatus != null) sh.getRange(item.rowIndex, iStatus + 1).setValue('sent');
-                    if (iSentAt != null) sh.getRange(item.rowIndex, iSentAt + 1).setValue(now);
-                    if (iAttempts != null) sh.getRange(item.rowIndex, iAttempts + 1).setValue(newAttempts);
-                    if (iLastError != null) sh.getRange(item.rowIndex, iLastError + 1).setValue('');
-                }
+                resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                 sent++;
             } catch (err) {
-                if (!testMode) {
-                    if (iStatus != null) sh.getRange(item.rowIndex, iStatus + 1).setValue('failed');
-                    if (iSentAt != null) sh.getRange(item.rowIndex, iSentAt + 1).setValue(''); // not sent
-                    if (iAttempts != null) sh.getRange(item.rowIndex, iAttempts + 1).setValue(newAttempts);
-                    if (iLastError != null) sh.getRange(item.rowIndex, iLastError + 1).setValue(String(err));
-                }
+                resultsByRow.set(item.rowIndex, { ok: false, attempts: newAttempts, error: String(err) });
                 failed++;
 
                 // Stop on first error if requested
                 if (stopOnError) {
                     attempted = k + 1; // processed this many (including the failure)
-                    return { sent, failed, attempted, testMode, stoppedEarly: true, creditsLeft: MailApp.getRemainingDailyQuota() };
+                    break
                 }
             }
         }
 
-        return { sent, failed, attempted: batch.length, testMode, creditsLeft: MailApp.getRemainingDailyQuota() };
+        // ─────────────────────────────────────────────────────────────
+        // DOCUMENT LOCK #2: finalize statuses for the rows we marked
+        // ─────────────────────────────────────────────────────────────
+        (function finalizeStatuses() {
+            if (testMode || !batch.length) return;
+
+            const dlock = LockService.getDocumentLock();
+            if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
+            try {
+                // Identify which of the target columns actually exist
+                const presentCols = [
+                    { key: 'status', idx: iStatus },
+                    { key: 'sentAt', idx: iSentAt },
+                    { key: 'attempts', idx: iAttempts },
+                    { key: 'lastErr', idx: iLastError },
+                ].filter(c => c.idx != null);
+
+                if (!presentCols.length) return;
+
+                // Compute minimal rectangle [minRow..maxRow] x [minCol..maxCol]
+                const minRow = Math.min.apply(null, batch.map(it => it.rowIndex));
+                const maxRow = Math.max.apply(null, batch.map(it => it.rowIndex));
+                const height = maxRow - minRow + 1;
+
+                const minColIdx = Math.min.apply(null, presentCols.map(c => c.idx));
+                const maxColIdx = Math.max.apply(null, presentCols.map(c => c.idx));
+                const width = maxColIdx - minColIdx + 1;
+
+                // Read the block once
+                const range = sh.getRange(minRow, minColIdx + 1, height, width);
+                const grid = range.getValues(); // 2D array
+
+                // Quick offset helpers
+                const off = {
+                    status: (iStatus != null) ? (iStatus - minColIdx) : null,
+                    sentAt: (iSentAt != null) ? (iSentAt - minColIdx) : null,
+                    attempts: (iAttempts != null) ? (iAttempts - minColIdx) : null,
+                    lastErr: (iLastError != null) ? (iLastError - minColIdx) : null,
+                };
+
+                // Patch only the selected rows inside the in-memory grid
+                for (let k = 0; k < batch.length; k++) {
+                    const rowIndex = batch[k].rowIndex;
+                    const res = resultsByRow.get(rowIndex);
+                    if (!res) continue;
+
+                    const r = rowIndex - minRow; // row offset in grid
+
+                    if (off.status != null) grid[r][off.status] = res.ok ? 'sent' : 'failed';
+                    if (off.sentAt != null) grid[r][off.sentAt] = res.ok ? (res.sentAt || new Date()) : '';
+                    if (off.attempts != null) grid[r][off.attempts] = res.attempts;
+                    if (off.lastErr != null) grid[r][off.lastErr] = res.ok ? '' : (res.error || 'Error');
+                }
+
+                // Single batched write
+                range.setValues(grid);
+                SpreadsheetApp.flush();
+            } catch (error) {
+                console.log('error', error);
+                throw error;
+            } finally {
+                dlock.releaseLock();
+            }
+        })();
+
+        // Commit usage (consume sent; release any unused portion of grant)
+        // console.log('granted', granted);
+        // console.log('sent', sent);
+        const { used: usedNow } = _commitCredits_({ granted, sent });
+        const gmailLeft = MailApp.getRemainingDailyQuota();
+        const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);
+        const creditsLeft = Math.min(gmailLeft, planLeft);
+
+        return {
+            sent, failed, attempted: batch.length, testMode,
+            creditsLeft, plan, dailyCap, sentToday: usedNow,
+          };
     }
     catch (error) {
         console.log('error', error)
-        lock.releaseLock();
         throw error;
-    }
-    finally {
-        lock.releaseLock();
     }
 
     // Helpers
@@ -1390,4 +1541,10 @@ function columnsOverFree(mapping, emailColumn) {
         .filter(Boolean);
     const uniq = Array.from(new Set(letters.map(String)));
     return uniq.filter(L => colToNumber(L) > CONSTANTS.FREE_MAX_COL_NUMBER); // > D
+}
+
+function _colLetter_(n: number): string {
+    let s = "";
+    while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+    return s;
 }
