@@ -1020,10 +1020,10 @@ export const sendNextBatch = (payload) => {
                         const colVals = sh.getRange(minRow, col, maxRow - minRow + 1, 1).getValues(); // [[val],...]
                         const toMarkA1 = [];
                         for (const r of rows) {
-                          const v = String(colVals[r - minRow][0] || '').toLowerCase();
-                          if (v === 'queued') toMarkA1.push(`${colA1}${r}`);
+                            const v = String(colVals[r - minRow][0] || '').toLowerCase();
+                            if (v === 'queued') toMarkA1.push(`${colA1}${r}`);
                         }
-                        
+
                         // Batch mark as processing
                         if (toMarkA1.length) {
                             sh.getRangeList(toMarkA1).setValue('processing');
@@ -1623,6 +1623,79 @@ export const queueDeleteDocsSimple = (opts?: {
         lock.releaseLock();
     }
 };
+
+/**
+ * Delete all "sent" rows in Sender Queue and compact so there are no gaps.
+ * Keeps header row intact. Uses a document lock to avoid stomping with other ops.
+ * Returns a small report.
+ */
+export function queuePurgeSentAndCompact() {
+    const dlock = LockService.getDocumentLock();
+    if (!dlock.tryLock(10_000)) {
+        throw new Error('Another operation is in progress. Try again soon.');
+    }
+
+    try {
+        const { sh } = queueEnsureSheet();
+        const head = headerIndexMap(sh);
+        const iStatus = head[normHeader('status')];
+        if (iStatus == null) {
+            throw new Error('Sender Queue: missing "status" column.');
+        }
+
+        const lastRow = sh.getLastRow();
+        const lastCol = sh.getLastColumn();
+        if (lastRow <= 1) {
+            return { deleted: 0, kept: 0, total: 0, nowRows: 1 };
+        }
+
+        // Read all data rows (below header)
+        const height = lastRow - 1;
+        const data = sh.getRange(2, 1, height, lastCol).getValues();
+
+        const kept = [];
+        let deleted = 0;
+
+        for (let r = 0; r < data.length; r++) {
+            const row = data[r];
+            // consider an entirely empty row as "gap" (drop it during compaction)
+            const isEmpty = row.every(v => v === '' || v == null);
+            if (isEmpty) continue;
+
+            const status = String(row[iStatus] || '').trim().toLowerCase();
+            if (status === 'sent') {
+                deleted++;
+                continue;
+            }
+            kept.push(row);
+        }
+
+        // Wipe old data area, then write back only the kept rows contiguously
+        sh.getRange(2, 1, height, lastCol).clearContent();
+        if (kept.length > 0) {
+            sh.getRange(2, 1, kept.length, lastCol).setValues(kept);
+        }
+
+        // Optional: trim trailing sheet rows so there are literally no empty rows
+        // below the data area. Comment out this block if you prefer to keep extra rows.
+        const desiredRows = kept.length + 1; // header + data
+        const maxRows = sh.getMaxRows();
+        if (maxRows > desiredRows) {
+            sh.deleteRows(desiredRows + 1, maxRows - desiredRows);
+        }
+
+        SpreadsheetApp.flush();
+        return {
+            deleted,
+            kept: kept.length,
+            total: data.length,
+            nowRows: kept.length + 1, // includes header
+        };
+    } finally {
+        dlock.releaseLock();
+    }
+}
+
 
 function columnsOverFree(mapping, emailColumn) {
     const letters = []

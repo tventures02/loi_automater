@@ -14,6 +14,8 @@ import { Snackbar } from "@mui/material";
 import { User } from "../../utils/types";
 import CtaCard from "./CtaCard";
 import CONSTANTS from "../../utils/constants";
+import JobWarning from "./JobWarning";
+
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
 // Some constants
@@ -568,6 +570,41 @@ export default function SendCenterScreen({
                     <CtaCard message="Upgrade to send more emails!" onUpgradeClick={onUpgradeClick} />
                 )
             }
+
+            {!sendData.loading && (
+                <>
+                    {summary?.total >= CONSTANTS.TOTAL_JOBS_WARNING && summary?.total < CONSTANTS.TOTAL_JOBS_CRITICAL && (
+                        <JobWarning
+                            type="warning"
+                            message={`You have over ${CONSTANTS.TOTAL_JOBS_WARNING} total LOIs jobs in the Sender Queue tab. Delete already sent LOIs to improve performance.`}
+                            buttonText="Remove sent LOIs"
+                            action={async () => {
+                                setSendData(s => ({ ...s, loading: true }));
+                                const res = await serverFunctions.queuePurgeSentAndCompact();
+                                console.log('res', res);
+                                refreshSendData(true);
+                                setSendData(s => ({ ...s, loading: false }));
+                            }}
+                        />
+                    )}
+
+                    {summary?.total >= CONSTANTS.TOTAL_JOBS_CRITICAL && (
+                        <JobWarning
+                            type="critical"
+                            message={`You have over ${CONSTANTS.TOTAL_JOBS_CRITICAL} total LOIs jobs in the Sender Queue tab. Please clear the queue to continue sending.`}
+                            buttonText="Clear queue"
+                            action={async () => {
+                                setSendData(s => ({ ...s, loading: true }));
+                                const res = await serverFunctions.queueClearAll();
+                                console.log('res', res);
+                                refreshSendData(true);
+                                setSendData(s => ({ ...s, loading: false }));
+                            }}
+                        />
+                    )}
+                </>
+            )}
+
 
             {/* Snackbar */}
             {snackbar.open && (

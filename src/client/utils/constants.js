@@ -8,7 +8,6 @@ module.exports = {
     SETTINGS_SHEETNAME: `Settings`,
     PRIVACY_PAGE: 'https://tidisventures.com/privacy-policy?policy=z-real-estate-calc-gsheets-addon-privacy-policy',
     SETTINGS_NOTE: 'All settings and values are optional. Fill them out for defaulting the calculations.',
-    ANA_SHEETNAME: String.fromCodePoint(0x1F4C8) + 'Properties to analyze',
     STRIPE_BADGE: "https://s3.amazonaws.com/blueplanit.co/stripebadge.png",
     SUPPORT_PAGE: "https://tidisventures.com/support?app=z-real-estate-calculator-support",
     TERMS: "https://tidisventures.com/terms-and-conditions?app=z-real-estate-calculator-terms",
@@ -41,4 +40,6 @@ module.exports = {
     MAX_GWORKSPACE_PREMIUM_SEND_CAP: 1500,
     USE_GOOGLE_DOCS_BATCH_CAP: 25,
     NO_ATTACH_BATCH_CAP: 50,
+    TOTAL_JOBS_WARNING: 5000,
+    TOTAL_JOBS_CRITICAL: 10000,
 }
