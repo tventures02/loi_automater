@@ -836,6 +836,11 @@ export default function GenerateLOIsStepScreen({
                             />
                         </div>
                         <div className="text-[10px] text-gray-500">{Math.min(99, Math.round(innerPct))}% of current batch</div>
+
+                        <div className="mt-2 text-[10px] text-red-400">
+                            Don't close this window or sidebar while creating.
+                        </div>
+
                         {autoContinue ? (
                             <div className="flex items-center justify-end w-full mt-3">
                                 <button

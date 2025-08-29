@@ -86,7 +86,7 @@ const TemplateStepScreen = ({
                 user,
                 docId: docData.id,
                 verType: 'idToken',
-                source: CONSTANTS.APP_SOURCE,
+                source: CONSTANTS.APP_SOURCE_CODE,
                 app: CONSTANTS.APP_CODE,
             }
             const saveResp = await backendCall(dataToServer, 'loiApi/addDocTemplate', user.idToken);

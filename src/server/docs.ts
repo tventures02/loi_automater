@@ -1108,7 +1108,7 @@ export const sendNextBatch = (payload) => {
                         }
                     }
 
-                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    // MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;

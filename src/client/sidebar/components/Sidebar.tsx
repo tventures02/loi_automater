@@ -246,7 +246,7 @@ const SidebarContainer = () => {
                             user,
                             invalidDocIds,
                             verType: 'idToken',
-                            source: CONSTANTS.APP_SOURCE,
+                            source: CONSTANTS.APP_SOURCE_CODE,
                             app: CONSTANTS.APP_CODE,
                         }
                         await backendCall(dataToServer, 'loiApi/syncDocTemplates', user.idToken);
@@ -704,7 +704,7 @@ const SidebarContainer = () => {
                 )}
 
                 {
-                    isDev && mode === "send" && (
+                    isDev && (mode === "send" || currentStep === "send") && (
                         <div className='flex gap-2 text-[10px] justify-center'>
                             <span onClick={() => serverFunctions.resetLoiUserPropsDev()} className='text-gray-500 cursor-pointer hover:underline'>Reset user props</span>
                             <span onClick={async () => console.log(await serverFunctions.getLoiUserPropsDev())} className='text-gray-500 cursor-pointer hover:underline'>Get user props</span>

@@ -531,12 +531,17 @@ export default function SendCenterScreen({
                         {sendProg.failed > 0 && <> &middot; <span className="text-red-600">Failed: {sendProg.failed}</span></>}
                     </div>
 
-                    <div className="mt-2 h-2 w-full bg-gray-200 rounded">
-                        <div
-                            className="h-2 rounded bg-indigo-500 transition-[width] duration-200"
-                            style={{ width: `${percent}%` }}
-                        />
-                    </div>
+                    {/* Progres bar  only shows since free send cap is less than batch size */}
+                    {
+                        isPremium && (
+                            <div className="mt-2 h-2 w-full bg-gray-200 rounded">
+                                <div
+                                    className="h-2 rounded bg-indigo-500 transition-[width] duration-200"
+                                    style={{ width: `${percent}%` }}
+                                />
+                            </div>)
+                    }
+
                     <div className="mt-1 text-[10px] text-gray-500">{percent}% complete</div>
                     <div className="mt-2 text-[10px] text-red-400">
                         Don't close this window or sidebar while sending.

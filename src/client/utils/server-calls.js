@@ -6,7 +6,7 @@ export function backendCall(dataToServer, endpoint, idToken = null) {
         'Content-Type': 'application/json',
     };
     if (!dataToServer.verType) dataToServer.verType = 'idToken';
-    if (!dataToServer.source) dataToServer.source = CONSTANTS.APP_SOURCE;
+    if (!dataToServer.source) dataToServer.source = CONSTANTS.APP_SOURCE_CODE;
     if (idToken) {
         headers = {
             ...headers,

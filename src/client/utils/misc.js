@@ -1,4 +1,5 @@
 import CONSTANTS from '../utils/constants';
+import { initiateTokenPurchase } from '../utils/purchase-server-calls';
 const isDev = process.env.REACT_APP_TV_BACKEND.includes('localhost');
 
 export function constructHTMLData(data) {
@@ -91,8 +92,9 @@ export function parseHTMLData() {
 
 
 export const generatePricingPageUrl = async (emailIn = '', token = '', getUserData) => {
-    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://tidisventures.com/';
-    const appSlug = 'z-real-estate-calculator';
+    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://flashcardlab.co/';
+    const appSlug = CONSTANTS.APP_SLUG;
+    let purchaseResp = null;
 
     try {
         const tokenIsExpired = !token || !emailIn ? true : checkTokenExpiration(token);
@@ -102,7 +104,11 @@ export const generatePricingPageUrl = async (emailIn = '', token = '', getUserDa
         }
 
         if (!tokenIsExpired) {
-            return `${baseUrl}purchase/${appSlug}?email=${emailIn}&verType=idToken&token=${token}&appVariant=gwscalc`;
+            purchaseResp = await initiateTokenPurchase(token, 'idToken', CONSTANTS.APP_SOURCE_CODE);
+            if (!purchaseResp || !purchaseResp?.success || !purchaseResp?.purchaseCode) {
+                throw Error('Error retrieving purchase code.');
+            }
+            return `${baseUrl}purchase/${appSlug}?purchaseCode=${purchaseResp.purchaseCode}`;
         }
 
         const {
@@ -110,13 +116,21 @@ export const generatePricingPageUrl = async (emailIn = '', token = '', getUserDa
             idToken,
         } = await getUserData();
 
-        if (!email || !idToken) return `${baseUrl}purchase/${appSlug}?appVariant=gwscalc`;
+        if (!email || !idToken) return `${baseUrl}purchase/${appSlug}`;
 
-        return `${baseUrl}purchase/${appSlug}?email=${email}&verType=idToken&token=${idToken}&appVariant=gwscalc`        
+        purchaseResp = await initiateTokenPurchase(idToken, 'idToken', CONSTANTS.APP_SOURCE_CODE);
+        if (!purchaseResp || !purchaseResp?.success || !purchaseResp?.purchaseCode) {
+            throw Error('Error retrieving purchase code after getting id token.');
+        }
+
+        return `${baseUrl}purchase/${appSlug}?purchaseCode=${purchaseResp.purchaseCode}`;
     } catch (error) {
-        return `${baseUrl}purchase/${appSlug}?appVariant=gwscalc`;
+        const errorMsg = error.message ? error.message : JSON.stringify(error);
+        sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { errorMsg, }, emailIn, false);
+        return `${baseUrl}purchase/${appSlug}`;
     }
 }
+
 
 export const returnNewIdTokenIfNecessary = async (token, getUserData) => {
     try {
