@@ -12,7 +12,7 @@ import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
 import MappingStepScreen from './MappingStepScreen';
 import GenerateLOIsStepScreen from './GenerateLOIsStepScreen';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
 import SendCenterScreen, { QUEUE_DISPLAY_LIMIT } from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
@@ -572,16 +572,15 @@ const SidebarContainer = () => {
                                     Open Builder
                                 </div>
                                 {helpButton}
+                                <div className="flex items-center gap-2">
+                                    <Cog6ToothIcon className="w-5 h-5 cursor-pointer hover:opacity-90 text-gray-500" onClick={() => setShowSettings(true)}/>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )
                 }
             </div >
-            <div className='flex gap-2 text-[10px] justify-center'>
-                <span onClick={() => serverFunctions.resetLoiUserPropsDev()} className='text-gray-500 cursor-pointer hover:underline'>reset</span>
-                <span onClick={async () => console.log(await serverFunctions.getLoiUserPropsDev())} className='text-gray-500 cursor-pointer hover:underline'>get</span>
-            </div>
 
             {/* Dialogs */}
             {showSettings && <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} settings={settings} setSettings={setSettings} />}
@@ -618,6 +617,8 @@ const SidebarContainer = () => {
                         mode={mode}
                         currentStep={currentStep}
                         setCurrentStep={setCurrentStep}
+                        user={user}
+                        onUpgradeClick={onUpgradeClick}
                     />
                 ) : (
                     <>
@@ -695,10 +696,21 @@ const SidebarContainer = () => {
                                 mode={mode}
                                 currentStep={currentStep}
                                 setCurrentStep={setCurrentStep}
+                                user={user}
+                                onUpgradeClick={onUpgradeClick}
                             />
                         )}
                     </>
                 )}
+
+                {
+                    isDev && mode === "send" && (
+                        <div className='flex gap-2 text-[10px] justify-center'>
+                            <span onClick={() => serverFunctions.resetLoiUserPropsDev()} className='text-gray-500 cursor-pointer hover:underline'>Reset user props</span>
+                            <span onClick={async () => console.log(await serverFunctions.getLoiUserPropsDev())} className='text-gray-500 cursor-pointer hover:underline'>Get user props</span>
+                        </div>
+                    )
+                }
             </div >
 
             {mode === "build" && footer}

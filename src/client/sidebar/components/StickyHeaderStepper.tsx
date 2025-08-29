@@ -1,5 +1,5 @@
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
-import React, { forwardRef, useMemo, useState } from "react";
+import React, { forwardRef, useMemo } from "react";
 
 export type Step = { key: string; label: string };
 

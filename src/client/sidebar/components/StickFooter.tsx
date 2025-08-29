@@ -37,6 +37,9 @@ type Props = {
 
     /** Whether to force the primary button to be disabled */
     forcePrimaryDisabled?: boolean;
+
+    /** Whether to disable the secondary button */
+    secondaryDisabled?: boolean;
 };
 
 function cx(...cls: (string | false | null | undefined)[]) {
@@ -58,6 +61,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
         mode = "send",
         fixYPos = false,
         forcePrimaryDisabled = false,
+        secondaryDisabled = false,
     },
     ref
 ) {
@@ -125,9 +129,11 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                             role="button"
                             tabIndex={0}
                             aria-label={secondaryLabel}
-                            className="cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
-                            onClick={handleActivate(onSecondary)}
-                            onKeyDown={handleActivate(onSecondary)}
+                            aria-disabled={secondaryDisabled}
+                            className={`cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 
+                                hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 ${secondaryDisabled ? "opacity-50 !pointer-events-none" : ""}`}
+                            onClick={handleActivate(onSecondary, secondaryDisabled)}
+                            onKeyDown={handleActivate(onSecondary, secondaryDisabled)}
                         >
                             {secondaryLabel}
                         </div>
@@ -144,7 +150,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
                                         aria-disabled={primaryControlDisabled}
                                         className={cx(
                                             "!cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none",
-                                            `${isFinalStep ? `bg-green-600 hover:bg-green-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500` :
+                                            `${isFinalStep ? `bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500` :
                                                 `bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900`}`,
                                             primaryControlDisabled && "opacity-50 pointer-events-none"
                                         )}

@@ -11,6 +11,8 @@ import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
 import { ArrowPathIcon, LinkIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Alert, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
+import { User } from "../../utils/types";
+import CtaCard from "./CtaCard";
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
@@ -38,6 +40,8 @@ type Props = {
     mode: "build" | "send";
     currentStep: string;
     setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
+    user: User;
+    onUpgradeClick: () => void;
 };
 
 export default function SendCenterScreen({
@@ -49,6 +53,8 @@ export default function SendCenterScreen({
     mode,
     currentStep,
     setCurrentStep,
+    user,
+    onUpgradeClick,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
@@ -67,9 +73,8 @@ export default function SendCenterScreen({
     }>({ open: false, id: null, x: 0, y: 0, current: "queued" });
     const [pendingId, setPendingId] = useState<string | null>(null);
     const { summary, items, loading, error } = sendData;
-
+    const isPremium = user.subscriptionStatusActive;
     const queuedTotal = summary?.queued ?? 0;
-    const canSend = (summary?.remaining ?? 0) > 0 && queuedTotal > 0;
 
     useEffect(() => {
         setVisibleCount(PAGE_SIZE);
@@ -106,7 +111,7 @@ export default function SendCenterScreen({
                 count: numEmailsToSend,
                 stopOnError,
             });
-            const sent = res?.sent ?? numEmailsToSend;
+            const sent = res?.sent ?? 0;
 
             if (isDev) {
                 console.log('real send results')
@@ -166,6 +171,7 @@ export default function SendCenterScreen({
     };
 
     const confirmTestSend = async (sampleCount = 1) => {
+        if (!summary?.remaining) return;
         // do NOT mutate queue locally
         setSending(true);
         try {
@@ -176,12 +182,14 @@ export default function SendCenterScreen({
                 previewTo: sendData?.summary?.userEmail, // fallback handled server-side
             });
 
+            const sent = res?.sent ?? 0;
+
             if (isDev) {
                 console.log('test send results')
                 console.log('res', res);
             }
 
-            setSnackbar({ open: true, message: `Sent ${numEmailsToSend} test email${numEmailsToSend > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
+            setSnackbar({ open: true, message: `Sent ${sent} test email${sent > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
         } catch {
             setSnackbar({ open: true, message: "Test send failed. Please try again.", severity: "error" });
         } finally {
@@ -198,7 +206,7 @@ export default function SendCenterScreen({
         try {
             if (deleteDocs) {
                 const deleteRes = await serverFunctions.queueDeleteDocsSimple();
-                console.log('deleteRes', deleteRes);
+                if (isDev) console.log('deleteRes', deleteRes);
             }
 
             await serverFunctions.queueClearAll();
@@ -253,7 +261,7 @@ export default function SendCenterScreen({
     if (sending) primaryLabel = "Sending…";
     else if (queuedTotal === 0) primaryLabel = "Open Builder";
 
-    const primaryDisabled = queuedTotal === 0 ? loading : (!canSend || sending || loading);
+    const primaryDisabled = queuedTotal === 0 ? loading : (sending || loading);
     const canLoadMore = visibleCount < filtered.length;
     const queueTotal = summary?.total ?? 0;
 
@@ -422,6 +430,12 @@ export default function SendCenterScreen({
                 )}
             </div>
 
+            {
+                !isPremium && summary?.remaining === 0 && (
+                    <CtaCard message="Upgrade to send more emails!" onUpgradeClick={onUpgradeClick} />
+                )
+            }
+
             {/* Snackbar */}
             {snackbar.open && (
                 <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
@@ -434,7 +448,8 @@ export default function SendCenterScreen({
                 primaryLabel={primaryLabel}
                 secondaryLabel="Send Test Email"
                 onSecondary={queuedTotal > 0 ? openTestDialog : undefined}
-                onPrimary={canSend && !sending ? openRealDialog : queuedTotal === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
+                secondaryDisabled={loading || sending}
+                onPrimary={!sending ? openRealDialog : queuedTotal === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
@@ -465,11 +480,11 @@ export default function SendCenterScreen({
                 onConfirm={dialog.variant === "real" ?
                     ({ count, stopOnError } = { count: 1, stopOnError: false }) => confirmRealSend(count, stopOnError) :
                     ({ sampleCount } = { sampleCount: 1 }) => confirmTestSend(sampleCount)}
-                remaining={summary?.remaining}
-                queued={summary?.queued ?? 0}
-                toEmail={sendData?.summary?.userEmail}
+                summary={summary}
                 defaultSampleCount={1}
                 isSubmitting={sending}
+                isPremium={isPremium}
+                onUpgrade={onUpgradeClick}
             />
 
             {openClear && (
