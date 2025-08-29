@@ -3,7 +3,6 @@ import CONSTANTS from "../client/utils/constants";
 import {
     _commitCredits_,
     _reserveCredits_,
-    DEFAULT_FREE_DAILY_SEND_CAP,
     getSendCreditsLeft
 } from "./send_credits_management";
 
@@ -227,7 +226,7 @@ export const preflightGenerateLOIs = (payload) => {
     if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
     const outputFolderId = loiEnsureOutputFolder();
-    
+
     const FREE_CAP = CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET || 100; // safety
     const isPremium = !!(user?.subscriptionStatusActive);
     const existingForSheet = countQueueForSheet(sheetName) || 0;
@@ -786,7 +785,7 @@ export const queueStatus = () => {
 }
 
 /** Return basic counters for Sender from Sender Queue. */
-export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number = DEFAULT_FREE_DAILY_SEND_CAP) => {
+export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number = 10) => {
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
@@ -874,9 +873,10 @@ export const sendNextBatch = (payload) => {
     else if (!isFinite(payload.count)) {
         throw new Error('Invalid number of emails to send provided.');
     }
-
+    const startFromRow = Number(payload?.startFromRow) || 2; // The cursor
+    const isPremium = !!payload?.isPremium;         // from client
     const T_BUDGET_MS = Number(payload?.timeBudgetMs || 240_000); // 4 min
-    const T_GUARD_MS  = 15_000; // stop ~15s before budget to finalize safely
+    const T_GUARD_MS = 15_000; // stop ~15s before budget to finalize safely
     const t0 = Date.now();
     const attachPDFBatchCap = payload?.attachPDFBatchCap || 25;
     const noAttachBatchCap = payload?.noAttachBatchCap || 100;
@@ -885,14 +885,19 @@ export const sendNextBatch = (payload) => {
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
     const lastRow = sh.getLastRow();
-    if (lastRow <= 1) return { sent: 0, failed: 0, attempted: 0 };
+    if (lastRow < startFromRow) return {
+        sent: 0,
+        failed: 0,
+        attempted: 0,
+        nextToken: null,
+        creditsLeft: getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }).creditsLeft,
+    };
 
     // Normalize controls
     const stopOnError = !!payload?.stopOnError;
     const testMode = !!payload?.testMode;          // test mode now consumes credits
     const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
-    const isPremium = !!payload?.isPremium;         // from client
-    const freeDailyCap = Number(payload?.freeDailyCap ?? DEFAULT_FREE_DAILY_SEND_CAP);
+    const freeDailyCap = Number(payload?.freeDailyCap ?? 10);
     const gmailRemaining = MailApp.getRemainingDailyQuota();
     // console.log('gmailRemaining', gmailRemaining);
     // console.log('isPremium', isPremium);
@@ -900,7 +905,6 @@ export const sendNextBatch = (payload) => {
 
     try {
         // Indices (0-based). Some may be undefined if columns don't exist.
-        const iId = head[normHeader('id')];
         const iEmail = head[normHeader('email')];
         const iDocId = head[normHeader('docId')];
         const iDocUrl = head[normHeader('docUrl')];
@@ -908,19 +912,28 @@ export const sendNextBatch = (payload) => {
         const iSentAt = head[normHeader('sentAt')];
         const iAttempts = head[normHeader('attempts')];
         const iLastError = head[normHeader('lastError')];
-        const iCreatedAt = head[normHeader('createdAt')];
         const iSubject = head[normHeader('subject')];     // optional
         const iBody = head[normHeader('body')];        // optional (plain text)
         const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
         const iUseDocBody = coalesce(head[normHeader('useLOIAsBody')], head[normHeader('useDocBody')]); // legacy fallback if needed
 
         // Read all data rows
-        const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+        const numRows = lastRow - startFromRow + 1;
+        if (numRows <= 0) {
+            return {
+                sent: 0,
+                failed: 0,
+                attempted: 0,
+                nextToken: null,
+                creditsLeft: getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }).creditsLeft,
+            };
+        }
+        const vals = sh.getRange(startFromRow, 1, numRows, sh.getLastColumn()).getValues();
         let queuedCount = 0, queuedAttachCount = 0;
         for (let r = 0; r < vals.length; r++) {
             if (String(safeAt(vals[r], iStatus) || '').toLowerCase() === 'queued') {
                 queuedCount++;
-                if (asBool(safeAt(vals[r], iAttachPdf) || false) || 
+                if (asBool(safeAt(vals[r], iAttachPdf) || false) ||
                     asBool(safeAt(vals[r], iUseDocBody) || false)) {
                     queuedAttachCount++;
                 }
@@ -933,6 +946,8 @@ export const sendNextBatch = (payload) => {
         const attachHeavy = queuedAttachCount > 0;
         const serverBatchCap = attachHeavy ? attachPDFBatchCap : noAttachBatchCap;
         const ask = Math.min(requested, gmailRemaining, queuedCount, serverBatchCap);
+        let sent = 0, failed = 0, attempted = 0, timeBudgetHit = false;
+        let nextToken = null;
 
         // console.log('ask', ask);
         // console.log('requested', requested);
@@ -947,219 +962,271 @@ export const sendNextBatch = (payload) => {
         // console.log('used', used);
         if (granted <= 0) {
             return {
-                sent: 0, failed: 0, attempted: 0, testMode,
-                creditsLeft: Math.min(gmailRemaining, Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - used)),
-                plan, dailyCap, sentToday: used,
-                timeBudgetHit: false, batchCap: serverBatchCap,
+                sent: 0,
+                failed: 0,
+                attempted: 0,
+                testMode,
+                creditsLeft: getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }).creditsLeft,
+                plan,
+                dailyCap,
+                sentToday: used,
+                timeBudgetHit: false,
+                batchCap: serverBatchCap,
+                nextToken: null,
             };
         }
 
-        // ─────────────────────────────────────────────────────────────
-        // DOCUMENT LOCK #1: pick and mark rows as 'processing'
-        // ─────────────────────────────────────────────────────────────
-        let batch = []; // { rowIndex, email, docId, docUrl, subject, body, attempts, attachPdf, useDocBody }
-        (function selectAndMarkProcessing() {
-            const dlock = LockService.getDocumentLock();
-            if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
-            try {
-                const queuedRows = [];
-                for (let r = 0; r < vals.length; r++) {
-                    const row = vals[r];
-                    if (String(safeAt(row, iStatus) || '').toLowerCase() !== 'queued') continue;
-                    const rowIndex = r + 2;
-                    queuedRows.push({
-                        rowIndex,
-                        email: String(safeAt(row, iEmail) || ''),
-                        docId: String(safeAt(row, iDocId) || ''),
-                        docUrl: String(safeAt(row, iDocUrl) || ''),
-                        subject: String(safeAt(row, iSubject) || ''),
-                        body: String(safeAt(row, iBody) || ''),
-                        attempts: Number(safeAt(row, iAttempts) || 0),
-                        attachPdf: asBool(safeAt(row, iAttachPdf) || false),
-                        useDocBody: asBool(safeAt(row, iUseDocBody) || false),
-                    });
-                    if (queuedRows.length >= granted) break; // only need up to grant
-                }
-
-                batch = queuedRows;
-
-                // Batch mark as processing
-                if (!testMode && iStatus != null && batch.length) {
-                    const colL = _colLetter_(iStatus + 1);
-                    const a1s = batch.map(it => `${colL}${it.rowIndex}`);
-                    sh.getRangeList(a1s).setValue('processing');
-                    SpreadsheetApp.flush();
-                }
-            } catch (error) {
-                console.log('error', error);
-                throw error;
-            } finally {
-                dlock.releaseLock();
-            }
-        })();
-
-        if (batch.length === 0) {
-            // No rows left by the time we tried to mark them
-            const { used: usedNow } = _commitCredits_({ granted, sent: 0 });
-            return {
-                sent: 0, failed: 0, attempted: 0, testMode,
-                creditsLeft: Math.min(MailApp.getRemainingDailyQuota(), Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow)),
-                plan, dailyCap, sentToday: usedNow,
-                timeBudgetHit: false, batchCap: serverBatchCap,
-            };
-        }
-
-        // Send loop (no locks held)
-
-        // Fallbacks in case subject/body not present
-        const defaultSubject = String(payload?.subject || 'Letter of Intent');
-        const defaultBodyMaker = (docUrl) => String(payload?.bodyTemplate || `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
-        const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
-        const activeUserEmail = Session.getActiveUser().getEmail();
-
-        let sent = 0, failed = 0, attempted = 0, timeBudgetHit = false;
-        const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
-        for (let k = 0; k < batch.length; k++) {
-            // Time budget guard (leave time to finalize)
-            if ((Date.now() - t0) > (T_BUDGET_MS - T_GUARD_MS)) { timeBudgetHit = true; break; }
-
-            const item = batch[k];
-            const now = new Date();
-            const newAttempts = (item.attempts || 0) + 1;
-
-            try {
-                // Determine subject/body from row; fall back if missing
-                const rowSubject = item.subject && item.subject.trim().length ? item.subject.trim() : defaultSubject;
-                const finalSubject = testMode ? `[TEST] ${rowSubject}` : rowSubject;
-
-                // BODY
-                let rowBody = (item.body && item.body.trim()) ? item.body : "";
-                if (!rowBody && item.useDocBody && item.docId) {
-                    if (!docBodyCache[item.docId]) {
-                        docBodyCache[item.docId] = buildPlainTextFromDoc(item.docId);
+        try {
+            // ─────────────────────────────────────────────────────────────
+            // DOCUMENT LOCK #1: pick and mark rows as 'processing'
+            // ─────────────────────────────────────────────────────────────
+            let batch = []; // { rowIndex, email, docId, docUrl, subject, body, attempts, attachPdf, useDocBody }
+            (function selectAndMarkProcessing() {
+                const dlock = LockService.getDocumentLock();
+                if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
+                try {
+                    const queuedRows = [];
+                    for (let r = 0; r < vals.length; r++) {
+                        const row = vals[r];
+                        if (String(safeAt(row, iStatus) || '').toLowerCase() !== 'queued') continue;
+                        const rowIndex = r + startFromRow;
+                        queuedRows.push({
+                            rowIndex,
+                            email: String(safeAt(row, iEmail) || ''),
+                            docId: String(safeAt(row, iDocId) || ''),
+                            docUrl: String(safeAt(row, iDocUrl) || ''),
+                            subject: String(safeAt(row, iSubject) || ''),
+                            body: String(safeAt(row, iBody) || ''),
+                            attempts: Number(safeAt(row, iAttempts) || 0),
+                            attachPdf: asBool(safeAt(row, iAttachPdf) || false),
+                            useDocBody: asBool(safeAt(row, iUseDocBody) || false),
+                        });
+                        if (queuedRows.length >= granted) {
+                            nextToken = rowIndex + 1;
+                            if (nextToken > lastRow) nextToken = null;
+                            break; // only need up to grant
+                        }
                     }
-                    rowBody = docBodyCache[item.docId] || "";
-                }
-                if (!rowBody) rowBody = defaultBodyMaker(item.docUrl || "");
 
-                // Test mode: send previews to the user; Real mode: send to recipient
-                const to = testMode ? previewTo || activeUserEmail : item.email;
+                    batch = queuedRows;
 
-                // ATTACHMENTS
-                const wantAttach = item.attachPdf && !!item.docId;
+                    // Batch mark as processing while revalidating to prevent stomping from potential process from 
+                    // another tab and keeps the batch consistent.
+                    if (!testMode && iStatus != null && batch.length) {
+                        const col = iStatus + 1;
+                        const rows = batch.map(b => b.rowIndex);
+                        const minRow = Math.min(...rows), maxRow = Math.max(...rows);
+                        const colA1 = _colLetter_(col);
+                        const colVals = sh.getRange(minRow, col, maxRow - minRow + 1, 1).getValues(); // [[val],...]
+                        const toMarkA1 = [];
+                        for (const r of rows) {
+                          const v = String(colVals[r - minRow][0] || '').toLowerCase();
+                          if (v === 'queued') toMarkA1.push(`${colA1}${r}`);
+                        }
+                        
+                        // Batch mark as processing
+                        if (toMarkA1.length) {
+                            sh.getRangeList(toMarkA1).setValue('processing');
+                            SpreadsheetApp.flush();
+                        }
 
-                let attachments = null;
-                if (wantAttach) {
-                    try {
-                        const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
-                        if (pdf) attachments = [pdf];
-                    } catch (_) {
-                        // fail soft: skip attachment if PDF generation fails
+                        // shrink batch to only rows we actually marked
+                        const markedSet = new Set(toMarkA1.map(a1 => Number(a1.replace(/^[A-Z]+/, ''))));
+                        batch = batch.filter(b => markedSet.has(b.rowIndex));
                     }
+                } catch (error) {
+                    console.log('error', error);
+                    throw error;
+                } finally {
+                    dlock.releaseLock();
                 }
+            })();
 
-                MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
-
-                resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
-                sent++;
-            } catch (err) {
-                resultsByRow.set(item.rowIndex, { ok: false, attempts: newAttempts, error: String(err) });
-                failed++;
-
-                // Stop on first error if requested
-                if (stopOnError) {
-                    attempted = k + 1; // processed this many (including the failure)
-                    break
-                }
-            }
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // DOCUMENT LOCK #2: finalize statuses for the rows we marked
-        // ─────────────────────────────────────────────────────────────
-        (function finalizeStatuses() {
-            if (testMode || !batch.length) return;
-
-            const dlock = LockService.getDocumentLock();
-            if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
-            try {
-                // Identify which of the target columns actually exist
-                const presentCols = [
-                    { key: 'status', idx: iStatus },
-                    { key: 'sentAt', idx: iSentAt },
-                    { key: 'attempts', idx: iAttempts },
-                    { key: 'lastErr', idx: iLastError },
-                ].filter(c => c.idx != null);
-
-                if (!presentCols.length) return;
-
-                // Compute minimal rectangle [minRow..maxRow] x [minCol..maxCol]
-                const minRow = Math.min.apply(null, batch.map(it => it.rowIndex));
-                const maxRow = Math.max.apply(null, batch.map(it => it.rowIndex));
-                const height = maxRow - minRow + 1;
-
-                const minColIdx = Math.min.apply(null, presentCols.map(c => c.idx));
-                const maxColIdx = Math.max.apply(null, presentCols.map(c => c.idx));
-                const width = maxColIdx - minColIdx + 1;
-
-                // Read the block once
-                const range = sh.getRange(minRow, minColIdx + 1, height, width);
-                const grid = range.getValues(); // 2D array
-
-                // Quick offset helpers
-                const off = {
-                    status: (iStatus != null) ? (iStatus - minColIdx) : null,
-                    sentAt: (iSentAt != null) ? (iSentAt - minColIdx) : null,
-                    attempts: (iAttempts != null) ? (iAttempts - minColIdx) : null,
-                    lastErr: (iLastError != null) ? (iLastError - minColIdx) : null,
+            if (batch.length === 0) {
+                // No rows left by the time we tried to mark them
+                const { used: usedNow } = _commitCredits_({ granted, sent: 0 });
+                return {
+                    sent: 0,
+                    failed: 0,
+                    attempted: 0,
+                    testMode,
+                    creditsLeft: getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }).creditsLeft,
+                    plan,
+                    dailyCap,
+                    sentToday: usedNow,
+                    timeBudgetHit: false,
+                    batchCap: serverBatchCap,
+                    nextToken,
                 };
-
-                // Patch only the selected rows inside the in-memory grid
-                for (let k = 0; k < batch.length; k++) {
-                    const rowIndex = batch[k].rowIndex;
-                    const res = resultsByRow.get(rowIndex);
-                    if (!res) continue;
-
-                    const r = rowIndex - minRow; // row offset in grid
-
-                    if (off.status != null) grid[r][off.status] = res.ok ? 'sent' : 'failed';
-                    if (off.sentAt != null) grid[r][off.sentAt] = res.ok ? (res.sentAt || new Date()) : '';
-                    if (off.attempts != null) grid[r][off.attempts] = res.attempts;
-                    if (off.lastErr != null) grid[r][off.lastErr] = res.ok ? '' : (res.error || 'Error');
-                }
-
-                // Single batched write
-                range.setValues(grid);
-                SpreadsheetApp.flush();
-            } catch (error) {
-                console.log('error', error);
-                throw error;
-            } finally {
-                dlock.releaseLock();
             }
-        })();
 
-        // Commit usage (consume sent; release any unused portion of grant)
-        // console.log('granted', granted);
-        // console.log('sent', sent);
-        const { used: usedNow } = _commitCredits_({ granted, sent });
-        const gmailLeft = MailApp.getRemainingDailyQuota();
-        const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);
-        const creditsLeft = Math.min(gmailLeft, planLeft);
+            // Send loop (no locks held)
 
-        return {
-            sent,
-            failed,
-            attempted: batch.length,
-            testMode,
-            creditsLeft,
-            plan,
-            dailyCap,
-            sentToday: usedNow,
-            timeBudgetHit,
-            batchCap: serverBatchCap,
-            newQueuedCount: queuedCount - resultsByRow.size 
-        };
+            // Fallbacks in case subject/body not present
+            const defaultSubject = String(payload?.subject || 'Letter of Intent');
+            const defaultBodyMaker = (docUrl) => String(payload?.bodyTemplate || `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
+            const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
+            const activeUserEmail = Session.getActiveUser().getEmail();
+
+            const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
+            for (let k = 0; k < batch.length; k++) {
+                // Time budget guard (leave time to finalize)
+                if ((Date.now() - t0) > (T_BUDGET_MS - T_GUARD_MS)) { timeBudgetHit = true; break; }
+
+                const item = batch[k];
+                const now = new Date();
+                const newAttempts = (item.attempts || 0) + 1;
+
+                try {
+                    // Determine subject/body from row; fall back if missing
+                    const rowSubject = item.subject && item.subject.trim().length ? item.subject.trim() : defaultSubject;
+                    const finalSubject = testMode ? `[TEST] ${rowSubject}` : rowSubject;
+
+                    // BODY
+                    let rowBody = (item.body && item.body.trim()) ? item.body : "";
+                    if (!rowBody && item.useDocBody && item.docId) {
+                        if (!docBodyCache[item.docId]) {
+                            docBodyCache[item.docId] = buildPlainTextFromDoc(item.docId);
+                        }
+                        rowBody = docBodyCache[item.docId] || "";
+                    }
+                    if (!rowBody) rowBody = defaultBodyMaker(item.docUrl || "");
+
+                    // Test mode: send previews to the user; Real mode: send to recipient
+                    const to = testMode ? previewTo || activeUserEmail : item.email;
+
+                    // ATTACHMENTS
+                    const wantAttach = item.attachPdf && !!item.docId;
+
+                    let attachments = null;
+                    if (wantAttach) {
+                        try {
+                            const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
+                            if (pdf) attachments = [pdf];
+                        } catch (_) {
+                            // fail soft: skip attachment if PDF generation fails
+                        }
+                    }
+
+                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+
+                    resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
+                    sent++;
+                } catch (err) {
+                    resultsByRow.set(item.rowIndex, { ok: false, attempts: newAttempts, error: String(err) });
+                    failed++;
+
+                    // Stop on first error if requested
+                    if (stopOnError) {
+                        attempted = k + 1; // processed this many (including the failure)
+                        break
+                    }
+                }
+                attempted++;
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // DOCUMENT LOCK #2: finalize statuses for the rows we marked
+            // ─────────────────────────────────────────────────────────────
+            (function finalizeStatuses() {
+                if (testMode || !batch.length) return;
+
+                const dlock = LockService.getDocumentLock();
+                if (!dlock.tryLock(10_000)) throw new Error('Another operation is in progress. Try again soon.');
+                try {
+                    // Identify which of the target columns actually exist
+                    const presentCols = [
+                        { key: 'status', idx: iStatus },
+                        { key: 'sentAt', idx: iSentAt },
+                        { key: 'attempts', idx: iAttempts },
+                        { key: 'lastErr', idx: iLastError },
+                    ].filter(c => c.idx != null);
+
+                    if (!presentCols.length) return;
+
+                    // Compute minimal rectangle [minRow..maxRow] x [minCol..maxCol]
+                    const minRow = Math.min.apply(null, batch.map(it => it.rowIndex));
+                    const maxRow = Math.max.apply(null, batch.map(it => it.rowIndex));
+                    const height = maxRow - minRow + 1;
+
+                    const minColIdx = Math.min.apply(null, presentCols.map(c => c.idx));
+                    const maxColIdx = Math.max.apply(null, presentCols.map(c => c.idx));
+                    const width = maxColIdx - minColIdx + 1;
+
+                    // Read the block once
+                    const range = sh.getRange(minRow, minColIdx + 1, height, width);
+                    const grid = range.getValues(); // 2D array
+
+                    // Quick offset helpers
+                    const off = {
+                        status: (iStatus != null) ? (iStatus - minColIdx) : null,
+                        sentAt: (iSentAt != null) ? (iSentAt - minColIdx) : null,
+                        attempts: (iAttempts != null) ? (iAttempts - minColIdx) : null,
+                        lastErr: (iLastError != null) ? (iLastError - minColIdx) : null,
+                    };
+
+                    // Patch only the selected rows inside the in-memory grid
+                    for (let k = 0; k < batch.length; k++) {
+                        const rowIndex = batch[k].rowIndex;
+                        const res = resultsByRow.get(rowIndex);
+                        const r = rowIndex - minRow; // row offset in grid
+
+                        if (res) {
+                            if (off.status != null) grid[r][off.status] = res.ok ? 'sent' : 'failed';
+                            if (off.sentAt != null) grid[r][off.sentAt] = res.ok ? (res.sentAt || new Date()) : '';
+                            if (off.attempts != null) grid[r][off.attempts] = res.attempts;
+                            if (off.lastErr != null) grid[r][off.lastErr] = res.ok ? '' : (res.error || 'Error');
+                        }
+                        else {
+                            // not processed -> revert "processing" back to "queued"
+                            if (off.status != null) grid[r][off.status] = 'queued';
+                            if (off.sentAt != null) grid[r][off.sentAt] = '';
+                        }
+                    }
+
+                    // Single batched write
+                    range.setValues(grid);
+                    SpreadsheetApp.flush();
+                } catch (error) {
+                    console.log('error', error);
+                    throw error;
+                } finally {
+                    dlock.releaseLock();
+                }
+            })();
+
+            // Commit usage (consume sent; release any unused portion of grant)
+            // console.log('granted', granted);
+            // console.log('sent', sent);
+            const { used: usedNow } = _commitCredits_({ granted, sent });
+            const gmailLeft = MailApp.getRemainingDailyQuota();
+            const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);
+            const creditsLeft = Math.min(gmailLeft, planLeft);
+
+            // If we didn't process all rows, resume from the earliest unsent row
+            if (timeBudgetHit || stopOnError) {
+                const firstUnsent = Math.min.apply(null, batch.map(b => b.rowIndex).filter(idx => !resultsByRow.has(idx)));
+                if (isFinite(firstUnsent)) nextToken = firstUnsent;
+            }
+
+            return {
+                sent,
+                failed,
+                attempted,
+                testMode,
+                creditsLeft,
+                plan,
+                dailyCap,
+                sentToday: usedNow,
+                timeBudgetHit,
+                batchCap: serverBatchCap,
+                newQueuedCount: Math.max(0, queuedCount - resultsByRow.size),
+                nextToken,
+            };
+        } catch (e) {
+            _commitCredits_({ granted, sent });
+            throw e;
+        }
     }
     catch (error) {
         console.log('error', error)
@@ -1529,7 +1596,7 @@ export const queueDeleteDocsSimple = (opts?: {
         }
 
         // Delete (Trash by default)
-        let trashed = 0, deleted = 0, missing = 0;  
+        let trashed = 0, deleted = 0, missing = 0;
         ids.forEach((id, i) => {
             Utilities.sleep(perIterSleepMs);
             try {

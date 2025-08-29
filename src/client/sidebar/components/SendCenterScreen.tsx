@@ -16,9 +16,12 @@ import CtaCard from "./CtaCard";
 import CONSTANTS from "../../utils/constants";
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
-type SendDialogState = { open: boolean; variant: "real" | "test" };
+// Some constants
 const PAGE_SIZE = 50;
 export const QUEUE_DISPLAY_LIMIT = 500;
+
+// Types
+type SendDialogState = { open: boolean; variant: "real" | "test" };
 type AllowedStatus = "queued" | "paused" | "sent" | "failed";
 type Props = {
     sendData: {
@@ -133,9 +136,11 @@ export default function SendCenterScreen({
             let failedSoFar = 0;
             let loops = 0;
             let done = false
+            let nextToken: number | null = 2; // Start scanning from row 2
             const attachPDFBatchCap = CONSTANTS.USE_GOOGLE_DOCS_BATCH_CAP;
             const noAttachBatchCap = CONSTANTS.NO_ATTACH_BATCH_CAP;
             const MAX_LOOPS = Math.ceil(CONSTANTS.MAX_GWORKSPACE_PREMIUM_SEND_CAP / attachPDFBatchCap); // hard safety
+            let queuedRemaining = queuedTotal;
 
             while (loops < MAX_LOOPS && !done) {
                 if (pauseRef.current) break;
@@ -148,6 +153,7 @@ export default function SendCenterScreen({
                     noAttachBatchCap,
                     isPremium,
                     freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
+                    startFromRow: nextToken,
                 });
 
                 if (isDev) {
@@ -159,6 +165,7 @@ export default function SendCenterScreen({
                 const failed = res?.failed ?? 0;
                 const creditsLeft = res?.creditsLeft ?? 0;
                 const timeBudgetHit = !!res?.timeBudgetHit;
+                nextToken = res?.nextToken ?? null;
 
                 // Optimistic summary updates
                 setSendData(s => ({
@@ -186,15 +193,12 @@ export default function SendCenterScreen({
                 }));
 
                 // Stop conditions
-                const noneQueuedNow = (sendData?.summary?.queued ?? 0) - sent <= 0;
-                if (sent === 0 || creditsLeft <= 0 || noneQueuedNow || timeBudgetHit) {
-                    if (timeBudgetHit) {
-                        //@ts-ignore
-                        setSnackbar({ open: true, message: "Batch paused to avoid timeouts. Refreshing...", severity: "info" });
-                    }
+                queuedRemaining = Math.max(0, queuedRemaining - sent);
+                const noneQueuedNow = queuedRemaining <= 0;
+                if (sent === 0 || creditsLeft <= 0 || noneQueuedNow) {
                     done = true;
                 }
-                if (sentSoFar >= requestedCount) {
+                if (sentSoFar >= requestedCount || nextToken === null) {
                     done = true;
                 }
             }

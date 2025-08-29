@@ -1,7 +1,6 @@
 // ───────────────────────────────────────────────────────────────
 // Freemium counters (per-user) via UserProperties
 // ───────────────────────────────────────────────────────────────
-export const DEFAULT_FREE_DAILY_SEND_CAP = 100;                 // Free users get 10/day by default
 const RESERVATION_TTL_MS = 15 * 60 * 1000;         // Reclaim stuck reservations after 15 minutes
 
 const LOI_PROP = {
@@ -55,10 +54,10 @@ function _readAndNormalizeCounters_(tz: string) {
     return { today, used, reserved, props };
 }
 
-function _resolvePlanAndCap_(isPremium: boolean, freeDailyCap?: number) {
+function _resolvePlanAndCap_(isPremium: boolean, freeDailyCap?: number, defaultFreeDailyCap: number = 10) {
     const plan = isPremium ? 'premium' : 'free';
     const cap = isPremium ? Number.MAX_SAFE_INTEGER
-        : _toInt_(freeDailyCap, DEFAULT_FREE_DAILY_SEND_CAP);
+        : _toInt_(freeDailyCap, defaultFreeDailyCap);
     return { plan, cap };
 }
 
@@ -124,7 +123,7 @@ export function _commitCredits_({ granted, sent }: { granted: number, sent: numb
 
 export const getSendCreditsLeft = (payload) => {
     const isPremium = !!payload?.isPremium;
-    const freeDailyCap = Number(payload?.freeDailyCap ?? DEFAULT_FREE_DAILY_SEND_CAP);
+    const freeDailyCap = Number(payload?.freeDailyCap ?? 10);
 
     const lock = LockService.getUserLock();
     if (!lock.tryLock(10_000)) throw new Error('Busy, try again.');
