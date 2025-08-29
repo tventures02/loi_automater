@@ -875,6 +875,12 @@ export const sendNextBatch = (payload) => {
         throw new Error('Invalid number of emails to send provided.');
     }
 
+    const T_BUDGET_MS = Number(payload?.timeBudgetMs || 240_000); // 4 min
+    const T_GUARD_MS  = 15_000; // stop ~15s before budget to finalize safely
+    const t0 = Date.now();
+    const attachPDFBatchCap = payload?.attachPDFBatchCap || 25;
+    const noAttachBatchCap = payload?.noAttachBatchCap || 100;
+
     const qSheetRes = queueEnsureSheet();
     const sh = qSheetRes.sh;
     const head = headerIndexMap(sh);
@@ -903,27 +909,30 @@ export const sendNextBatch = (payload) => {
         const iAttempts = head[normHeader('attempts')];
         const iLastError = head[normHeader('lastError')];
         const iCreatedAt = head[normHeader('createdAt')];
-
-        // New email-related columns (rendered at generate time)
         const iSubject = head[normHeader('subject')];     // optional
         const iBody = head[normHeader('body')];        // optional (plain text)
         const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
-        const iUseDocBody = coalesce(
-            head[normHeader('useLOIAsBody')],
-            head[normHeader('useDocBody')] // legacy fallback if needed
-        );
+        const iUseDocBody = coalesce(head[normHeader('useLOIAsBody')], head[normHeader('useDocBody')]); // legacy fallback if needed
 
         // Read all data rows
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-        let queuedCount = 0;
+        let queuedCount = 0, queuedAttachCount = 0;
         for (let r = 0; r < vals.length; r++) {
-          if (String(safeAt(vals[r], iStatus) || '').toLowerCase() === 'queued') queuedCount++;
+            if (String(safeAt(vals[r], iStatus) || '').toLowerCase() === 'queued') {
+                queuedCount++;
+                if (asBool(safeAt(vals[r], iAttachPdf) || false) || 
+                    asBool(safeAt(vals[r], iUseDocBody) || false)) {
+                    queuedAttachCount++;
+                }
+            }
         }
 
         // Determine requested/ask
         const requestedRaw = Number(payload.count);
         const requested = Math.max(1, Math.min(1000, requestedRaw));
-        const ask = Math.min(requested, gmailRemaining, queuedCount);
+        const attachHeavy = queuedAttachCount > 0;
+        const serverBatchCap = attachHeavy ? attachPDFBatchCap : noAttachBatchCap;
+        const ask = Math.min(requested, gmailRemaining, queuedCount, serverBatchCap);
 
         // console.log('ask', ask);
         // console.log('requested', requested);
@@ -941,6 +950,7 @@ export const sendNextBatch = (payload) => {
                 sent: 0, failed: 0, attempted: 0, testMode,
                 creditsLeft: Math.min(gmailRemaining, Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - used)),
                 plan, dailyCap, sentToday: used,
+                timeBudgetHit: false, batchCap: serverBatchCap,
             };
         }
 
@@ -995,6 +1005,7 @@ export const sendNextBatch = (payload) => {
                 sent: 0, failed: 0, attempted: 0, testMode,
                 creditsLeft: Math.min(MailApp.getRemainingDailyQuota(), Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow)),
                 plan, dailyCap, sentToday: usedNow,
+                timeBudgetHit: false, batchCap: serverBatchCap,
             };
         }
 
@@ -1006,9 +1017,12 @@ export const sendNextBatch = (payload) => {
         const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
         const activeUserEmail = Session.getActiveUser().getEmail();
 
-        let sent = 0, failed = 0, attempted = 0;
+        let sent = 0, failed = 0, attempted = 0, timeBudgetHit = false;
         const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
         for (let k = 0; k < batch.length; k++) {
+            // Time budget guard (leave time to finalize)
+            if ((Date.now() - t0) > (T_BUDGET_MS - T_GUARD_MS)) { timeBudgetHit = true; break; }
+
             const item = batch[k];
             const now = new Date();
             const newAttempts = (item.attempts || 0) + 1;
@@ -1134,9 +1148,18 @@ export const sendNextBatch = (payload) => {
         const creditsLeft = Math.min(gmailLeft, planLeft);
 
         return {
-            sent, failed, attempted: batch.length, testMode,
-            creditsLeft, plan, dailyCap, sentToday: usedNow,
-          };
+            sent,
+            failed,
+            attempted: batch.length,
+            testMode,
+            creditsLeft,
+            plan,
+            dailyCap,
+            sentToday: usedNow,
+            timeBudgetHit,
+            batchCap: serverBatchCap,
+            newQueuedCount: queuedCount - resultsByRow.size 
+        };
     }
     catch (error) {
         console.log('error', error)

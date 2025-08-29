@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────
 // Freemium counters (per-user) via UserProperties
 // ───────────────────────────────────────────────────────────────
-export const DEFAULT_FREE_DAILY_SEND_CAP = 10;                 // Free users get 10/day by default
+export const DEFAULT_FREE_DAILY_SEND_CAP = 100;                 // Free users get 10/day by default
 const RESERVATION_TTL_MS = 15 * 60 * 1000;         // Reclaim stuck reservations after 15 minutes
 
 const LOI_PROP = {

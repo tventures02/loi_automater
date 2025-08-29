@@ -1,5 +1,5 @@
 // src/client/components/SendCenterScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import InlineSpinner from "../../utils/components/InlineSpinner";
 import { serverFunctions } from "../../utils/serverFunctions";
@@ -13,6 +13,7 @@ import { Alert, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
 import { User } from "../../utils/types";
 import CtaCard from "./CtaCard";
+import CONSTANTS from "../../utils/constants";
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
 type SendDialogState = { open: boolean; variant: "real" | "test" };
@@ -72,6 +73,22 @@ export default function SendCenterScreen({
         current: AllowedStatus;
     }>({ open: false, id: null, x: 0, y: 0, current: "queued" });
     const [pendingId, setPendingId] = useState<string | null>(null);
+    const [sendProg, setSendProg] = useState<{
+        active: boolean;
+        mode: "real" | "test";
+        planned: number;
+        sent: number;
+        failed: number;
+        loops: number;
+        lastBatch: number;
+        batchCap?: number;
+        timeBudgetHit?: boolean;
+    }>({ active: false, mode: "real", planned: 0, sent: 0, failed: 0, loops: 0, lastBatch: 0 });
+    const pauseRef = useRef(false);
+    const [pauseRequested, setPauseRequested] = useState(false);
+    const requestPause = () => { pauseRef.current = true; setPauseRequested(true); };
+    const resetPause = () => { pauseRef.current = false; setPauseRequested(false); };
+
     const { summary, items, loading, error } = sendData;
     const isPremium = user.subscriptionStatusActive;
     const queuedTotal = summary?.queued ?? 0;
@@ -104,37 +121,92 @@ export default function SendCenterScreen({
             setSnackbar({ open: true, message: "No emails to send. Please generate some LOIs first or increase the number of emails to send.", severity: "error" });
             return;
         }
-        setSending(true);
-        try {
-            const numEmailsToSend = count;
-            const res = await serverFunctions.sendNextBatch({
-                count: numEmailsToSend,
-                stopOnError,
-            });
-            const sent = res?.sent ?? 0;
+        const requestedCount = count;
+        setDialog({ open: false, variant: "real" });
 
-            if (isDev) {
-                console.log('real send results')
-                console.log('res', res);
+        resetPause();
+        setSending(true);
+        setSendProg({ active: true, mode: "real", planned: requestedCount, sent: 0, failed: 0, loops: 0, lastBatch: 0 });
+
+        try {
+            let sentSoFar = 0;
+            let failedSoFar = 0;
+            let loops = 0;
+            let done = false
+            const attachPDFBatchCap = CONSTANTS.USE_GOOGLE_DOCS_BATCH_CAP;
+            const noAttachBatchCap = CONSTANTS.NO_ATTACH_BATCH_CAP;
+            const MAX_LOOPS = Math.ceil(CONSTANTS.MAX_GWORKSPACE_PREMIUM_SEND_CAP / attachPDFBatchCap); // hard safety
+
+            while (loops < MAX_LOOPS && !done) {
+                if (pauseRef.current) break;
+
+                const ask = Math.max(1, requestedCount - sentSoFar);
+                const res = await serverFunctions.sendNextBatch({
+                    count: ask,
+                    stopOnError,
+                    attachPDFBatchCap,
+                    noAttachBatchCap,
+                    isPremium,
+                    freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
+                });
+
+                if (isDev) {
+                    console.log('real send results')
+                    console.log('res', res);
+                }
+
+                const sent = res?.sent ?? 0;
+                const failed = res?.failed ?? 0;
+                const creditsLeft = res?.creditsLeft ?? 0;
+                const timeBudgetHit = !!res?.timeBudgetHit;
+
+                // Optimistic summary updates
+                setSendData(s => ({
+                    ...s,
+                    summary: {
+                        ...s.summary,
+                        remaining: creditsLeft ?? Math.max(0, (s.summary?.remaining || 0) - sent),
+                        sent: (s.summary?.sent || 0) + sent,
+                        queued: Math.max(0, (s.summary?.queued || 0) - sent),
+                    }
+                }));
+
+                sentSoFar += sent;
+                failedSoFar += failed;
+                loops += 1;
+
+                setSendProg(p => ({
+                    ...p,
+                    loops,
+                    batchCap: res?.batchCap,
+                    timeBudgetHit,
+                    lastBatch: sent,
+                    sent: sentSoFar,
+                    failed: failedSoFar,
+                }));
+
+                // Stop conditions
+                const noneQueuedNow = (sendData?.summary?.queued ?? 0) - sent <= 0;
+                if (sent === 0 || creditsLeft <= 0 || noneQueuedNow || timeBudgetHit) {
+                    if (timeBudgetHit) {
+                        //@ts-ignore
+                        setSnackbar({ open: true, message: "Batch paused to avoid timeouts. Refreshing...", severity: "info" });
+                    }
+                    done = true;
+                }
+                if (sentSoFar >= requestedCount) {
+                    done = true;
+                }
             }
 
-            // Optimistic local counters; the list itself will be refreshed after
-            setSendData(s => ({
-                ...s,
-                summary: {
-                    ...s.summary,
-                    remaining: res?.creditsLeft ?? Math.max(0, (s.summary?.remaining || 0) - sent),
-                    sent: (s.summary?.sent || 0) + sent,
-                    queued: Math.max(0, (s.summary?.queued || 0) - sent),
-                }
-            }));
-            setSnackbar({ open: true, message: `Sent ${sent} LOIs`, severity: "success" });
+            setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs`, severity: "success" });
         } catch (e) {
             setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
+            setSendProg(p => ({ ...p, active: false }));
             refreshSendData(true);
         }
     };
@@ -180,6 +252,8 @@ export default function SendCenterScreen({
                 count: numEmailsToSend,
                 testMode: true,
                 previewTo: sendData?.summary?.userEmail, // fallback handled server-side
+                isPremium,
+                freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
             });
 
             const sent = res?.sent ?? 0;
@@ -264,6 +338,7 @@ export default function SendCenterScreen({
     const primaryDisabled = queuedTotal === 0 ? loading : (sending || loading);
     const canLoadMore = visibleCount < filtered.length;
     const queueTotal = summary?.total ?? 0;
+    const percent = sendProg.planned > 0 ? Math.min(100, Math.round((sendProg.sent / sendProg.planned) * 100)) : 0;
 
     // if (isDev) console.log('items', items.slice(0, 10));
 
@@ -429,6 +504,60 @@ export default function SendCenterScreen({
                     </>
                 )}
             </div>
+
+            {sendProg.active && (
+                <div className="rounded-xl border border-gray-200 p-3 bg-white shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-gray-900 flex items-center gap-1">
+                            <InlineSpinner /> Sending emails
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {sendProg.timeBudgetHit ? (
+                                <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                                    Time budget reached — continuing…
+                                </span>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-gray-600">
+                        Sent this run: <b>{sendProg.sent}</b> / {sendProg.planned} &middot; Last batch: {sendProg.lastBatch}
+                        {sendProg.failed > 0 && <> &middot; <span className="text-red-600">Failed: {sendProg.failed}</span></>}
+                    </div>
+
+                    <div className="mt-2 h-2 w-full bg-gray-200 rounded">
+                        <div
+                            className="h-2 rounded bg-indigo-500 transition-[width] duration-200"
+                            style={{ width: `${percent}%` }}
+                        />
+                    </div>
+                    <div className="mt-1 text-[10px] text-gray-500">{percent}% complete</div>
+                    <div className="mt-2 text-[10px] text-red-400">
+                        Don't close this window or sidebar while sending.
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end gap-2">
+                        {!pauseRequested ? (
+                            <button
+                                type="button"
+                                onClick={requestPause}
+                                className="rounded-md px-3 py-1.5 text-[11px] text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 cursor-pointer"
+                            >
+                                Stop after this batch
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled
+                                className="rounded-md px-3 py-1.5 text-[11px] text-gray-500 ring-1 ring-gray-200 bg-gray-50 cursor-not-allowed"
+                            >
+                                Will stop after this batch…
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
 
             {
                 !isPremium && summary?.remaining === 0 && (

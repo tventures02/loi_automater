@@ -838,19 +838,23 @@ export default function GenerateLOIsStepScreen({
                         <div className="text-[10px] text-gray-500">{Math.min(99, Math.round(innerPct))}% of current batch</div>
                         {autoContinue ? (
                             <div className="flex items-center justify-end w-full mt-3">
-                                <div
-                                    role="button"
-                                    tabIndex={0}
+                                <button
+                                    type="button"
                                     onClick={() => setAutoContinue(false)}
-                                    className="inline-block select-none rounded-md border border-red-200 px-3 py-2 text-[11px] bg-red-50 text-red-500 hover:bg-red-100 cursor-pointer w-fit"
+                                    className="rounded-md px-3 py-1.5 text-[11px] text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 cursor-pointer"
                                 >
-                                    Pause after this batch
-                                </div>
+                                    Stop after this batch
+                                </button>
                             </div>
+
                         ) : <div className="flex items-center justify-end w-full mt-3">
-                            <div className="inline-block select-none rounded-md border border-gray-200 px-3 py-2 text-[11px] text-gray-700 w-fit">
-                                Stopping after this batch...
-                            </div>
+                            <button
+                                type="button"
+                                disabled
+                                className="rounded-md px-3 py-1.5 text-[11px] text-gray-500 ring-1 ring-gray-200 bg-gray-50 cursor-not-allowed"
+                            >
+                                Will stop after this batch…
+                            </button>
                         </div>}
                     </div>
                 )}

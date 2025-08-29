@@ -1,5 +1,6 @@
 // ConfirmSendDialog.tsx
 import React, { useEffect, useRef, useState } from "react";
+import CONSTANTS from "../../utils/constants";
 
 type Variant = "real" | "test";
 
@@ -55,7 +56,6 @@ export default function ConfirmSendDialog({
         setAdvancedOpen(false);
         // Reset counts on open / changes
         setCount(Math.max(0, Math.min(remaining ?? 0, queued ?? 0)));
-        setSampleCount(defaultSampleCount);
 
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") onCancel();
@@ -82,7 +82,7 @@ export default function ConfirmSendDialog({
 
     const descWhenNoCredits = isPremium
         ? "You've used all of your Gmail daily sending quota. It resets automatically tomorrow."
-        : "You've used your 10 free sends for today. Upgrade to keep sending right now.";
+        : `You've used your ${CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP} free sends for today. Upgrade to keep sending right now.`;
 
     const description = noCredits ? descWhenNoCredits : descWhenOk;
 
