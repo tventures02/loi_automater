@@ -20,7 +20,7 @@ export default function SendCenterSetup({
 
     const message = !exists ?
         <>Create a sheet tab (<span className="font-mono">Sender Queue</span>) to track and send LOIs. This won’t modify your data.</> :
-        <>The <span className="font-mono">Sender Queue</span> sheet tab is ready to use. Go to the builder to generate some LOIs.</>;
+        <>The <span className="font-mono">Sender Queue</span> is ready to use. Go to the builder to generate some LOIs.</>;
 
     return (
         <div className="space-y-3">

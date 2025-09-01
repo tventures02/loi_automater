@@ -5,6 +5,8 @@ import { colLabel } from "../../utils/misc";
 import useLocalStorage from 'use-local-storage';
 import { Settings } from "../../utils/types";
 import { INIT_SETTINGS } from "../../utils/initVals";
+import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
+import { Tooltip } from "@mui/material";
 
 type Props = {
     open: boolean;
@@ -54,7 +56,9 @@ export default function SettingsDialog({
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">Settings</h3>
 
                     <div className="grid grid-cols-[2fr_1fr] gap-2 text-xs">
-                        <div className="text-gray-500 flex items-center">Max column for mapping</div>
+                        <div className="text-gray-500 flex items-center gap-1">Last column for mapping
+                            <Tooltip title="The last column letter that can be mapped from your source data sheet tab."> 
+                            <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-900" /></Tooltip></div>
                         <div>
                             <select
                                 value={maxColCharNumber}

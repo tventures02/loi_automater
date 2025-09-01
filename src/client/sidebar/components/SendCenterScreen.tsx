@@ -64,7 +64,7 @@ export default function SendCenterScreen({
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
-    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
+    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" | "warning" }>({ open: false, message: "", severity: "success" });
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
     const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -203,15 +203,23 @@ export default function SendCenterScreen({
                 if (sentSoFar >= requestedCount || nextToken === null) {
                     done = true;
                 }
+                if (stopOnError && failedSoFar > 0) {
+                    done = true;
+                }
             }
 
-            setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs`, severity: "success" });
+            if (failedSoFar > 0) {
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs but failed to send ${failedSoFar} LOIs`, severity: "warning" });
+            }
+            else {
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs`, severity: "success" });
+            }
         } catch (e) {
             setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION);
             setSendProg(p => ({ ...p, active: false }));
             refreshSendData(true);
         }
@@ -270,12 +278,12 @@ export default function SendCenterScreen({
             }
 
             setSnackbar({ open: true, message: `Sent ${sent} test email${sent > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
-        } catch {
-            setSnackbar({ open: true, message: "Test send failed. Please try again.", severity: "error" });
+        } catch (e) {
+            setSnackbar({ open: true, message: `Test send failed. ${e.message}`, severity: "error" });
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION);
             refreshSendData(true);
         }
     };
@@ -613,7 +621,7 @@ export default function SendCenterScreen({
 
             {/* Snackbar */}
             {snackbar.open && (
-                <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                <Snackbar open={snackbar.open} autoHideDuration={CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
                     <Alert severity={snackbar.severity}><span className="text-xs">{snackbar.message}</span></Alert>
                 </Snackbar>
             )}
@@ -660,6 +668,7 @@ export default function SendCenterScreen({
                 isSubmitting={sending}
                 isPremium={isPremium}
                 onUpgrade={onUpgradeClick}
+                user={user}
             />
 
             {openClear && (

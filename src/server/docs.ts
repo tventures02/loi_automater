@@ -44,6 +44,18 @@ export function getLoiUserPropsDev() {
         reservedAt: reservedTs ? JSON.stringify(new Date(reservedTs)) : null,
     };
 }
+
+// Sets the LOI dateKey to "yesterday" so daily credits will replenish on next run.
+export function setLoiDateKeyToYesterdayDev() {
+    const up = PropertiesService.getUserProperties();
+    const tz = Session.getScriptTimeZone() || 'Etc/GMT';
+    const d = new Date(Date.now());
+    d.setDate(d.getDate() - 1); // exactly one day ago
+    const dateKey = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+    up.setProperty('loi.dateKey', dateKey);
+    return { dateKey };
+}
+
 // Dev functions--------------------------------
 
 /**
@@ -1082,6 +1094,10 @@ export const sendNextBatch = (payload) => {
                     const rowSubject = item.subject && item.subject.trim().length ? item.subject.trim() : defaultSubject;
                     const finalSubject = testMode ? `[TEST] ${rowSubject}` : rowSubject;
 
+                    // if (k === 2) {
+                    //     throw new Error('test error');
+                    // }
+
                     // BODY
                     let rowBody = (item.body && item.body.trim()) ? item.body : "";
                     if (!rowBody && item.useDocBody && item.docId) {
@@ -1100,15 +1116,11 @@ export const sendNextBatch = (payload) => {
 
                     let attachments = null;
                     if (wantAttach) {
-                        try {
-                            const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
-                            if (pdf) attachments = [pdf];
-                        } catch (_) {
-                            // fail soft: skip attachment if PDF generation fails
-                        }
+                        const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
+                        if (pdf) attachments = [pdf];
                     }
 
-                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    // MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;
@@ -1196,8 +1208,6 @@ export const sendNextBatch = (payload) => {
             })();
 
             // Commit usage (consume sent; release any unused portion of grant)
-            // console.log('granted', granted);
-            // console.log('sent', sent);
             const { used: usedNow } = _commitCredits_({ granted, sent });
             const gmailLeft = MailApp.getRemainingDailyQuota();
             const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);

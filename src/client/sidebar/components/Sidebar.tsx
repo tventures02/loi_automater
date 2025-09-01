@@ -260,9 +260,9 @@ const SidebarContainer = () => {
             }
 
             const getQueueData = async (user: User) => {
-                console.log('getQueueData')
+                if (isDev) console.log('getQueueData')
                 if (await serverFunctions.queueExists()) {
-                    console.log('refreshSendData')
+                    if (isDev) console.log('refreshSendData')
                     refreshSendData(true, user);
                 }
             }
@@ -709,6 +709,7 @@ const SidebarContainer = () => {
                         <div className='flex gap-2 text-[10px] justify-center'>
                             <span onClick={() => serverFunctions.resetLoiUserPropsDev()} className='text-gray-500 cursor-pointer hover:underline'>Reset user props</span>
                             <span onClick={async () => console.log(await serverFunctions.getLoiUserPropsDev())} className='text-gray-500 cursor-pointer hover:underline'>Get user props</span>
+                            <span onClick={async () => console.log(await serverFunctions.setLoiDateKeyToYesterdayDev())} className='text-gray-500 cursor-pointer hover:underline'>Reset date key</span>
                         </div>
                     )
                 }

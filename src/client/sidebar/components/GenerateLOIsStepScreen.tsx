@@ -467,7 +467,7 @@ export default function GenerateLOIsStepScreen({
             setIsGenerating(false);
             setProgressText("");
             refreshSendData(true);
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 8000);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION);
             setAutoContinue(true);
         }
     };
@@ -892,7 +892,7 @@ export default function GenerateLOIsStepScreen({
 
             {/* Snackbar */}
             {snackbar.open && (
-                <Snackbar open={snackbar.open} autoHideDuration={8000} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                <Snackbar open={snackbar.open} autoHideDuration={CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
                     <Alert severity={snackbar.severity}><span className="text-xs">{snackbar.message}</span></Alert>
                 </Snackbar>
             )}

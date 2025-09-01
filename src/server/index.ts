@@ -36,7 +36,8 @@ import {
     queueDeleteDocsSimple,
     resetLoiUserPropsDev,
     getLoiUserPropsDev,
-    queuePurgeSentAndCompact
+    queuePurgeSentAndCompact,
+    setLoiDateKeyToYesterdayDev
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -72,5 +73,6 @@ export {
     queueDeleteDocsSimple,
     resetLoiUserPropsDev,
     getLoiUserPropsDev,
-    queuePurgeSentAndCompact
+    queuePurgeSentAndCompact,
+    setLoiDateKeyToYesterdayDev
 };

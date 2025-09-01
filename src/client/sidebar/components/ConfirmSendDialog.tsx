@@ -1,6 +1,7 @@
 // ConfirmSendDialog.tsx
 import React, { useEffect, useRef, useState } from "react";
 import CONSTANTS from "../../utils/constants";
+import { User } from "../../utils/types";
 
 type Variant = "real" | "test";
 
@@ -27,6 +28,8 @@ type Props = {
 
     isPremium: boolean;
     onUpgrade?: () => void;       // optional CTA action
+
+    user: User;
 };
 
 export default function ConfirmSendDialog({
@@ -39,6 +42,7 @@ export default function ConfirmSendDialog({
     isSubmitting = false,
     isPremium,
     onUpgrade,
+    user,
 }: Props) {
     const { remaining = 0, queued, toEmail } = summary || {};
     const noCredits = (remaining ?? 0) <= 0;
@@ -78,7 +82,7 @@ export default function ConfirmSendDialog({
     const descWhenOk =
         variant === "real"
             ? `This will send ${count} email${count === 1 ? "" : "s"} now.`
-            : `We'll send ${sampleCount} preview email${sampleCount === 1 ? "" : "s"} to you (${toEmail || "your email address"}) using the next queued LOIs. Test emails also use your daily credits.`;
+            : `We'll send ${sampleCount} preview email${sampleCount === 1 ? "" : "s"} to you (${user.email || toEmail || "your email address"}) using the next queued LOIs to verify correctness.`;
 
     const descWhenNoCredits = isPremium
         ? "You've used all of your Gmail daily sending quota. It resets automatically tomorrow."
@@ -142,7 +146,7 @@ export default function ConfirmSendDialog({
                                 </div>
                             </div>
                             <div className="mt-2 text-gray-500">
-                                Test emails also use your daily credits and won’t change the Sender Queue status.
+                                Test emails also use your daily credits but won’t change the Sender Queue status.
                             </div>
                             {noCredits && (
                                 <div className="mt-2 rounded bg-red-50 text-red-700 p-2">
@@ -158,7 +162,7 @@ export default function ConfirmSendDialog({
                             <button
                                 type="button"
                                 onClick={() => setAdvancedOpen((v) => !v)}
-                                className={`text-[11px] ${noCredits ? "text-gray-400 cursor-not-allowed" : "text-gray-600 hover:text-gray-900 hover:underline"} flex justify-end`}
+                                className={`text-[11px] ${noCredits ? "text-gray-400 cursor-not-allowed" : "text-gray-600 hover:text-gray-900 hover:underline cursor-pointer"} flex justify-end`}
                                 disabled={noCredits}
                             >
                                 {advancedOpen ? "Hide advanced options" : "Show advanced options"}
