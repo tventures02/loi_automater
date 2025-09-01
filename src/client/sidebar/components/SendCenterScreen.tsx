@@ -291,13 +291,56 @@ export default function SendCenterScreen({
     const handleClearQueue = async (deleteDocs: boolean = false, removeSent: boolean = false) => {
         if (clearing) return;
         setClearing(true);
+
         try {
             if (deleteDocs) {
-                const deleteRes = await serverFunctions.queueDeleteDocsSimple({removeSent});
-                if (isDev) console.log('deleteRes', deleteRes);
+                // Progressive deletion: loop until nextToken is null
+                let nextToken: number | null = 2;      // first data row
+                let totalDeleted = 0;
+                let totalTrashed = 0;
+                let totalMissing = 0;
+                let totalCandidates = 0;
+                let loops = 0;
+                let maxLoops = 10;
+
+                while (nextToken !== null && loops < maxLoops) {
+                    const res = await serverFunctions.queueDeleteDocsSimple({
+                        removeSent,            // true => only delete Docs for rows with status "sent"
+                        startFromRow: nextToken,
+                        limit: 200,            // tune as needed
+                        timeBudgetMs: 270000,  // ~4.5 min; server will return early if needed
+                        throttleEvery: 50,
+                        sleepMs: 600,
+                        // permanentDelete: false, // keep default "trash"
+                    });
+
+                    loops += 1;
+                    totalDeleted += res?.deleted ?? 0;
+                    totalTrashed += res?.trashed ?? 0;
+                    totalMissing += res?.missing ?? 0;
+                    totalCandidates += loops === 1 ? (res?.candidates ?? 0) : 0; // candidates per-call; first call is enough for UI
+                    nextToken = res?.nextToken ?? null;
+
+                    // Lightweight progress ping (non-blocking UX)
+                    setSnackbar({
+                        open: true,
+                        severity: "success",
+                        message: `Deleting docs… ${(totalDeleted + totalTrashed)} deleted so far.`,
+                    });
+
+                    // Nothing to do or server didn’t hit budget but returned no candidates
+                    if (!res?.timeBudgetHit && (res?.candidates ?? 0) === 0) break;
+                    if (loops >= maxLoops) break;
+                }
+
+                if (isDev) {
+                    console.log("Doc deletion totals:", { totalDeleted, totalTrashed, totalMissing, totalCandidates, loops });
+                }
             }
 
+            // Now clear the sheet (all rows or only "sent" rows depending on removeSent)
             await serverFunctions.queueClearAll(removeSent);
+
             // Optimistic local reset; also call onRefresh to re-pull counts
             setSendData(s => ({ ...s, items: [] }));
             setSendData(s => ({
@@ -307,8 +350,8 @@ export default function SendCenterScreen({
             onRefresh?.();
 
             setSnackbar({ open: true, message: "Queue cleared.", severity: "success" });
-        } catch (e) {
-            console.error('Failed to clear queue', e);
+        } catch (e: any) {
+            console.error("Failed to clear queue", e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
         } finally {
             setClearing(false);
@@ -317,6 +360,7 @@ export default function SendCenterScreen({
             setQueueOpen(false);
         }
     };
+
 
     const handleGoToGenLOIs = () => {
         if (mode === "send") {

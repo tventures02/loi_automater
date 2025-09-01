@@ -28,7 +28,7 @@ export default function ConfirmClearQueueModal({
             <div className="relative w-full max-w-sm rounded-xl bg-white shadow-lg ring-1 ring-black/5 p-4">
                 <div className="text-sm font-semibold text-gray-900">Clear queue</div>
                 <p className="mt-2 text-xs text-gray-600">
-                    This will permanently remove <b>{count}</b> item{count !== 1 ? "s" : ""} from <span className="font-mono">Sender Queue</span>.
+                    This will permanently remove <b>{count}</b> item{count !== 1 ? "s" : ""} from the <span className="font-mono">Sender Queue</span>.
                 </p>
 
                 <div className="mt-2 text-xs text-gray-600">
@@ -68,7 +68,7 @@ export default function ConfirmClearQueueModal({
                     <div
                         role="button"
                         tabIndex={0}
-                        onClick={onCancel}
+                        onClick={() => { if (!clearing) onCancel(); }}
                         className="cursor-pointer select-none rounded-md ring-1 ring-gray-200 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                     >
                         Cancel

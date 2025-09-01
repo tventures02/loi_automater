@@ -1585,18 +1585,38 @@ export const loiEnsureOutputFolder = (): string => {
 
 
 /**
- * Delete Docs referenced in the "Sender Queue" sheet.
- * - Default: delete ALL referenced Docs (deduped).
- * - If removeSent = true: delete only Docs whose job status is "sent".
- * - Trash by default; set permanentDelete=true to permanently delete (requires Advanced Drive Service).
+ * Delete Docs referenced in the "Sender Queue" sheet — progressively.
+ * Designed for large sets: scans in chunks, respects a time budget,
+ * returns a nextToken so the client can loop and show progress.
+ *
+ * Backward-compatible:
+ * - removeSent=true -> restricts to rows with status === "sent"
+ * - statuses -> optional explicit filter (ignored when removeSent=true)
+ * - permanentDelete=false -> trash instead of permanent delete
+ *
+ * New UX helpers:
+ * - startFromRow: row cursor to continue where you left off
+ * - limit: max files to attempt per call (default 200)
+ * - timeBudgetMs: stop early to avoid Apps Script timeout (default ~4.5 min)
+ * - dryRun: collect candidates but DO NOT delete (for preview/confirm)
+ * - sampleNames: attempt to include up to N file names (small number) for UI
+ *
+ * Returns progress fields: nextToken, candidatesFound, deleted/trashed/missing, timeBudgetHit, scannedRows, elapsedMs.
  */
 export const queueDeleteDocsSimple = (opts?: {
     sheetName?: string;              // default: LOI_QUEUE_NAME
-    removeSent?: boolean;            // if true, restrict to rows with status === "sent"
+    removeSent?: boolean;            // if true, restrict to status === "sent"
     statuses?: string[] | null;      // optional explicit filter (ignored when removeSent=true)
     permanentDelete?: boolean;       // default: false (Trash instead of permanent)
     throttleEvery?: number;          // default: 50 (sleep every N deletes)
     sleepMs?: number;                // default: 600ms (to be gentle on quotas)
+
+    // New progressive / UX options:
+    startFromRow?: number;           // default: 2 (first data row)
+    limit?: number;                  // max files to attempt per call; default 200
+    timeBudgetMs?: number;           // default: 270_000 (~4.5 min)
+    dryRun?: boolean;                // default: false (when true, don't delete; just preview counts)
+    sampleNames?: number;            // default: 0 (try to return up to N file names for UI)
 }) => {
     const {
         sheetName = LOI_QUEUE_NAME,
@@ -1605,11 +1625,19 @@ export const queueDeleteDocsSimple = (opts?: {
         permanentDelete = false,
         throttleEvery = 50,
         sleepMs = 600,
+
+        startFromRow = 2,
+        limit = 200,
+        timeBudgetMs = 270_000, // ~4.5 min, leaving buffer for UI/network
+        dryRun = false,
+        sampleNames = 0,
     } = opts || {};
 
     const DOC_ID = "docId";
     const STATUS = "status";
     const perIterSleepMs = 20;
+    const t0 = Date.now();
+    const withinBudget = () => (Date.now() - t0) < timeBudgetMs;
 
     const { sh } = queueEnsureSheet();
     if (sh.getName() !== sheetName) {
@@ -1623,7 +1651,13 @@ export const queueDeleteDocsSimple = (opts?: {
     try {
         const lastRow = sh.getLastRow();
         const lastCol = sh.getLastColumn();
-        if (lastRow < 2) return { deleted: 0, trashed: 0, candidates: 0, missing: 0 };
+        if (lastRow < 2 || startFromRow > lastRow) {
+            return {
+                deleted: 0, trashed: 0, missing: 0, candidates: 0,
+                nextToken: null, timeBudgetHit: false, scannedRows: 0, elapsedMs: Date.now() - t0,
+                previewNames: [] as string[],
+            };
+        }
 
         const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(v => String(v || "").trim());
         const findIdx = (h: string) => headers.findIndex(x => x.toLowerCase() === h.toLowerCase());
@@ -1631,43 +1665,100 @@ export const queueDeleteDocsSimple = (opts?: {
         const docIdIdx = findIdx(DOC_ID);
         const statusIdx = findIdx(STATUS);
         if (docIdIdx < 0) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
-
-        // Effective status filter
-        const effectiveStatuses: string[] | null = removeSent ? ["sent"] : (statuses ? statuses : null);
-        if (effectiveStatuses && statusIdx < 0) {
-            // Caller asked to filter by status, but we can't without a status column.
+        if ((removeSent || (statuses && statuses.length)) && statusIdx < 0) {
             throw new Error(`Header "${STATUS}" is required to filter by status in ${sheetName}`);
         }
 
-        const rows = lastRow - 1;
-        const data = sh.getRange(2, 1, rows, lastCol).getValues();
+        // Effective status filter
+        const effectiveStatuses: string[] | null = removeSent ? ["sent"] : (statuses ? statuses : null);
+        const statusSet = effectiveStatuses ? new Set(effectiveStatuses.map(s => s.toLowerCase())) : null;
 
+        // Progressive scan: read the sheet in chunks, collect up to "limit" docIds
+        const CHUNK_ROWS = 500;
         const ids: string[] = [];
-        const seen = new Set<string>();
+        const seen = new Set<string>(); // dedupe within this call
+        let nextToken: number | null = null;
+        let scannedRows = 0;
+        let attachNames: string[] = [];
+        let hitLimit = false
 
-        for (let r = 0; r < data.length; r++) {
-            const docId = String(data[r][docIdIdx] || "").trim();
-            if (!docId) continue;
+        for (let r = startFromRow; r <= lastRow && ids.length < limit && withinBudget(); r += CHUNK_ROWS) {
+            const howMany = Math.min(CHUNK_ROWS, lastRow - r + 1);
+            const data = sh.getRange(r, 1, howMany, lastCol).getValues();
 
-            if (effectiveStatuses && statusIdx >= 0) {
-                const st = String(data[r][statusIdx] || "").trim().toLowerCase();
-                const want = effectiveStatuses.some(s => s.toLowerCase() === st);
-                if (!want) continue;
+            for (let i = 0; i < data.length && ids.length < limit; i++) {
+                scannedRows++;
+                const row = data[i];
+                const docId = String(row[docIdIdx] || "").trim();
+                if (!docId) continue;
+
+                if (statusSet && statusIdx >= 0) {
+                    const st = String(row[statusIdx] || "").trim().toLowerCase();
+                    if (!statusSet.has(st)) continue;
+                }
+
+                if (!seen.has(docId)) {
+                    seen.add(docId);
+                    ids.push(docId);
+                }
+
+                if (ids.length >= limit) {
+                    hitLimit = true;
+                    nextToken = r + i + 1; // continue after the chunk we just read
+                    if (nextToken > lastRow) nextToken = null;
+                    break;
+                }
             }
 
-            if (!seen.has(docId)) {
-                seen.add(docId);
-                ids.push(docId);
+            if (hitLimit) break;
+
+            // If we reached the end of this chunk and still under limit, keep scanning
+            nextToken = r + howMany;
+            if (nextToken > lastRow) nextToken = null;
+            if (!withinBudget()) break;
+        }
+
+        // Optional small preview of file names for UI (keep N tiny to avoid quotas)
+        if (sampleNames > 0 && ids.length > 0 && withinBudget()) {
+            const maxNames = Math.min(sampleNames, ids.length, 5);
+            const idsForNames = ids.slice(0, maxNames);
+            try {
+                // Prefer Advanced Drive (Drive.Files.get) if enabled; otherwise fallback is omitted
+                idsForNames.forEach(id => {
+                    try {
+                        // @ts-ignore Advanced Drive Service v2
+                        const file = Drive.Files.get(id);
+                        if (file && file.title) attachNames.push(file.title);
+                        Utilities.sleep(30); // be gentle
+                    } catch (_) {
+                        // ignore name fetch errors
+                    }
+                });
+            } catch (_) {
+                // ignore if Advanced Service not enabled
             }
         }
 
-        let trashed = 0, deleted = 0, missing = 0;
+        if (dryRun || ids.length === 0 || !withinBudget()) {
+            return {
+                deleted: 0, trashed: 0, missing: 0,
+                candidates: ids.length,
+                nextToken,
+                timeBudgetHit: !withinBudget(),
+                scannedRows,
+                elapsedMs: Date.now() - t0,
+                previewNames: attachNames,
+            };
+        }
 
+        // Delete (Trash by default), throttled
+        let trashed = 0, deleted = 0, missing = 0;
         ids.forEach((id, i) => {
+            if (!withinBudget()) return;
             Utilities.sleep(perIterSleepMs);
             try {
                 if (permanentDelete) {
-                    // Advanced Drive Service must be enabled
+                    // Requires Advanced Service: Drive API enabled
                     // @ts-ignore
                     Drive.Files.remove(id);
                     deleted++;
@@ -1675,14 +1766,24 @@ export const queueDeleteDocsSimple = (opts?: {
                     Drive.Files.trash(id);
                     trashed++;
                 }
-            } catch (_) {
-                // File may already be gone or inaccessible
+            } catch (e) {
+                // File might be gone, already trashed, or permission denied
                 missing++;
             }
             if ((i + 1) % throttleEvery === 0) Utilities.sleep(sleepMs);
         });
 
-        return { deleted, trashed, missing, candidates: ids.length };
+        return {
+            deleted,
+            trashed,
+            missing,
+            candidates: ids.length,
+            nextToken,
+            timeBudgetHit: !withinBudget(),
+            scannedRows,
+            elapsedMs: Date.now() - t0,
+            previewNames: attachNames,
+        };
     } finally {
         lock.releaseLock();
     }
