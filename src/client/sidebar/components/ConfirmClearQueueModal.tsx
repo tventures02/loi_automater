@@ -18,7 +18,7 @@ export default function ConfirmClearQueueModal({
     const { total, sent } = summary || {};
     const count = removeSent ? sent : total;
 
-    if (count === 0) return null;
+    if (total === 0) return null;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3" role="dialog" aria-modal="true">

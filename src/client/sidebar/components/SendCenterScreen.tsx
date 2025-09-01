@@ -632,7 +632,7 @@ export default function SendCenterScreen({
                 secondaryLabel="Send Test Email"
                 onSecondary={queuedTotal > 0 ? openTestDialog : undefined}
                 secondaryDisabled={loading || sending}
-                onPrimary={!sending ? openRealDialog : queuedTotal === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
+                onPrimary={!sending && queuedTotal > 0 ? openRealDialog : queuedTotal === 0 && !loading && (mode === "send" || currentStep === "send") ? handleGoToGenLOIs : undefined}
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
@@ -675,7 +675,7 @@ export default function SendCenterScreen({
                 <ConfirmClearQueueModal
                     summary={summary}
                     clearing={clearing}
-                    onCancel={() => { if (!clearing) { setOpenClear(false); } }}
+                    onCancel={() => { setOpenClear(false); }}
                     onConfirm={(deleteDocs, removeSent) => handleClearQueue(deleteDocs, removeSent)}
                 />
             )}
