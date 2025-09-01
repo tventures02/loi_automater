@@ -172,7 +172,7 @@ export const createGoogleDoc = (docTitle: string, templatesFolderId?: string) =>
         const doc = DocumentApp.openById(file.id);
         const body = doc.getBody();
         body.clear(); // ensure empty body
-        const content = `Sample Letter (Edit me)\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close within 30 days, pending agreement on final terms.\n\nBest,\nJohn Smith\n\n`;
+        const content = `Sample Letter\n\nHi {{agent_name}},\n\nI’m interested in purchasing the property at {{address}} and would like to make an offer of {{offer}}. I’d be ready to close within 30 days, pending agreement on final terms.\n\nBest,\nJohn Smith\n\n`;
         body.appendParagraph(content);
         doc.saveAndClose();
 
@@ -1108,7 +1108,7 @@ export const sendNextBatch = (payload) => {
                         }
                     }
 
-                    // MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;
@@ -1296,8 +1296,8 @@ export const queueUpdateStatus = (payload) => {
 
 
 /** Remove ALL rows from Sender Queue except the header row. */
-export const queueClearAll = () => {
-    const { sh } = queueEnsureSheet(); // your existing helper
+export const queueClearAll = (removeSent: boolean = false) => {
+    const { sh } = queueEnsureSheet(); // existing helper
     const lastRow = sh.getLastRow();
     if (lastRow <= 1) return { cleared: 0, remaining: 0 };
 
@@ -1305,14 +1305,65 @@ export const queueClearAll = () => {
     if (!lock.tryLock(10_000)) {
         throw new Error('Another operation is in progress. Try again soon.');
     }
+
     try {
-        const rows = lastRow - 1; // everything below the header
-        sh.getRange(2, 1, rows, sh.getLastColumn()).clearContent(); // keep header, formatting
-        return { cleared: rows, remaining: 0 };
+        if (!removeSent) {
+            // Original behavior: clear all rows below header (keep formatting/columns)
+            const rows = lastRow - 1;
+            sh.getRange(2, 1, rows, sh.getLastColumn()).clearContent();
+            return { cleared: rows, remaining: 0 };
+        }
+
+        // Only remove rows with status === 'sent'
+        const head = headerIndexMap(sh);
+        const iStatus = head[normHeader('status')];
+        if (iStatus == null) {
+            throw new Error("Couldn't find a 'status' column. Please restore the header.");
+        }
+
+        const numRows = lastRow - 1;
+        const statusVals = sh.getRange(2, iStatus + 1, numRows, 1).getValues(); // [[val], ...]
+        const toDelete: number[] = [];
+        for (let i = 0; i < statusVals.length; i++) {
+            const v = String(statusVals[i][0] || '').trim().toLowerCase();
+            if (v === 'sent') {
+                toDelete.push(i + 2); // row index in sheet
+            }
+        }
+
+        if (toDelete.length === 0) {
+            return { cleared: 0, remaining: lastRow - 1 };
+        }
+
+        // Compress consecutive rows into ranges and delete bottom-up
+        toDelete.sort((a, b) => a - b);
+        const ranges: Array<{ start: number; count: number }> = [];
+        let start = toDelete[0], count = 1;
+
+        for (let i = 1; i < toDelete.length; i++) {
+            if (toDelete[i] === toDelete[i - 1] + 1) {
+                count++;
+            } else {
+                ranges.push({ start, count });
+                start = toDelete[i];
+                count = 1;
+            }
+        }
+        ranges.push({ start, count });
+
+        // Delete from bottom to top to avoid row index shifting
+        ranges.sort((a, b) => b.start - a.start);
+        for (const r of ranges) {
+            sh.deleteRows(r.start, r.count);
+        }
+
+        const remaining = Math.max(0, sh.getLastRow() - 1);
+        return { cleared: toDelete.length, remaining };
     } finally {
         lock.releaseLock();
     }
 };
+  
 
 /**
    * Build a plain-text email body from a Google Doc, preserving paragraph breaks,
@@ -1524,20 +1575,22 @@ export const loiEnsureOutputFolder = (): string => {
 
 
 /**
- * Collect all docIds from the "Sender Queue" sheet and delete the Docs.
- * - Default behavior: move files to Trash (safer, reversible).
- * - Optionally: permanently delete (requires Advanced Service: Drive API enabled).
- * - Dedupe docIds so the same Doc gets deleted only once.
+ * Delete Docs referenced in the "Sender Queue" sheet.
+ * - Default: delete ALL referenced Docs (deduped).
+ * - If removeSent = true: delete only Docs whose job status is "sent".
+ * - Trash by default; set permanentDelete=true to permanently delete (requires Advanced Drive Service).
  */
 export const queueDeleteDocsSimple = (opts?: {
     sheetName?: string;              // default: LOI_QUEUE_NAME
-    statuses?: string[] | null;      // e.g. ["queued","failed"]; default = null (no filter)
+    removeSent?: boolean;            // if true, restrict to rows with status === "sent"
+    statuses?: string[] | null;      // optional explicit filter (ignored when removeSent=true)
     permanentDelete?: boolean;       // default: false (Trash instead of permanent)
-    throttleEvery?: number;          // default: 10 (sleep every N deletes)
+    throttleEvery?: number;          // default: 50 (sleep every N deletes)
     sleepMs?: number;                // default: 600ms (to be gentle on quotas)
 }) => {
     const {
         sheetName = LOI_QUEUE_NAME,
+        removeSent = false,
         statuses = null,
         permanentDelete = false,
         throttleEvery = 50,
@@ -1548,7 +1601,7 @@ export const queueDeleteDocsSimple = (opts?: {
     const STATUS = "status";
     const perIterSleepMs = 20;
 
-    const { sh } = queueEnsureSheet(); // your existing helper; ensure it returns { sh }
+    const { sh } = queueEnsureSheet();
     if (sh.getName() !== sheetName) {
         const target = SpreadsheetApp.getActive().getSheetByName(sheetName);
         if (!target) throw new Error(`Sheet "${sheetName}" not found`);
@@ -1563,45 +1616,48 @@ export const queueDeleteDocsSimple = (opts?: {
         if (lastRow < 2) return { deleted: 0, trashed: 0, candidates: 0, missing: 0 };
 
         const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(v => String(v || "").trim());
-        const idxOf = (h: string) => {
-            const i = headers.indexOf(h);
-            return i >= 0 ? i : null;
-        };
+        const findIdx = (h: string) => headers.findIndex(x => x.toLowerCase() === h.toLowerCase());
 
-        const docIdIdx = idxOf(DOC_ID);
-        const statusIdx = idxOf(STATUS);
-        if (docIdIdx == null) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
+        const docIdIdx = findIdx(DOC_ID);
+        const statusIdx = findIdx(STATUS);
+        if (docIdIdx < 0) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
+
+        // Effective status filter
+        const effectiveStatuses: string[] | null = removeSent ? ["sent"] : (statuses ? statuses : null);
+        if (effectiveStatuses && statusIdx < 0) {
+            // Caller asked to filter by status, but we can't without a status column.
+            throw new Error(`Header "${STATUS}" is required to filter by status in ${sheetName}`);
+        }
 
         const rows = lastRow - 1;
-        const data = sh.getRange(2, 1, rows, lastCol).getValues(); // raw values
-        const ids: string[] = [];
-        const idToRows = new Map<string, number[]>();
+        const data = sh.getRange(2, 1, rows, lastCol).getValues();
 
-        // Collect candidates (optionally filter by status)
+        const ids: string[] = [];
+        const seen = new Set<string>();
+
         for (let r = 0; r < data.length; r++) {
             const docId = String(data[r][docIdIdx] || "").trim();
             if (!docId) continue;
 
-            if (statuses && statusIdx != null) {
+            if (effectiveStatuses && statusIdx >= 0) {
                 const st = String(data[r][statusIdx] || "").trim().toLowerCase();
-                if (!statuses.map(s => s.toLowerCase()).includes(st)) continue;
+                const want = effectiveStatuses.some(s => s.toLowerCase() === st);
+                if (!want) continue;
             }
 
-            if (!idToRows.has(docId)) {
-                idToRows.set(docId, [r + 2]); // sheet row
+            if (!seen.has(docId)) {
+                seen.add(docId);
                 ids.push(docId);
-            } else {
-                idToRows.get(docId)!.push(r + 2);
             }
         }
 
-        // Delete (Trash by default)
         let trashed = 0, deleted = 0, missing = 0;
+
         ids.forEach((id, i) => {
             Utilities.sleep(perIterSleepMs);
             try {
                 if (permanentDelete) {
-                    // Requires Advanced Service: Drive enabled in Apps Script project
+                    // Advanced Drive Service must be enabled
                     // @ts-ignore
                     Drive.Files.remove(id);
                     deleted++;
@@ -1609,12 +1665,10 @@ export const queueDeleteDocsSimple = (opts?: {
                     Drive.Files.trash(id);
                     trashed++;
                 }
-            } catch (e) {
-                // File might be gone, in another user's drive, or permission denied
+            } catch (_) {
+                // File may already be gone or inaccessible
                 missing++;
             }
-
-            // Gentle throttling to avoid hitting short-term quotas
             if ((i + 1) % throttleEvery === 0) Utilities.sleep(sleepMs);
         });
 
@@ -1623,6 +1677,7 @@ export const queueDeleteDocsSimple = (opts?: {
         lock.releaseLock();
     }
 };
+
 
 /**
  * Delete all "sent" rows in Sender Queue and compact so there are no gaps.

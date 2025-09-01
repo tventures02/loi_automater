@@ -153,6 +153,7 @@ const TemplateStepScreen = ({
     };
 
     const openCreateDialog = () => {
+        if (isCreatingDoc) return;
         setDocTitle('New LOI Template'); // or ''
         setIsCreateDialogOpen(true);
         setTimeout(() => inputRef.current?.focus(), 0);
@@ -192,7 +193,8 @@ const TemplateStepScreen = ({
                                     role="button"
                                     tabIndex={0} // Makes it focusable
                                     onClick={openCreateDialog} // Your existing function
-                                    className={`flex items-center gap-1 !cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900 ${isCreatingDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex items-center gap-1 !cursor-pointer group select-none rounded-md px-3 py-2 text-xs font-medium text-white focus:outline-none 
+                                        bg-gray-900 hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900 ${isCreatingDoc ? 'opacity-50 !cursor-not-allowed' : ''}`}
                                 >
                                     <PlusIcon className="h-5 w-5 pointer-events-none" /> {/* Added pointer-events-none to icon */}
                                     <span className="pointer-events-none whitespace-nowrap">New Template</span> {/* Added pointer-events-none to text */}

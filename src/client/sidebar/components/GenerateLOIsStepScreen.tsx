@@ -4,7 +4,7 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
-import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, PencilIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { Alert, Snackbar, Tooltip } from "@mui/material";
 import { Settings, User } from "../../utils/types";
 import CONSTANTS from "../../utils/constants";
@@ -51,6 +51,7 @@ type Props = {
     setAttachPdf: React.Dispatch<React.SetStateAction<boolean>>;
     useLOIAsBody: boolean;
     setUseLOIAsBody: React.Dispatch<React.SetStateAction<boolean>>; 
+    setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export type PreflightResult = {
@@ -136,6 +137,7 @@ export default function GenerateLOIsStepScreen({
     setAttachPdf,
     useLOIAsBody,
     setUseLOIAsBody,
+    setCurrentStep,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -718,8 +720,9 @@ export default function GenerateLOIsStepScreen({
                                 {isPreflighting ? "…" : preflight ? preflight.invalidEmails : "—"}
                             </div>
                             <div className="text-gray-600">Data source</div>
-                            <div className="text-gray-900">
-                                {sheetName ? <>{sheetNameShort}</> : <span className="text-amber-600">⚠ no data source
+                            <div className="text-gray-900 flex items-center gap-1">
+                                {sheetName ? <>{sheetNameShort}<PencilIcon className="w-3 h-3 inline-block cursor-pointer text-gray-900" 
+                                onClick={() => setCurrentStep('template')} /></> : <span className="text-amber-600">⚠ no data source
                                     <Tooltip title="No data source found. Please select a data source or refresh the data source dropdown in step 1.">
                                         <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
                                     </Tooltip>

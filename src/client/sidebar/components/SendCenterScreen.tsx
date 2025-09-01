@@ -280,16 +280,16 @@ export default function SendCenterScreen({
         }
     };
 
-    const handleClearQueue = async (deleteDocs: boolean = false) => {
+    const handleClearQueue = async (deleteDocs: boolean = false, removeSent: boolean = false) => {
         if (clearing) return;
         setClearing(true);
         try {
             if (deleteDocs) {
-                const deleteRes = await serverFunctions.queueDeleteDocsSimple();
+                const deleteRes = await serverFunctions.queueDeleteDocsSimple({removeSent});
                 if (isDev) console.log('deleteRes', deleteRes);
             }
 
-            await serverFunctions.queueClearAll();
+            await serverFunctions.queueClearAll(removeSent);
             // Optimistic local reset; also call onRefresh to re-pull counts
             setSendData(s => ({ ...s, items: [] }));
             setSendData(s => ({
@@ -664,10 +664,10 @@ export default function SendCenterScreen({
 
             {openClear && (
                 <ConfirmClearQueueModal
-                    count={queueTotal}
+                    summary={summary}
                     clearing={clearing}
                     onCancel={() => { if (!clearing) { setOpenClear(false); } }}
-                    onConfirm={(deleteDocs) => handleClearQueue(deleteDocs)}
+                    onConfirm={(deleteDocs, removeSent) => handleClearQueue(deleteDocs, removeSent)}
                 />
             )}
 

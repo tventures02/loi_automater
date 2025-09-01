@@ -683,6 +683,7 @@ const SidebarContainer = () => {
                                 setAttachPdf={setAttachPdf}
                                 useLOIAsBody={useLOIAsBody}
                                 setUseLOIAsBody={setUseLOIAsBody}
+                                setCurrentStep={setCurrentStep}
                             />
                         )}
 

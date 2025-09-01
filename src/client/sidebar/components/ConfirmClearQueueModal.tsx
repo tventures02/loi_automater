@@ -1,18 +1,22 @@
 import React, { useState } from "react";
 import InlineSpinner from "../../utils/components/InlineSpinner";
+import { SendSummary } from "./Sidebar";
 
 export default function ConfirmClearQueueModal({
-    count,
+    summary,
     onCancel,
     onConfirm,
     clearing,
 }: {
-    count: number;
+    summary: SendSummary;
     onCancel: () => void;
-    onConfirm: (deleteDocs: boolean) => void;
+    onConfirm: (deleteDocs: boolean, removeSent: boolean) => void;
     clearing: boolean;
 }) {
     const [deleteDocs, setDeleteDocs] = useState(false);
+    const [removeSent, setRemoveSent] = useState(false);
+    const { total, sent } = summary || {};
+    const count = removeSent ? sent : total;
 
     if (count === 0) return null;
 
@@ -46,6 +50,20 @@ export default function ConfirmClearQueueModal({
                     </div>
                 )}
 
+                {!clearing && (
+                    <div className={`relative flex items-center gap-1 justify-end mt-2`}>
+                        <span className="text-[11px] text-gray-700 select-none">Only remove sent LOIs</span>
+                        <span
+                            role="switch"
+                            aria-checked={removeSent}
+                            onClick={() => setRemoveSent(!removeSent)}
+                            className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${removeSent ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                        >
+                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${removeSent ? "translate-x-3.5" : ""}`} />
+                        </span>
+                    </div>
+                )}
+
                 <div className="mt-4 flex items-center justify-end gap-2">
                     <div
                         role="button"
@@ -58,7 +76,7 @@ export default function ConfirmClearQueueModal({
                     <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => onConfirm(deleteDocs)}
+                        onClick={() => onConfirm(deleteDocs, removeSent)}
                         className={`select-none flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium bg-red-600 text-white hover:bg-red-700 ${clearing ? "opacity-50 !cursor-not-allowed" : "cursor-pointer"}`}
                     >
                         {clearing ? <><InlineSpinner />Clearing…</> : "Clear queue"}
