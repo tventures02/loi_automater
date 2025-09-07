@@ -17,7 +17,7 @@ export type DocInfo = {
     error?: string; // Optional for when an error occurs
 };
 const QUEUE_DISPLAY_LIMIT = 500;
-const ROOT_FOLDER_NAME = 'LOI Mailer';
+const ROOT_FOLDER_NAME = 'Bulk LOI Sender';
 const TEMPLATES_FOLDER_NAME = 'LOI Templates';
 const OUTPUT_FOLDER_NAME = 'LOIs';
 

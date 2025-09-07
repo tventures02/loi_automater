@@ -5,7 +5,7 @@ export const onInstall = (e) => {
 export const onOpen = (e) => {
   const menu = SpreadsheetApp.getUi()
   menu.createAddonMenu()
-      .addItem('Open LOI Automater', 'openSidebar').addToUi();
+      .addItem('Open Bulk LOI Sender', 'openSidebar').addToUi();
 };
 
 export const showGenTemplate = () => {
@@ -26,6 +26,6 @@ export const showActivationModal = () => {
     ui.showModalDialog(html, ' ');
 }
 export const openSidebar = () => {
-  const html = HtmlService.createHtmlOutputFromFile('sidebar').setTitle("LOI Automater");
+  const html = HtmlService.createHtmlOutputFromFile('sidebar').setTitle("Bulk LOI Sender");
   SpreadsheetApp.getUi().showSidebar(html);
 };
