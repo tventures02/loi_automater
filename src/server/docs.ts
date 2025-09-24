@@ -1121,7 +1121,7 @@ export const sendNextBatch = (payload) => {
 
                     let attachments = null;
                     if (wantAttach) {
-                        const pdf = generateLOIPDF(item.docId, item.docId); // TODO: add a name to the PDF
+                        const pdf = generateLOIPDF(item.docId); // TODO: add a name to the PDF
                         if (pdf) attachments = [pdf];
                     }
 
@@ -1448,14 +1448,15 @@ function buildPlainTextFromDoc(docId: string) {
 }
 
 
-function generateLOIPDF(docId: string, pdfName: string) {
+function generateLOIPDF(docId: string) {
     // Open the template document
     const doc = DocumentApp.openById(docId);
+    const docName = doc.getName();
 
     doc.saveAndClose();
 
     // Convert the document to a PDF blob
-    const pdfBlob = doc.getAs('application/pdf').setName(`${pdfName}.pdf`);
+    const pdfBlob = doc.getAs('application/pdf').setName(`${docName || docId}.pdf`);
     return pdfBlob; // Return the PDF blob
 }
 
