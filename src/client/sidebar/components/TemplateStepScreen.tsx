@@ -8,6 +8,7 @@ import CONSTANTS from '../../utils/constants';
 import { ArrowTopRightOnSquareIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
 import { NewTemplateDialog } from "./NewTemplateDialog";
+import { sendToAmplitude } from "../../utils/amplitude";
 
 type Props = {
     user: User;
@@ -166,6 +167,9 @@ const TemplateStepScreen = ({
         }
         setIsCreateDialogOpen(false);
         await handleCreateDoc(); // uses `docTitle`
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.CREATED_TEMPLATE, { docTitle }, { email: user.email });
+        } catch (error) {}
     };
 
     const cancelCreate = () => {
@@ -177,7 +181,7 @@ const TemplateStepScreen = ({
     return (
         <div className="space-y-3">
             <h2 className="text-sm font-semibold text-gray-900">Select Template</h2>
-            <p className="text-xs text-gray-600 mb-[3px]">
+            <div className="text-xs text-gray-600 mb-[3px] flex items-center gap-1">
                 {
                     templateExists ?
                         <span>Select the LOI Google Doc Template to use. 
@@ -202,7 +206,7 @@ const TemplateStepScreen = ({
                             </div>
                         )
                 }
-            </p>
+            </div>
 
             {isGettingTemplates || isCreatingDoc ? (
                 <div className="mt-1 animate-fadeIn flex items-center gap-2 justify-center text-sm text-gray-500">
@@ -222,6 +226,9 @@ const TemplateStepScreen = ({
                                     return;
                                 }
                                 setSelectedTemplate(event.target.value);
+                                try {
+                                    sendToAmplitude(CONSTANTS.AMPLITUDE.SELECTED_TEMPLATE, { docTitle: templates.find(template => template.id === event.target.value)?.name }, { email: user.email });
+                                } catch (error) {}
                             }}
                             className={`w-full rounded-md border border-gray-200 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 px-2 py-1 text-xs `}
                         >

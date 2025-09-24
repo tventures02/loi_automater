@@ -1,6 +1,9 @@
 import { Tooltip } from "@mui/material";
 import React, { forwardRef, useMemo } from "react";
 import { PaperAirplaneIcon } from "@heroicons/react/24/outline";
+import { sendToAmplitude } from "../../utils/amplitude";
+import CONSTANTS from "../../utils/constants";
+import { User } from "../../utils/types";
 
 type Progress = { current: number; total: number };
 
@@ -40,6 +43,9 @@ type Props = {
 
     /** Whether to disable the secondary button */
     secondaryDisabled?: boolean;
+
+    /** User */
+    user: User;
 };
 
 function cx(...cls: (string | false | null | undefined)[]) {
@@ -62,6 +68,7 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
         fixYPos = false,
         forcePrimaryDisabled = false,
         secondaryDisabled = false,
+        user,
     },
     ref
 ) {
@@ -77,6 +84,9 @@ const StickyFooter = forwardRef<HTMLDivElement, Props>(function StickyFooter(
             if (e.key !== "Enter" && e.key !== " ") return;
             e.preventDefault();
         }
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.NAVIGATE, { currentStep }, { email: user.email });
+        } catch (error) {}
         cb?.();
     };
 

@@ -15,6 +15,7 @@ import { User } from "../../utils/types";
 import CtaCard from "./CtaCard";
 import CONSTANTS from "../../utils/constants";
 import JobWarning from "./JobWarning";
+import { sendToAmplitude } from "../../utils/amplitude";
 
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
@@ -134,6 +135,10 @@ export default function SendCenterScreen({
         setSendProg({ active: true, mode: "real", planned: requestedCount, sent: 0, failed: 0, loops: 0, lastBatch: 0 });
 
         try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.SENDING_LOIS, { testMode: false }, { email: user.email });
+        } catch (error) { }
+
+        try {
             let sentSoFar = 0;
             let failedSoFar = 0;
             let loops = 0;
@@ -213,6 +218,9 @@ export default function SendCenterScreen({
             }
             else {
                 setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs`, severity: "success" });
+                try {
+                    sendToAmplitude(CONSTANTS.AMPLITUDE.SENT_LOIS, { requestedCount, sent: sentSoFar, testMode: false }, { email: user.email });
+                } catch (error) {}
             }
         } catch (e) {
             setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
@@ -261,7 +269,11 @@ export default function SendCenterScreen({
         // do NOT mutate queue locally
         setSending(true);
         try {
-            const numEmailsToSend = Math.min(sampleCount, queuedTotal, 5);
+            sendToAmplitude(CONSTANTS.AMPLITUDE.SENDING_LOIS, { testMode: true }, { email: user.email });
+        } catch (error) { }
+        const numEmailsToSend = Math.min(sampleCount, queuedTotal, 5);
+        let sent = 0;
+        try {
             const res = await serverFunctions.sendNextBatch({
                 count: numEmailsToSend,
                 testMode: true,
@@ -270,7 +282,7 @@ export default function SendCenterScreen({
                 freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
             });
 
-            const sent = res?.sent ?? 0;
+            sent = res?.sent ?? 0;
 
             if (isDev) {
                 console.log('test send results')
@@ -278,6 +290,9 @@ export default function SendCenterScreen({
             }
 
             setSnackbar({ open: true, message: `Sent ${sent} test email${sent > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.SENT_LOIS, { numEmailsToSend, sent, testMode: true }, { email: user.email });
+            } catch (error) {}
         } catch (e) {
             setSnackbar({ open: true, message: `Test send failed. ${e.message}`, severity: "error" });
         } finally {
@@ -684,6 +699,7 @@ export default function SendCenterScreen({
                 currentStep="send"
                 mode={mode}
                 fixYPos={true}
+                user={user}
             />
 
             {openMenu.open && openMenu.id && (

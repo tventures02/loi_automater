@@ -8,6 +8,7 @@ import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, P
 import { Alert, Snackbar, Tooltip } from "@mui/material";
 import { Settings, User } from "../../utils/types";
 import CONSTANTS from "../../utils/constants";
+import { sendToAmplitude } from "../../utils/amplitude";
 import CtaCard from "./CtaCard";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
@@ -336,9 +337,13 @@ export default function GenerateLOIsStepScreen({
 
     const runGenerate = async (resume = false) => {
         if (!preflight?.ok) return;
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.CREATING_LOIS, { preflight }, { email: user.email });
+        } catch (error) {}
         setIsGenerating(true);
         setSummary(null);
         setProgressText("Preparing…");
+        let finalSummary = summary ? { ...summary } : {};
 
         let offset = resume && summary ? summary.nextOffset || 0 : 0;
         let totals = resume && summary
@@ -442,8 +447,8 @@ export default function GenerateLOIsStepScreen({
 
             setProgressText("Finalizing…");
             // final snapshot
-            setSummary((prev) => prev ? {
-                ...prev,
+            finalSummary = {
+                ...summary,
                 created: totals.created,
                 skippedInvalid: totals.skippedInvalid,
                 failed: totals.failed,
@@ -451,7 +456,8 @@ export default function GenerateLOIsStepScreen({
                 nextOffset: offset,
                 totalRowsProcessed: totals.totalRowsProcessed,
                 done,
-            } : null);
+            };
+            setSummary((prev) => prev ? { ...prev, ...finalSummary } : null);
 
             created = totals.created;
 
@@ -459,6 +465,14 @@ export default function GenerateLOIsStepScreen({
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
             setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. ${!isPremium && created === 0 ? `Upgrade to create unlimited LOIs. ` : ''}Continue to send.`, severity: "success" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.CREATED_LOIS, { 
+                    summary: finalSummary,
+                    batchSize,
+                    attachPdf,
+                    useLOIAsBody,
+                }, { email: user.email });
+            } catch (error) {}
         } catch (e) {
             console.log('error', e)
             setSnackbar({ open: true, message: "Creation failed. Please try again.", severity: "error" });
@@ -492,6 +506,7 @@ export default function GenerateLOIsStepScreen({
     const canGenerate = checksOk && !!preflight?.ok;
     const sheetNameShort = sheetName?.length > MAX_SHEET_NAME_LENGTH ? sheetName.slice(0, MAX_SHEET_NAME_LENGTH) + "…" : sheetName;
     const placeholdersWithEmail = [...placeholders, "email"];
+    const generateLOIsSectionTitle = attachPdf ? "Create LOI Docs" : "Create LOI Jobs";
 
     return (
         <div className="space-y-3 pb-[40px]" id="generate-lois-step" ref={containerRef}>
@@ -534,7 +549,11 @@ export default function GenerateLOIsStepScreen({
 
                 <div className="grid grid-cols-1 gap-2">
                     <div className="flex items-center justify-between mb-1">
-                        <div className="text-[11px] text-gray-600">Attach LOI as PDF</div>
+                        <div className="text-[11px] text-gray-600 flex items-center gap-1">Attach LOI as PDF
+                            <Tooltip title="This uses the LOI Google Docs created from this step as the PDFs for email attachments.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-600" />
+                            </Tooltip>
+                        </div>
                         {/* <Switch color="primary" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} size="small" /> */}
                         <span
                             role="switch"
@@ -558,7 +577,7 @@ export default function GenerateLOIsStepScreen({
                         />
                     </div>
                     {/* Body label + toggle (right-aligned) */}
-                    <div>
+                    <div className="mt-2">
                         <div className="flex items-center justify-between mb-1">
                             <div className="text-[11px] text-gray-600">Body (plain text)</div>
 
@@ -623,18 +642,26 @@ export default function GenerateLOIsStepScreen({
             </div>
 
             {/* File naming pattern */}
-            <div className="rounded-xl border border-gray-200 p-3 space-y-2">
-                <div className="text-xs font-medium text-gray-900"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Filename pattern</div>
-                <input
-                    value={pattern}
-                    onChange={(e) => setPattern(e.target.value)}
-                    className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
-                    placeholder={DEFAULT_PATTERN}
-                />
-                {preflight?.sampleFileName && (
-                    <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>
-                )}
-            </div>
+            {
+                attachPdf && (
+                    <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+                        <div className="text-xs font-medium text-gray-900 flex items-center gap-1"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Filename pattern
+                            <Tooltip title="The filename pattern for the LOI Google Doc. This is only needed if you have enabled 'Attach LOI as PDF' and want to customize the filename.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-600" />
+                            </Tooltip>
+                        </div>
+                        <input
+                            value={pattern}
+                            onChange={(e) => setPattern(e.target.value)}
+                            className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
+                            placeholder={DEFAULT_PATTERN}
+                        />
+                        {preflight?.sampleFileName && (
+                            <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>
+                        )}
+                    </div>
+                )
+            }
 
 
             {/* Preflight (summary row + collapsible details) */}
@@ -704,11 +731,17 @@ export default function GenerateLOIsStepScreen({
                                     <span className="inline-flex items-center gap-1">
                                         <InlineSpinner /> checking…
                                     </span>
+                                ) : preflight?.eligibleRows === 0 ? (
+                                    <span className="text-amber-600">⚠ no eligible rows
+                                        <Tooltip title="No eligible rows found. Please check your mapping (ensure email column is correctly mapped) and data.">
+                                            <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
+                                        </Tooltip>
+                                    </span>
                                 ) : preflight ? (
                                     `${preflight.eligibleRows} / ${preflight.totalRows}`
                                 ) : (
                                     <span className="text-amber-600">⚠ no eligible rows
-                                        <Tooltip title="No eligible rows found. Please check your mapping and data.">
+                                        <Tooltip title="No eligible rows found. Please check your mapping (ensure email column is correctly mapped) and data.">
                                             <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-amber-600" />
                                         </Tooltip>
                                     </span>
@@ -767,7 +800,7 @@ export default function GenerateLOIsStepScreen({
             {/* Generate action + progress */}
             <div className="rounded-xl border border-gray-200 p-3 space-y-3">
                 <div className="text-xs text-gray-600">
-                    <SparklesIcon className="w-4 h-4 inline-block mr-1 text-indigo-600" />Create LOIs Docs {sheetName ? <>from <b>{sheetNameShort}</b></> : ""}.
+                    <SparklesIcon className="w-4 h-4 inline-block mr-1 text-indigo-600" />{generateLOIsSectionTitle} {sheetName ? <>from <b>{sheetNameShort}</b></> : ""}.
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px]">
@@ -780,7 +813,7 @@ export default function GenerateLOIsStepScreen({
                 </div>
 
                 {/* Long-running generation notice & controls */}
-                {attachPdf && (
+                {attachPdf && preflight?.eligibleRows > batchSize && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 w-fit">
                         <div className="font-medium flex items-center gap-1">Creates Docs in batches of {batchSize}
                             <Tooltip title={<><div className="mb-1">Creating LOI Docs for PDF attachments may take some time. To avoid timeouts, we'll create them in batches of {batchSize}.</div>
@@ -880,8 +913,11 @@ export default function GenerateLOIsStepScreen({
                         <div>Skipped (invalid): {summary.skippedInvalid}</div>
                         <div>Skipped (duplicates): {summary.duplicates}</div>
                         <div>Failed: {summary.failed}</div>
-                        <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
-                            target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 hover:underline">Open Docs in Drive</a></div>
+                        
+                        {
+                            attachPdf && outputFolderId && <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
+                                target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 hover:underline">Open Docs in Drive</a></div>
+                        }
                     </div>
                 )}
             </div>

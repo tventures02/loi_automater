@@ -347,6 +347,11 @@ const SidebarContainer = () => {
 
     const onUpgradeClick = async () => {
         try {
+            try{
+                sendToAmplitude(CONSTANTS.AMPLITUDE.UPGRADE_CLICKED, null, { email: user.email });
+            }
+            catch (error) {}
+            
             const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
             if (isDev) {
                 console.log(url);
@@ -362,6 +367,9 @@ const SidebarContainer = () => {
     const handleChangeDataSheet = (name: string) => {
         setDataSheet(name);
         localStorage.setItem("loi:dataSheet", name);
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.SELECTED_DATA_SOURCE, { dataSheet: name }, { email: user.email });
+        } catch (error) {}
     };
     const refreshSheets = async () => {
 
@@ -516,19 +524,25 @@ const SidebarContainer = () => {
         currentStep={currentStep}
         mode={mode}
         forcePrimaryDisabled={disablePrimary}
+        user={user}
     />;
 
     const helpButton = (<div
         role="button"
         tabIndex={0}
         className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
-        onClick={() => window.open('https://support.google.com/docs', '_blank')}
+        onClick={() => {
+            window.open('https://support.google.com/docs', '_blank');
+            sendToAmplitude(CONSTANTS.AMPLITUDE.CLICKED_HELP, null, { email: user.email });
+        }}
     >
         Help
     </div>);
 
-    console.log('sidebar render-------------------')
-    console.log('settings', settings)
+    if (isDev) {
+        console.log('sidebar render-------------------')
+        console.log('settings', settings)
+    }
 
     return (
         < div className='container' >

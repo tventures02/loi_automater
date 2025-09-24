@@ -1,9 +1,7 @@
 import {
     onInstall,
     onOpen,
-    showGenTemplate,
     openSidebar,
-    showActivationModal,
 } from './ui';
 
 import {
@@ -44,10 +42,8 @@ import {
 export {
     onInstall,
     onOpen,
-    showGenTemplate,    
     openSidebar,
     createGoogleDoc,
-    showActivationModal,
     getUserEmail,
     getUserData,
     getInitData,

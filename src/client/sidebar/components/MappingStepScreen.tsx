@@ -5,6 +5,9 @@ import { Settings, User } from "../../utils/types";
 import { colLabel } from "../../utils/misc";
 import CtaCard from "./CtaCard";
 import CONSTANTS from "../../utils/constants";
+import { sendToAmplitude } from "../../utils/amplitude";
+import Tooltip from "@mui/material/Tooltip";
+import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 
 type Props = {
     /** Full text of the selected template (from TemplateStepScreen) */
@@ -207,6 +210,9 @@ export default function MappingStepScreen({
     }, [mapping, emailColumn]);
 
     const updateMapping = (ph: string, col: string) => {
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.MAPPED_PLACEHOLDER, { placeholder: ph, column: col }, { email: user.email });
+        } catch (error) { }
         setMapping((prev) => {
             const next = { ...prev, [ph]: col };
             return next;
@@ -214,6 +220,9 @@ export default function MappingStepScreen({
     };
 
     const updateEmailColumn = (col: string) => {
+        try {
+            sendToAmplitude(CONSTANTS.AMPLITUDE.MAPPED_PLACEHOLDER, { placeholder: "__email", column: col }, { email: user.email });
+        } catch (error) { }
         setEmailColumn(col);
     };
 
@@ -229,6 +238,51 @@ export default function MappingStepScreen({
                 Select columns (A–{maxLetter}) from {sheetName ? <b>{sheetNameShort}</b> : "your spreadsheet"} for placeholders in your LOI template.
             </p>
 
+            {/* Delivery email column (separate card for clarity) */}
+            <div className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-medium text-gray-900 flex items-center gap-1">Delivery email column {sheetName ? <>in {sheetNameShort}</> : null}
+                            <Tooltip title="Select the email column in your source data sheet. These are the emails where LOIs will be sent.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-600" />
+                            </Tooltip>
+                        </div>
+                    </div>
+                    {firstRowEmail ? (
+                        <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
+                            First row: {firstRowEmail}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div className="mt-2">
+                    <select
+                        value={emailColumn}
+                        onChange={(e) => updateEmailColumn(e.target.value)}
+                        className={`
+              w-full rounded-md border px-2 py-1 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900
+              ${emailColumn ? "border-gray-200" : "border-amber-300"}
+            `}
+                    >
+                        <option value="">{`— Select (A–${maxLetter}) —`}</option>
+                        {COLUMN_OPTIONS.map((col) => {
+                            const locked = isLockedCol(col, isPremium);
+                            const inUse = taken.has(col) && emailColumn !== col;
+                            const disabled = locked || inUse;
+                            const label =
+                                `Column ${col}` +
+                                (inUse ? " (in use)" : "") +
+                                (locked ? "  🔒 Pro" : "");
+                            return (
+                                <option key={col} value={locked ? "" : col} disabled={disabled} title={locked ? "Upgrade to unlock email column beyond D" : ""}>
+                                    {label}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+            </div>
+
             {/* Empty-state if no placeholders */}
             {placeholders.length === 0 ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
@@ -237,6 +291,13 @@ export default function MappingStepScreen({
                 </div>
             ) : (
                 <div className="rounded-xl border border-gray-200 p-3" id="mapping-parameters" onMouseEnter={() => setOnMapperHover(true)} onMouseLeave={() => setOnMapperHover(false)}>
+                    <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-gray-900 mb-2 flex items-center gap-1">Other placeholders
+                            <Tooltip title="Select the columns in your source data sheet for other placeholders in your LOI template. These are the data that will be inserted into the template using the {{ }} placeholder format.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-600" />
+                            </Tooltip>
+                        </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="text-gray-500">Placeholder</div>
                         <div className="text-gray-500">Mapped column</div>
@@ -299,50 +360,6 @@ export default function MappingStepScreen({
             {!isPremium && totalColsToMap > CONSTANTS.FREE_MAX_COL_NUMBER && (
                 <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to unlock more columns!" />
             )}
-
-            {/* Delivery email column (separate card for clarity) */}
-            <div className="rounded-xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-xs font-medium text-gray-900">Delivery email column {sheetName ? <>in {sheetNameShort}</> : null}</div>
-                        <div className="mt-0.5 text-[11px] text-gray-600">
-                            Select email column (where LOIs will be sent)
-                        </div>
-                    </div>
-                    {firstRowEmail ? (
-                        <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
-                            First row: {firstRowEmail}
-                        </div>
-                    ) : null}
-                </div>
-
-                <div className="mt-2">
-                    <select
-                        value={emailColumn}
-                        onChange={(e) => updateEmailColumn(e.target.value)}
-                        className={`
-              w-full rounded-md border px-2 py-1 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900
-              ${emailColumn ? "border-gray-200" : "border-amber-300"}
-            `}
-                    >
-                        <option value="">{`— Select (A–${maxLetter}) —`}</option>
-                        {COLUMN_OPTIONS.map((col) => {
-                            const locked = isLockedCol(col, isPremium);
-                            const inUse = taken.has(col) && emailColumn !== col;
-                            const disabled = locked || inUse;
-                            const label =
-                                `Column ${col}` +
-                                (inUse ? " (in use)" : "") +
-                                (locked ? "  🔒 Pro" : "");
-                            return (
-                                <option key={col} value={locked ? "" : col} disabled={disabled} title={locked ? "Upgrade to unlock email column beyond D" : ""}>
-                                    {label}
-                                </option>
-                            );
-                        })}
-                    </select>
-                </div>
-            </div>
 
             {/* Preview */}
             {allMapped && showPreview ? (

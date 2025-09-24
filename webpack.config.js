@@ -47,23 +47,11 @@ const devDialogEntry = './dev/index.js';
 // define client entry points and output names
 const clientEntrypoints = [
     {
-        name: 'CLIENT - Generate Template',
-        entry: './src/client/generateTemplate/index',
-        filename: 'generateTemplate',
-        template: './src/client/generateTemplate/index.html',
-    },
-    {
         name: 'CLIENT - Sidebar',
         entry: './src/client/sidebar/index.js',
         filename: 'sidebar',
         template: './src/client/sidebar/index.html',
-    },
-    {
-        name: 'CLIENT - Activation',
-        entry: './src/client/activation/index.js',
-        filename: 'activation',
-        template: './src/client/activation/index.html',
-    },
+    }
 ];
 
 // define certificate locations
