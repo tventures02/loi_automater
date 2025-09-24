@@ -224,6 +224,9 @@ export default function SendCenterScreen({
             }
         } catch (e) {
             setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (confirmRealSend)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
@@ -295,6 +298,9 @@ export default function SendCenterScreen({
             } catch (error) {}
         } catch (e) {
             setSnackbar({ open: true, message: `Test send failed. ${e.message}`, severity: "error" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (confirmTestSend)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
@@ -368,6 +374,9 @@ export default function SendCenterScreen({
         } catch (e: any) {
             console.error("Failed to clear queue", e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClearQueue)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setClearing(false);
             setOpenClear(false);

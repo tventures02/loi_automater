@@ -144,6 +144,7 @@ const SidebarContainer = () => {
         try {
             console.clear()
             const getData = async () => {
+                let localEmail = user.email;
                 try {
                     setIsLoading(true);
                     const data = await serverFunctions.getInitData();
@@ -152,6 +153,7 @@ const SidebarContainer = () => {
                         aud,
                     } = data;
                     sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, { email: data.email });
+                    localEmail = data.email;
 
                     const preventAddingUserToDb = false;
                     const dataToServer = {
@@ -203,6 +205,9 @@ const SidebarContainer = () => {
                 } catch (error) {
                     console.log(error)
                     handleError('Error: Problem getting data during mounting.');
+                    try {
+                        sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'sidebar (getData)' }, { email: localEmail });
+                    } catch (error) {}
                 }
                 finally {
                     setIsLoading(false);
@@ -255,6 +260,9 @@ const SidebarContainer = () => {
                 } catch (err: any) {
                     console.log('error', err)
                     handleError(err?.message || 'Error loading templates.');
+                    try {
+                        sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: err?.message || JSON.stringify(err), where: 'sidebar (getTemplates)' }, { email: user.email });
+                    } catch (error) {}
                 } finally {
                     setIsGettingTemplates(false);
                 }
@@ -300,6 +308,9 @@ const SidebarContainer = () => {
             handleError(err?.message || 'Error fetching template content.');
             setTemplateContent('');
             setDraft('');
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: err?.message || JSON.stringify(err), where: 'sidebar (fetchTemplateContent)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setIsLoadingContent(false);
         }
@@ -341,6 +352,9 @@ const SidebarContainer = () => {
             }
         } catch (error) {
             handleError('Error: Problem loading sheets. Please try again.');
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'sidebar (loadSheets)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setIsLoadingSheets(false);
         }
@@ -372,6 +386,7 @@ const SidebarContainer = () => {
             sendToAmplitude(CONSTANTS.AMPLITUDE.SELECTED_DATA_SOURCE, { dataSheet: name }, { email: user.email });
         } catch (error) {}
     };
+
     const refreshSheets = async () => {
 
         try {
@@ -411,6 +426,9 @@ const SidebarContainer = () => {
             }
         } catch (e: any) {
             setQueueError(e?.message || "Could not create queue.");
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sidebar (ensureQueue)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setCreatingQueue(false);
         }
@@ -419,7 +437,12 @@ const SidebarContainer = () => {
     const getConfigFromBackend = async () => {
         const resp = await backendCall({ app: CONSTANTS.APP_CODE }, 'config/getConfig');
         if (resp.success) return resp.params;
-        else return null;
+        else {
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: resp.error || JSON.stringify(resp), where: 'sidebar (getConfigFromBackend)' }, { email: user.email });
+            } catch (error) {}
+            return null;
+        }
     }
 
     const handleError = (errorMsg) => {
@@ -445,7 +468,7 @@ const SidebarContainer = () => {
             ]);
 
             // if (s?.remaining) {
-            console.log('s', s);
+            // console.log('s', s);
                 setSendData(prev => ({
                     ...prev,
                     summary: {
@@ -462,9 +485,16 @@ const SidebarContainer = () => {
                     error: null
                 }));
             // }
+
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.REFRESHED_SEND_DATA, { summary: s, items: q.items }, { email: user.email });
+            } catch (error) {}
         } catch (e: any) {
             console.log('e', e)
             setSendData(s => ({ ...s, loading: false, error: e?.message || "Failed to load queue" }));
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sidebar (refreshSendData)' }, { email: user.email });
+            } catch (error) {}
         }
         finally {
             console.log('send data done loading')

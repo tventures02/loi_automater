@@ -98,6 +98,9 @@ const TemplateStepScreen = ({
 
         } catch (error) {
             handleError(error.message);
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'templateStepScreen (handleCreateDoc)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setIsCreatingDoc(false);
         }

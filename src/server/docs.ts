@@ -1120,7 +1120,7 @@ export const sendNextBatch = (payload) => {
                         if (pdf) attachments = [pdf];
                     }
 
-                    // MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;

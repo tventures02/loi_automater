@@ -277,6 +277,9 @@ export default function GenerateLOIsStepScreen({
                         freeRemainingForSheet: 0,
                         sheetQueueCount: 0,
                     });
+                    try {
+                        sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'generateLOIsStepScreen (preflightGenerateLOIs)' }, { email: user.email });
+                    } catch (error) {}
                     onValidChange?.("lois", false);
                 }
             } finally {
@@ -477,6 +480,9 @@ export default function GenerateLOIsStepScreen({
             console.log('error', e)
             setSnackbar({ open: true, message: "Creation failed. Please try again.", severity: "error" });
             onValidChange?.("lois", false);
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'generateLOIsStepScreen (runGenerate)' }, { email: user.email });
+            } catch (error) {}
         } finally {
             setIsGenerating(false);
             setProgressText("");

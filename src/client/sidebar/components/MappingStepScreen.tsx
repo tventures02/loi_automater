@@ -190,6 +190,10 @@ export default function MappingStepScreen({
                 if (cancelled) return;
                 setPreviewError(err?.message || "Failed to build preview.");
                 setPreviewState("error");
+
+                try {
+                    sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: err?.message || JSON.stringify(err), where: 'mappingStepScreen (getPreviewRowValues)' }, { email: user.email });
+                } catch (error) {}
             }
         })();
 
