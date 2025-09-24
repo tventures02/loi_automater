@@ -135,7 +135,8 @@ const SidebarContainer = () => {
         { key: "send", label: "Send" },
     ];
     const [config, setConfig] = useState({
-        gwsCalcYTURL: 'https://www.youtube.com/watch?v=c0-1-zYiCMU'
+        gwsCalcYTURL: 'https://www.youtube.com/watch?v=c0-1-zYiCMU',
+        helpLink: 'https://tidisventures.com/support?app=bulk-loi-sender',
     });
 
     //@ts-ignore
@@ -532,7 +533,7 @@ const SidebarContainer = () => {
         tabIndex={0}
         className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
         onClick={() => {
-            window.open('https://support.google.com/docs', '_blank');
+            window.open(config.helpLink ?? 'https://support.google.com/docs', '_blank');
             sendToAmplitude(CONSTANTS.AMPLITUDE.CLICKED_HELP, null, { email: user.email });
         }}
     >
