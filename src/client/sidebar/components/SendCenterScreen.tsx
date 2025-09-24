@@ -130,6 +130,10 @@ export default function SendCenterScreen({
         stopOnError: boolean = false,
     ) => {
         if (!(summary?.remaining && queuedTotal)) return;
+        if (summary?.missing.length > 0) {
+            setSnackbar({ open: true, message: `Some columns (${summary?.missing.join(", ")}) are missing in the "Sender Queue" tab. Please add them and try again or delete the "Sender Queue" tab and reopen Bulk LOI Sender.`, severity: "error" });
+            return;
+        }
         if (count === 0) {
             setSnackbar({ open: true, message: "No emails to send. Please generate some LOIs first or increase the number of emails to send.", severity: "error" });
             return;
@@ -275,6 +279,10 @@ export default function SendCenterScreen({
 
     const confirmTestSend = async (sampleCount = 1) => {
         if (!summary?.remaining) return;
+        if (summary?.missing.length > 0) {
+            setSnackbar({ open: true, message: `Some columns (${summary?.missing.join(", ")}) are missing in the "Sender Queue" tab. Please add them and try again or delete the "Sender Queue" tab and reopen Bulk LOI Sender.`, severity: "error" });
+            return;
+        }
         // do NOT mutate queue locally
         setSending(true);
         try {
