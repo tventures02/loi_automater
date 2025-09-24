@@ -540,15 +540,14 @@ export default function SendCenterScreen({
                                                             {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
                                                         </span>
                                                     </div>
-                                                    <div className="text-gray-600 text-[11px]">Queue tab row: {item.queueTabRow}</div>
+                                                    <div className="text-gray-600 text-[11px]" >Queue tab row:
+                                                        <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a></div>
                                                     <div className="text-[11px] text-gray-600 truncate">
                                                         {item.docUrl ? (
                                                             <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
                                                                 Open doc
                                                             </a>
-                                                        ) : (
-                                                            "No doc"
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                     {item.status === "failed" && item.lastError ? (
                                                         <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
