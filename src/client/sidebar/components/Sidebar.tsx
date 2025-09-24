@@ -275,6 +275,7 @@ const SidebarContainer = () => {
                     if (isDev) console.log('refreshSendData')
                     refreshSendData(true, user);
                 }
+                else setSendData(s => ({ ...s, loading: false }));
             }
 
             getData();
@@ -357,7 +358,6 @@ const SidebarContainer = () => {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'sidebar (loadSheets)' }, { email: user.email });
             } catch (error) {}
         } finally {
-            setSendData(s => ({ ...s, loading: false }));
             setIsLoadingSheets(false);
         }
     };

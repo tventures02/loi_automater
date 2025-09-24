@@ -225,7 +225,7 @@ export default function SendCenterScreen({
             }
 
             if (failedSoFar > 0) {
-                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs`, severity: "warning" });
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.`, severity: "warning" });
             }
             else {
                 setSnackbar({ open: true, message: `Successfully sent ${sentSoFar} LOIs.`, severity: "success" });
@@ -565,7 +565,7 @@ export default function SendCenterScreen({
                                                         ) : null}
                                                     </div>
                                                     {item.status === "failed" && item.lastError ? (
-                                                        <div className="text-[11px] text-red-600 truncate mt-0.5">Error: {item.lastError}</div>
+                                                        <div className="text-[11px] text-red-600 truncate mt-0.5">{item?.lastError?.includes('Error:') ? item.lastError : `Error: ${item.lastError}`}</div>
                                                     ) : null}
                                                 </div>
                                                 <StatusPill
