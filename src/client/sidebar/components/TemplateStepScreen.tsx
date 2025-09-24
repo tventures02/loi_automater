@@ -5,7 +5,7 @@ import InlineSpinner from "../../utils/components/InlineSpinner";
 import { DocInfo } from "../../../server/docs";
 import { backendCall } from "../../utils/server-calls";
 import CONSTANTS from '../../utils/constants';
-import { ArrowTopRightOnSquareIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
 import { NewTemplateDialog } from "./NewTemplateDialog";
 import { sendToAmplitude } from "../../utils/amplitude";
@@ -247,42 +247,25 @@ const TemplateStepScreen = ({
             {/* Template controls */}
             {templateExists && (
                 <div className="flex items-center justify-end gap-2">
-                    {templateUrl && (
-                        <a
-                            href={templateUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] !text-gray-600 hover:!text-gray-900 underline underline-offset-2"
-                        >
-                            <Tooltip title="Open in Docs">
-                                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                            </Tooltip>
-                        </a>
-                    )}
-                        <>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={handleRefresh}
-                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleRefresh()}
-                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            >
-                                Refresh
-                            </div>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => window.open(templateUrl, '_blank')}
-                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            >
-                                Edit
-                            </div>
-                        </>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={handleRefresh}
+                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleRefresh()}
+                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                        Refresh
+                    </div>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { if (templateUrl) window.open(templateUrl, '_blank') }}
+                        className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                        Edit
+                    </div>
                 </div>
             )}
-
-
-
         </div>
     )
 }
