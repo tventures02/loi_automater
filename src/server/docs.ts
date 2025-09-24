@@ -1004,10 +1004,12 @@ export const sendNextBatch = (payload) => {
                     for (let r = 0; r < vals.length; r++) {
                         const row = vals[r];
                         if (String(safeAt(row, iStatus) || '').toLowerCase() !== 'queued') continue;
+                        const rowEmail = String(safeAt(row, iEmail) || '');
+                        if (!rowEmail) continue;
                         const rowIndex = r + startFromRow;
                         queuedRows.push({
                             rowIndex,
-                            email: String(safeAt(row, iEmail) || ''),
+                            email: rowEmail,
                             docId: String(safeAt(row, iDocId) || ''),
                             docUrl: String(safeAt(row, iDocUrl) || ''),
                             subject: String(safeAt(row, iSubject) || ''),
