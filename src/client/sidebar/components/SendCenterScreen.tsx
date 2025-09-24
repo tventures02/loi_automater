@@ -214,10 +214,10 @@ export default function SendCenterScreen({
             }
 
             if (failedSoFar > 0) {
-                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs but failed to send ${failedSoFar} LOIs`, severity: "warning" });
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs`, severity: "warning" });
             }
             else {
-                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs`, severity: "success" });
+                setSnackbar({ open: true, message: `Successfully sent ${sentSoFar} LOIs.`, severity: "success" });
                 try {
                     sendToAmplitude(CONSTANTS.AMPLITUDE.SENT_LOIS, { requestedCount, sent: sentSoFar, testMode: false }, { email: user.email });
                 } catch (error) {}
@@ -230,7 +230,6 @@ export default function SendCenterScreen({
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION);
             setSendProg(p => ({ ...p, active: false }));
             refreshSendData(true);
         }
@@ -304,7 +303,6 @@ export default function SendCenterScreen({
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION);
             refreshSendData(true);
         }
     };
@@ -689,7 +687,7 @@ export default function SendCenterScreen({
 
             {/* Snackbar */}
             {snackbar.open && (
-                <Snackbar open={snackbar.open} autoHideDuration={CONSTANTS.SNACKBAR_AUTO_HIDE_DURATION} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
+                <Snackbar open={snackbar.open} onClose={() => setSnackbar({ open: false, message: "", severity: "success" })}>
                     <Alert severity={snackbar.severity}><span className="text-xs">{snackbar.message}</span></Alert>
                 </Snackbar>
             )}
