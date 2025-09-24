@@ -733,6 +733,7 @@ export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();
     var sh = ss.getSheetByName(LOI_QUEUE_NAME);
     let newlyCreated = false;
+    let missing = [];
     if (!sh) {
         sh = ss.insertSheet(LOI_QUEUE_NAME);
         sh.getRange(1, 1, 1, LOI_QUEUE_HEADERS.length).setValues([LOI_QUEUE_HEADERS]);
@@ -740,13 +741,14 @@ export const queueEnsureSheet = () => {
         sh.autoResizeColumns(1, LOI_QUEUE_HEADERS.length);
         newlyCreated = true;
     } else {
-        // Make sure all columns exist (append any missing headers to the right)
+        // Check if all columns exist
         var lastCol = sh.getLastColumn();
         var head = sh.getRange(1, 1, 1, Math.max(lastCol, LOI_QUEUE_HEADERS.length)).getValues()[0];
-        var missing = LOI_QUEUE_HEADERS.filter(function (h) { return head.indexOf(h) === -1; });
-        if (missing.length) {
-            sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
-        }
+        missing = LOI_QUEUE_HEADERS.filter(function (h) { return head.indexOf(h) === -1; });
+        // Actually append missing columns
+        // if (missing.length) {
+        //     sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
+        // }
     }
     PropertiesService.getDocumentProperties().setProperty('LOI_QUEUE_SCHEMA_VERSION', '1');
     return {
@@ -754,6 +756,7 @@ export const queueEnsureSheet = () => {
         headers: LOI_QUEUE_HEADERS,
         sh,
         newlyCreated,
+        missing,
     };
 }
 
@@ -822,7 +825,7 @@ export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number 
     }
     const creditsObj = getSendCreditsLeft({ isPremium, freeDailyCap });
     const remaining = creditsObj.creditsLeft;
-    return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1 };
+    return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1, missing: qSheetRes.missing };
 };
 
 export const queueList = (payload) => {

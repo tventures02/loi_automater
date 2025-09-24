@@ -100,8 +100,15 @@ export default function SendCenterScreen({
     const queuedTotal = summary?.queued ?? 0;
 
     useEffect(() => {
+        if (summary?.missing.length > 0) {
+            setSnackbar({ open: true, message: `Some columns (${summary?.missing.join(", ")}) are missing in the "Sender Queue" tab. Please add them and try again or delete the "Sender Queue" tab and reopen Bulk LOI Sender.`, severity: "error" });
+        }
+    }, [summary?.missing]);
+
+    useEffect(() => {
         setVisibleCount(PAGE_SIZE);
     }, [filter, items.length]);
+
 
     useEffect(() => {
         if (!openMenu.open) return;

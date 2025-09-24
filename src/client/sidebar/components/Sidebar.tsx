@@ -48,6 +48,7 @@ export type SendSummary = {
     failed: number;
     userEmail: string;
     total: number;
+    missing: string[];
 };
 
 export type QueueStatus = {
@@ -356,6 +357,7 @@ const SidebarContainer = () => {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'sidebar (loadSheets)' }, { email: user.email });
             } catch (error) {}
         } finally {
+            setSendData(s => ({ ...s, loading: false }));
             setIsLoadingSheets(false);
         }
     };
@@ -478,6 +480,7 @@ const SidebarContainer = () => {
                         failed: s.failed ?? 0,
                         userEmail: s.userEmail,
                         total: s.total,
+                        missing: s.missing ?? [],
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
                     lastFetched: Date.now(),
