@@ -383,7 +383,7 @@ export default function SendCenterScreen({
             }));
             onRefresh?.();
 
-            setSnackbar({ open: true, message: "Queue cleared.", severity: "success" });
+            setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
         } catch (e: any) {
             console.error("Failed to clear queue", e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });

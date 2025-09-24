@@ -783,6 +783,7 @@ export default function GenerateLOIsStepScreen({
                                             emailColumn: mapping.__email,
                                             pattern,
                                             sheetName: sheetName || null,
+                                            user,
                                         });
                                         setPreflight(res);
                                         onValidChange?.("lois", !!res.ok);

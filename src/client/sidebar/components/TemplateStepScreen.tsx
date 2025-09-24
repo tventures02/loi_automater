@@ -23,8 +23,6 @@ type Props = {
     isGettingTemplates: boolean;
     isLoadingContent: boolean;
     fetchTemplateContent: (docId: string) => void;
-    draft: string;
-    setDraft: (draft: string) => void;
 }
 const TemplateStepScreen = ({
     user,
@@ -39,19 +37,15 @@ const TemplateStepScreen = ({
     isGettingTemplates,
     isLoadingContent,
     fetchTemplateContent,
-    draft,
-    setDraft
 }: Props) => {
 
     const [docTitle, setDocTitle] = useState('New LOI Template');
     const [isCreatingDoc, setIsCreatingDoc] = useState(false);
 
-    const [isEditing, setIsEditing] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const selectRef = useRef<HTMLSelectElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const hasUnsaved = isEditing && draft !== templateContent;
 
     const firstPassRef = useRef(true);
 
@@ -114,45 +108,14 @@ const TemplateStepScreen = ({
         }
         // Load content when selection changes; exit edit mode
         if (selectedTemplate) {
-            setIsEditing(false);
             fetchTemplateContent(selectedTemplate);
         } else {
             setTemplateContent('');
-            setDraft('');
         }
     }, [selectedTemplate]);
 
     // ---- EDIT HANDLERS ----
-    const handleEdit = () => {
-        setIsEditing(true);
-        setDraft(templateContent || "");
-        // focus after paint
-        setTimeout(() => textareaRef.current?.focus(), 0);
-    };
-
-    const handleSave = () => {
-        setTemplateContent(draft);  // commit to parent
-        setIsEditing(false);
-        // (Optional) persist back to Google Doc here in future
-    };
-
-    const handleCancel = () => {
-        setDraft(templateContent || ""); // discard local edits
-        setIsEditing(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-            e.preventDefault();
-            handleSave();
-        }
-    };
-
     const handleRefresh = () => {
-        if (isEditing && hasUnsaved) {
-            const ok = window.confirm("You have unsaved changes. Refresh anyway?");
-            if (!ok) return;
-        }
         if (selectedTemplate) fetchTemplateContent(selectedTemplate);
     };
 
@@ -250,8 +213,7 @@ const TemplateStepScreen = ({
             {selectedTemplate && !isCreatingDoc && templateExists && (
                 <div className="mt-1 !mb-1">
                     <div className={`
-            rounded-lg border ${isEditing ? 'border-gray-300' : 'border-gray-200'}
-            ${isEditing ? 'bg-white' : 'bg-gray-50'}
+            rounded-lg border border-gray-200 bg-gray-50}
             transition-colors
           `}>
                         {isLoadingContent ? (
@@ -261,24 +223,15 @@ const TemplateStepScreen = ({
                         ) : (
                             <textarea
                                 ref={textareaRef}
-                                readOnly={!isEditing}
-                                value={isEditing ? draft : (templateContent || "(empty document)")}
-                                onChange={isEditing ? (e) => setDraft(e.target.value) : undefined}
-                                onKeyDown={isEditing ? handleKeyDown : undefined}
-                                className={`
-                  w-full h-32 resize-none p-3 text-xs leading-relaxed outline-none
-                  ${isEditing ? 'bg-white text-gray-900' : 'bg-transparent text-gray-800'}
-                `}
+                                readOnly={true}
+                                value={templateContent || "(empty document)"}
+                                onChange={undefined}
+                                onKeyDown={undefined}
+                                className={`w-full h-32 resize-none p-3 text-xs leading-relaxed outline-none bg-transparent text-gray-800`}
                                 spellCheck={false}
                             />
                         )}
                     </div>
-                    {isEditing && (
-                        <div className="mt-1 text-[10px] text-gray-500">
-                            Press <span className="font-medium">⌘/Ctrl + S</span> to save this text only.
-                            {hasUnsaved && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 mr-[3px] ml-[3px]" title="Unsaved changes" />}
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -306,8 +259,6 @@ const TemplateStepScreen = ({
                             </Tooltip>
                         </a>
                     )}
-
-                    {!isEditing ? (
                         <>
                             <div
                                 role="button"
@@ -321,35 +272,12 @@ const TemplateStepScreen = ({
                             <div
                                 role="button"
                                 tabIndex={0}
-                                onClick={handleEdit}
-                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleEdit()}
+                                onClick={() => window.open(templateUrl, '_blank')}
                                 className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
                             >
                                 Edit
                             </div>
                         </>
-                    ) : (
-                        <>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={handleSave}
-                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleSave()}
-                                className="select-none rounded-md bg-gray-900 px-2 py-1 text-[11px] text-white hover:bg-gray-800 cursor-pointer"
-                            >
-                                Save
-                            </div>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={handleCancel}
-                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleCancel()}
-                                className="select-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            >
-                                Cancel
-                            </div>
-                        </>
-                    )}
                 </div>
             )}
 

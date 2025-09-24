@@ -243,6 +243,7 @@ export const preflightGenerateLOIs = (payload) => {
     const isPremium = !!(user?.subscriptionStatusActive);
     const existingForSheet = countQueueForSheet(sheetName) || 0;
     const freeRemainingForSheet = isPremium ? Number.MAX_SAFE_INTEGER : Math.max(0, FREE_CAP - existingForSheet);
+    const maxColCharNumber = isPremium ? CONSTANTS.MAX_COL_NUMBER : CONSTANTS.FREE_MAX_COL_NUMBER;
 
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
@@ -261,7 +262,7 @@ export const preflightGenerateLOIs = (payload) => {
         };
     }
 
-    const width = Math.min(lastCol, 8); // A..H only
+    const width = Math.min(lastCol, maxColCharNumber);
     const values = sheet.getRange(1, 1, lastRow, width).getDisplayValues();
 
     const mapping = payload.mapping || {};

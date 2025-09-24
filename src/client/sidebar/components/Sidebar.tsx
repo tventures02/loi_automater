@@ -68,7 +68,6 @@ const SidebarContainer = () => {
     const [isGettingTemplates, setIsGettingTemplates] = useState(true);
     const [templates, setTemplates] = useState<DocInfo[]>([]);
     const [isLoadingContent, setIsLoadingContent] = useState(false);
-    const [draft, setDraft] = useState<string>('');
     const [templateContent, setTemplateContent] = useState('');
     const [isLoadingSheets, setIsLoadingSheets] = useState(true);
 
@@ -288,7 +287,6 @@ const SidebarContainer = () => {
     const fetchTemplateContent = async (docId: string) => {
         if (!docId) {
             setTemplateContent('');
-            setDraft('');
             return;
         }
 
@@ -302,14 +300,12 @@ const SidebarContainer = () => {
             text = text.trim().replace(/\n/, '');
             const templateContent_ = text || '';
             setTemplateContent(templateContent_);
-            setDraft(templateContent_);
             if (templateContent_ && dataSheet) {
                 setCanContinue({ ...canContinue, template: true });
             }
         } catch (err: any) {
             handleError(err?.message || 'Error fetching template content.');
             setTemplateContent('');
-            setDraft('');
             try {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: err?.message || JSON.stringify(err), where: 'sidebar (fetchTemplateContent)' }, { email: user.email });
             } catch (error) {}
@@ -685,8 +681,6 @@ const SidebarContainer = () => {
                                     isGettingTemplates={isGettingTemplates}
                                     isLoadingContent={isLoadingContent}
                                     fetchTemplateContent={fetchTemplateContent}
-                                    draft={draft}
-                                    setDraft={setDraft}
                                 />
                                 <DataSourcePicker
                                     sheets={sheetNames}
