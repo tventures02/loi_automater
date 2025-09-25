@@ -12,7 +12,7 @@ import StickyFooter from './StickFooter';
 import TemplateStepScreen from './TemplateStepScreen';
 import MappingStepScreen from './MappingStepScreen';
 import GenerateLOIsStepScreen from './GenerateLOIsStepScreen';
-import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { DocInfo } from 'src/server/docs';
 import SendCenterScreen, { QUEUE_DISPLAY_LIMIT } from './SendCenterScreen';
 import SendCenterSetup from './SendCenterSetup';
@@ -22,7 +22,6 @@ import SettingsDialog from './SettingsDialog';
 import useLocalStorage from 'use-local-storage';
 import { INIT_SETTINGS } from '../../utils/initVals';
 
-const errorMsgStyle = { marginBottom: "0.5rem", fontSize: ".75em", color: "red" };
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 const LOI_QUEUE_NAME = 'Sender Queue';
 
@@ -108,7 +107,7 @@ const SidebarContainer = () => {
         email: '',
         stripe_payment_methods: [],
         subscriptionId: '',
-        subscriptionStatusActive: true,
+        subscriptionStatusActive: false,
         addOnPurchaseTier: 'tier0',
         idToken: null,
         _id: '',
@@ -170,7 +169,7 @@ const SidebarContainer = () => {
                         'gworkspace/getSubscriptionPaidStatus',
                         idToken);
                     if (!subStatusResp.success) {
-                        handleError('Error: Problem getting subscription paid status.');
+                        handleError(CONSTANTS.SERVER_ERROR_MSG);
                         return;
                     }
 
@@ -204,7 +203,7 @@ const SidebarContainer = () => {
                     await getTemplates(localUser);
                 } catch (error) {
                     console.log(error)
-                    handleError('Error: Problem getting data during mounting.');
+                    handleError(`${CONSTANTS.SERVER_ERROR_MSG} Error: Problem getting data during initialization.`);
                     try {
                         sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'sidebar (getData)' }, { email: localEmail });
                     } catch (error) {}
@@ -447,7 +446,7 @@ const SidebarContainer = () => {
         setIsLoading(false);
         setMessages({
             ...messages,
-            errorMessage: errorMsg + ' Please contact tidisventures@gmail.com.',
+            errorMessage: errorMsg + ' Please reopen the app or contact support.',
         });
     }
 
@@ -571,7 +570,7 @@ const SidebarContainer = () => {
 
     if (isDev) {
         console.log('sidebar render-------------------')
-        console.log('settings', settings)
+        console.log('user', user)
     }
 
     return (
@@ -632,14 +631,11 @@ const SidebarContainer = () => {
             {/* Body */}
             < div style={{ height: middleHeight }} className='overflow-y-auto p-2 overflow-x-hidden' >
                 {
-                    messages.errorMessage ? (
-                        <Grid xs={12} container style={errorMsgStyle}>
-                            {messages.errorMessage}{" "}
-                            <button onClick={() => setMessages({ ...messages, errorMessage: null })}>
-                                <XMarkIcon className="h-4 w-4" />
-                            </button>
-                        </Grid>
-                    ) : null
+                    messages.errorMessage && (
+                        <div className="flex items-center justify-between w-full rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-xs text-red-800 shadow-sm mb-3">
+                            <span>{messages.errorMessage}</span>
+                        </div>
+                    )
                 }
 
                 {/* Main content */}
@@ -681,6 +677,7 @@ const SidebarContainer = () => {
                                     isGettingTemplates={isGettingTemplates}
                                     isLoadingContent={isLoadingContent}
                                     fetchTemplateContent={fetchTemplateContent}
+                                    
                                 />
                                 <DataSourcePicker
                                     sheets={sheetNames}

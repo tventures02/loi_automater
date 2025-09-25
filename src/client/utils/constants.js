@@ -1,11 +1,8 @@
 module.exports = {
-    SERVER_ERROR_MSG: "An error occurred while connecting to the server. Please contact support at tidisventures@gmail.com.",
-    PAYMENT_ERROR_MSG: "An error occurred with your payment. Please try again or contact support at tidisventures@gmail.com.",
+    SERVER_ERROR_MSG: "An error occurred while connecting to the server.",
+    PAYMENT_ERROR_MSG: "An error occurred with your payment. Please try again or contact support.",
     VIEW_ACT_CTA: 'See pricing.',
-    LIGHT_RED_BERRY: "#FFCBCB",
-    LIGHT_GREEN: "#93c47d",
     DARK_RED_BERRY: "#5f2120",
-    HEADERS_RANGE: 'A1:B1',
     AMPLITUDE: {
         OPEN_SIDEBAR: "LOI_AUTO: Opened sidebar",
         CREATED_TEMPLATE: "LOI_AUTO: Created template",
@@ -22,7 +19,6 @@ module.exports = {
         ERROR: "LOI_AUTO: Error",
         REFRESHED_SEND_DATA: "LOI_AUTO: Refreshed send data",
     },
-    FREE_VERSION_COPY: 'You are using a free version. ',
     APP_CODE: 'LOI_AUTO',
     APP_SOURCE_CODE: 'sheets_loi',
     APP_SLUG: 'bulk-loi-sender',

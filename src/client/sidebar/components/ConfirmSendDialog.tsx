@@ -82,7 +82,7 @@ export default function ConfirmSendDialog({
     const descWhenOk =
         variant === "real"
             ? `This will send ${count} email${count === 1 ? "" : "s"} now.`
-            : `We'll send ${sampleCount} preview email${sampleCount === 1 ? "" : "s"} to you (${user.email || toEmail || "your email address"}) using the next queued LOIs to verify correctness.`;
+            : `Bulk LOI Sender will send ${sampleCount} preview email${sampleCount === 1 ? "" : "s"} to you (${user.email || toEmail || "your email address"}) using the next queued LOIs to verify correctness.`;
 
     const descWhenNoCredits = isPremium
         ? "You've used all of your Gmail daily sending quota. It resets automatically tomorrow."

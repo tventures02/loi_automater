@@ -426,6 +426,20 @@ export default function SendCenterScreen({
         [filtered, visibleCount]
     );
 
+    if (!user?.email) return (
+        <div className="space-y-3 pb-3">
+            <h2 className="text-sm font-semibold text-gray-900">Send Emails</h2>
+            <div className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
+                    <Tooltip title={`Open Sender Queue tab`}>
+                        <LinkIcon className="w-3 h-3 cursor-pointer" onClick={() => serverFunctions.showSendQueueTab()} />
+                    </Tooltip>
+                </div>
+            </div>
+        </div>
+    );
+
     let primaryLabel = "Send...";
     if (sending) primaryLabel = "Sending…";
     else if (queuedTotal === 0) primaryLabel = "Open Builder";

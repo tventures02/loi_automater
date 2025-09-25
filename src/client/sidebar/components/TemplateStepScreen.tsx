@@ -120,6 +120,7 @@ const TemplateStepScreen = ({
     };
 
     const openCreateDialog = () => {
+        if (!user?.email) return;
         if (isCreatingDoc) return;
         setDocTitle('New LOI Template'); // or ''
         setIsCreateDialogOpen(true);
@@ -174,7 +175,7 @@ const TemplateStepScreen = ({
                 }
             </div>
 
-            {isGettingTemplates || isCreatingDoc ? (
+            {(isGettingTemplates || isCreatingDoc) && user?.email ? (
                 <div className="mt-1 animate-fadeIn flex items-center gap-2 justify-center text-sm text-gray-500">
                     <InlineSpinner />{isGettingTemplates ? "Loading templates..." : "Creating template..."}
                 </div>
