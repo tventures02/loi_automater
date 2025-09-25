@@ -29,6 +29,8 @@ export default function SettingsDialog({
     const [lsSettings, setLSSettings] = useLocalStorage<Settings>(CONSTANTS.LS_KEYS.SETTINGS, INIT_SETTINGS);
     const [maxColCharNumber, setMaxColCharNumber] = useState(lsSettings.maxColCharNumber);
 
+    console.log('config', config);
+
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>, key: string) => {
         if (e?.target?.value === "") return;
         const maxColCharNumberSelected = parseInt(e.target.value);
@@ -50,6 +52,7 @@ export default function SettingsDialog({
 
     if (!open) return null;
     const isPremium = user?.subscriptionStatusActive;
+    const subManagementLink = config?.purchasePg?.subManagementLink;
 
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
@@ -87,7 +90,7 @@ export default function SettingsDialog({
 
                         {isPremium && (
                             <div className="text-gray-500 flex items-center gap-1">
-                                <a href={config.subManagementLink} className="text-indigo-500 hover:text-indigo-600 hover:underline">Manage subscription</a>
+                                <a href={subManagementLink} className="text-indigo-500 hover:text-indigo-600 hover:underline cursor-pointer" target="_blank" rel="noopener noreferrer">Manage subscription</a>
                             </div>
                         )}
                         
