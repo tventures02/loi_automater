@@ -1,13 +1,45 @@
-import React from "react";
+import React, { useState } from "react";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { sendToAmplitude } from "../../utils/amplitude";
+import CONSTANTS from "../../utils/constants";
+import { generatePricingPageUrl } from "../../utils/misc";
+import { serverFunctions } from "../../utils/serverFunctions";
+import { User } from "../../utils/types";
+
+const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
 export default function CtaCard ({ 
-    onUpgradeClick,
     message,    
+    user,
 }: {
-    onUpgradeClick: () => void;
     message: string;
+    user: User;
 }) {
+    const [isNavigating, setIsNavigating] = useState(false);
+    const onUpgradeClick = async () => {
+        try {
+            if (isNavigating) return;
+            setIsNavigating(true);
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.UPGRADE_CLICKED, null, { email: user.email });
+            }
+            catch (error) { }
+
+            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
+            if (isDev) {
+                console.log(url);
+                console.log(user.email)
+                console.log(user.idToken)
+            }
+            window.open(url, '_blank');
+        } catch (error) {
+            if (isDev) console.log(error);
+        }
+        finally {
+            setIsNavigating(false);
+        }
+    }
+
     return (
         <div
             role="button"
@@ -34,13 +66,14 @@ px-3 py-2
                 {/* left: message + tiny attention beacon (no extra copy) */}
                 <div className="flex items-center gap-2">
                     <div className="text-[10px] text-amber-900">
-                        {message}
+                        { isNavigating ? 'Going to pricing page...' : message}
                     </div>
                 </div>
 
                 {/* right: button (keeps same label); isolates click to avoid double-fire */}
                 <button
                     type="button"
+                    disabled={isNavigating}
                     onClick={(e) => {
                         e.stopPropagation();
                         onUpgradeClick();

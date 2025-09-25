@@ -362,7 +362,7 @@ export default function MappingStepScreen({
             )}
 
             {!isPremium && totalColsToMap > CONSTANTS.FREE_MAX_COL_NUMBER && (
-                <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to unlock more columns!" />
+                <CtaCard message="Upgrade to unlock more columns!" user={user} />
             )}
 
             {/* Preview */}

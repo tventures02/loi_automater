@@ -930,7 +930,7 @@ export default function GenerateLOIsStepScreen({
             </div>
 
             {!isPremium && !isPreflighting && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
-                <CtaCard onUpgradeClick={onUpgradeClick} message="Upgrade to create unlimited LOIs!" />
+                <CtaCard message="Upgrade to create unlimited LOIs!" user={user} />
             )}
 
             {/* Snackbar */}

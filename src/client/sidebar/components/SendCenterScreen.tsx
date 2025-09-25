@@ -677,7 +677,7 @@ export default function SendCenterScreen({
 
             {
                 !isPremium && ctaMsg && !sendData.loading && (
-                    <CtaCard message={ctaMsg} onUpgradeClick={onUpgradeClick} />
+                    <CtaCard message={ctaMsg} user={user} />
                 )
             }
 
