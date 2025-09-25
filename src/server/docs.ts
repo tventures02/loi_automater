@@ -418,7 +418,7 @@ export const generateLOIChunk = (payload) => {
         }
 
         const existingForSheet = !isPremium ? countQueueForSheet(sheetName) || 0 : 0;
-        const freeRemainingForSheet = !isPremium ? freeRemainingForSheet_ || Math.max(0, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET - existingForSheet) : Number.MAX_SAFE_INTEGER;
+        const freeRemainingForSheet = !isPremium ? freeRemainingForSheet_ ?? Math.max(0, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET - existingForSheet) : Number.MAX_SAFE_INTEGER;
         const initialRemaining = freeRemainingForSheet; // keep original remaining for this run
         const hitHardStop = !isPremium && freeRemainingForSheet <= 0;
 
@@ -568,11 +568,10 @@ export const generateLOIChunk = (payload) => {
                     if (attachPdf && docInfo.fileId) {
                         // If we created a Doc, use its final text
                         try {
-                            const body = DocumentApp.openById(docInfo.fileId).getBody().getText() || '';
+                            const body = DocumentApp.openById(docInfo.fileId).getBody().getText();
                             bodyResolved = body;
                         } catch (e) {
-                            // Fallback to string template
-                            bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
+                            throw new Error(`Error getting body from doc: ${e.toString()}`);
                         }
                     } else {
                         // No Doc created: render from the *template* Doc body directly
@@ -694,11 +693,7 @@ function generateLOIDocFromTemplate(templateId, opts) {
     newDoc.saveAndClose();
 
     return { fileId: newDocId, fileUrl: newDoc.getUrl() };
-
-    function escapeRegExp(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 }
-
-// --- helpers ---
 
 // Helper: convert 'A'..'Z'..'AA' -> number
 const colToNumber = (col) => {
@@ -729,6 +724,7 @@ function renderName(pattern, row, tokenCols, emailColIdx) {
     // Clean up any leftover illegal filename chars
     return name.replace(/[/\\:*?"<>|]/g, ' ').trim() || 'LOI';
 }
+
 /** Ensure Sender Queue exists with headers; returns sheet. */
 export const queueEnsureSheet = () => {
     var ss = SpreadsheetApp.getActive();
@@ -1004,9 +1000,13 @@ export const sendNextBatch = (payload) => {
                     const queuedRows = [];
                     for (let r = 0; r < vals.length; r++) {
                         const row = vals[r];
-                        if (String(safeAt(row, iStatus) || '').toLowerCase() !== 'queued') continue;
+
+                        const status = String(safeAt(row, iStatus) || '').toLowerCase();
+                        if (status !== 'queued') continue;
+
                         const rowEmail = String(safeAt(row, iEmail) || '');
                         if (!rowEmail) continue;
+
                         const rowIndex = r + startFromRow;
                         queuedRows.push({
                             rowIndex,
