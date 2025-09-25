@@ -627,7 +627,7 @@ const SidebarContainer = () => {
             </div >
 
             {/* Dialogs */}
-            {showSettings && <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} settings={settings} setSettings={setSettings} />}
+            {showSettings && <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} settings={settings} setSettings={setSettings} config={config} user={user} />}
 
             {/* Body */}
             < div style={{ height: middleHeight }} className='overflow-y-auto p-2 overflow-x-hidden' >

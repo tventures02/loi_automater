@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import CONSTANTS, { MAX_COL_NUMBER } from "../../utils/constants";
 import { colLabel } from "../../utils/misc";
 import useLocalStorage from 'use-local-storage';
-import { Settings } from "../../utils/types";
+import { Settings, User } from "../../utils/types";
 import { INIT_SETTINGS } from "../../utils/initVals";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@mui/material";
@@ -13,6 +13,8 @@ type Props = {
     onClose: () => void;
     settings: Settings;
     setSettings: (settings: Settings) => void;
+    config: any;
+    user: User;
 };
 const COLUMN_OPTIONS = Array.from({ length: MAX_COL_NUMBER }, (_, i) => colLabel(i + 1)); // A..CV (100 cols)
 
@@ -21,6 +23,8 @@ export default function SettingsDialog({
     onClose,
     settings,
     setSettings,
+    config,
+    user,
 }: Props) {
     const [lsSettings, setLSSettings] = useLocalStorage<Settings>(CONSTANTS.LS_KEYS.SETTINGS, INIT_SETTINGS);
     const [maxColCharNumber, setMaxColCharNumber] = useState(lsSettings.maxColCharNumber);
@@ -45,6 +49,7 @@ export default function SettingsDialog({
     }
 
     if (!open) return null;
+    const isPremium = user?.subscriptionStatusActive;
 
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
@@ -79,6 +84,13 @@ export default function SettingsDialog({
                                 })}
                             </select>
                         </div>
+
+                        {isPremium && (
+                            <div className="text-gray-500 flex items-center gap-1">
+                                <a href={config.subManagementLink} className="text-indigo-500 hover:text-indigo-600 hover:underline">Manage subscription</a>
+                            </div>
+                        )}
+                        
                     </div>
 
                     <div className="mt-4 flex items-center justify-end gap-2">

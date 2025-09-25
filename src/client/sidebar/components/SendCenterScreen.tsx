@@ -434,6 +434,9 @@ export default function SendCenterScreen({
     const canLoadMore = visibleCount < filtered.length;
     const queueTotal = summary?.total ?? 0;
     const percent = sendProg.planned > 0 ? Math.min(100, Math.round((sendProg.sent / sendProg.planned) * 100)) : 0;
+    let ctaMsg = '';
+    if (summary?.queued > CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP) ctaMsg = `Upgrade to send ${CONSTANTS.DEFAULT_PREMIUM_DAILY_SEND_CAP}+ emails / day`;
+    else if (summary?.remaining === 0) ctaMsg = `Upgrade to send more emails!`;
 
     // if (isDev) console.log('items', items.slice(0, 10));
 
@@ -490,7 +493,7 @@ export default function SendCenterScreen({
                     className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                 >
                     <div className="flex items-center justify-between">
-                        <div className="text-xs font-medium text-gray-900">Queue</div>
+                        <div className="text-xs font-medium text-gray-900">Queue Review</div>
                     </div>
                     <svg
                         className={`h-4 w-4 text-gray-500 transition-transform ${queueOpen ? "rotate-180" : ""}`}
@@ -659,8 +662,8 @@ export default function SendCenterScreen({
 
 
             {
-                !isPremium && summary?.remaining === 0 && (
-                    <CtaCard message="Upgrade to send more emails!" onUpgradeClick={onUpgradeClick} />
+                !isPremium && ctaMsg && !sendData.loading && (
+                    <CtaCard message={ctaMsg} onUpgradeClick={onUpgradeClick} />
                 )
             }
 
