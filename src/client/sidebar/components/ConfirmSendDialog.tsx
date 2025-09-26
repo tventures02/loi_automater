@@ -110,7 +110,7 @@ export default function ConfirmSendDialog({
         noCredits ||
         (variant === "real" ? count <= 0 : sampleCount <= 0);
 
-    const maxSampleCount = summary?.remaining < sampleCount ? summary?.remaining : sampleCount;
+    const maxSampleCount = queued < 5 ? queued : 5;
 
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
