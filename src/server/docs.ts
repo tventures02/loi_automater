@@ -1590,7 +1590,6 @@ export const loiEnsureOutputFolder = (): string => {
     return id;
 }
 
-
 /**
  * Delete Docs referenced in the "Sender Queue" sheet — progressively.
  * Designed for large sets: scans in chunks, respects a time budget,

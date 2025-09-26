@@ -612,7 +612,7 @@ export default function GenerateLOIsStepScreen({
                             </>
                         ) : (
                             <div className="rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-[11px] text-gray-700">
-                                Using your LOI document text as the email body.
+                                Using your LOI document (text only) as the email body.
                             </div>
                         )}
                     </div>
@@ -923,10 +923,20 @@ export default function GenerateLOIsStepScreen({
                         
                         {
                             attachPdf && outputFolderId && <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
-                                target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 hover:underline">Open Docs in Drive</a></div>
+                                target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">Open Drive folder</a></div>
                         }
                     </div>
                 )}
+
+                {
+                    outputFolderId && attachPdf && (
+                        <div className="flex items-center text-[10px] !mb-0 justify-end">
+                            <a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`} target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">
+                                Open Drive folder
+                            </a>
+                        </div>
+                    )
+                }
             </div>
 
             {!isPremium && !isPreflighting && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
