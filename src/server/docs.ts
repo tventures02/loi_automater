@@ -405,7 +405,7 @@ export const generateLOIChunk = (payload) => {
         const lastRow = source.getLastRow();
         const lastCol = source.getLastColumn();
         const outFolderId = attachPdf ? loiEnsureOutputFolder() : '';
-        if (lastRow < 2) {
+        if (lastRow < 1) {
             return { created: 0, skippedInvalid: 0, failed: 0, duplicates: 0, nextOffset: offset, done: true, totalRows: 0, outputFolderId: outFolderId };
         }
 

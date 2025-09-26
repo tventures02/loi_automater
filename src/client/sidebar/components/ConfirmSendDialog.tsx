@@ -95,10 +95,22 @@ export default function ConfirmSendDialog({
         if (onUpgrade) onUpgrade();
     };
 
+    const handleOnConfirm = () => {
+        if (variant === "test") {
+            const countChecked = Math.min(sampleCount, summary?.remaining ?? 0);
+            if (countChecked > 0) onConfirm({ sampleCount: countChecked });
+        } else {
+            const countChecked = Math.min(count, summary?.remaining ?? 0);
+            if (countChecked > 0) onConfirm({ count: countChecked, stopOnError });
+        }
+    };
+
     const primaryDisabled =
         isSubmitting ||
         noCredits ||
         (variant === "real" ? count <= 0 : sampleCount <= 0);
+
+    const maxSampleCount = summary?.remaining < sampleCount ? summary?.remaining : sampleCount;
 
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-3" role="dialog" aria-modal="true">
@@ -139,7 +151,7 @@ export default function ConfirmSendDialog({
                                         type="button"
                                         className="px-2 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                                         disabled={noCredits}
-                                        onClick={() => setSampleCount((v) => Math.min(5, v + 1))}
+                                        onClick={() => setSampleCount((v) => Math.min(maxSampleCount, v + 1))}
                                     >
                                         +
                                     </button>
@@ -254,7 +266,7 @@ export default function ConfirmSendDialog({
                                 aria-disabled={primaryDisabled}
                                 onClick={
                                     !primaryDisabled
-                                        ? () => onConfirm(variant === "test" ? { sampleCount } : { count, stopOnError })
+                                        ? handleOnConfirm
                                         : undefined
                                 }
                                 className={`select-none rounded-md px-3 py-2 text-xs font-medium text-white ${primaryDisabled
