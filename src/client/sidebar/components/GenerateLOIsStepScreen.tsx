@@ -923,7 +923,7 @@ export default function GenerateLOIsStepScreen({
                         
                         {
                             attachPdf && outputFolderId && <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
-                                target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">Open Drive folder</a></div>
+                                target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">Preview created LOIs</a></div>
                         }
                     </div>
                 )}
