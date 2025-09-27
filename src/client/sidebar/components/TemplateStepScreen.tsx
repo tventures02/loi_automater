@@ -5,7 +5,7 @@ import InlineSpinner from "../../utils/components/InlineSpinner";
 import { DocInfo } from "../../../server/docs";
 import { backendCall } from "../../utils/server-calls";
 import CONSTANTS from '../../utils/constants';
-import { PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, QuestionMarkCircleIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import Tooltip from '@mui/material/Tooltip';
 import { NewTemplateDialog } from "./NewTemplateDialog";
 import { sendToAmplitude } from "../../utils/amplitude";
@@ -23,6 +23,7 @@ type Props = {
     isGettingTemplates: boolean;
     isLoadingContent: boolean;
     fetchTemplateContent: (docId: string) => void;
+    templatesFolderId: string;
 }
 const TemplateStepScreen = ({
     user,
@@ -37,6 +38,7 @@ const TemplateStepScreen = ({
     isGettingTemplates,
     isLoadingContent,
     fetchTemplateContent,
+    templatesFolderId
 }: Props) => {
 
     const [docTitle, setDocTitle] = useState('New LOI Template');
@@ -147,7 +149,16 @@ const TemplateStepScreen = ({
 
     return (
         <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-900">Select Template</h2>
+            <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-900">Select Template</h2>
+                {
+                    templatesFolderId && (
+                        <Tooltip title="Open templates folder in Drive">
+                            <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-500 cursor-pointer hover:text-gray-700" onClick={() => window.open(`https://drive.google.com/drive/u/0/folders/${templatesFolderId}`, '_blank')} />
+                        </Tooltip>
+                    )
+                }
+            </div>
             <div className="text-xs text-gray-600 mb-[3px] flex items-center gap-1">
                 {
                     templateExists ?

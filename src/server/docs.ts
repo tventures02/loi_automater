@@ -66,13 +66,13 @@ export function setLoiDateKeyToYesterdayDev() {
  * @returns {DocInfo[]} An array of objects, each containing the original ID
  *                      and either the document's name or an error message.
  */
-export const getGoogleDocNamesByIds = (docIds: string[]): DocInfo[] => {
+export const getGoogleDocNamesByIds = (docIds: string[]): { results: DocInfo[], templatesFolderId: string } => {
     // Validate that the input is a valid array
     if (!Array.isArray(docIds)) {
         // In a real-world scenario, throwing an error is often best here.
         console.error('Invalid input: docIds must be an array.');
         // However, returning a format consistent with an error might be better for the client
-        return [{ id: 'INVALID_INPUT', error: 'Input was not an array.' }];
+        return { results: [{ id: 'INVALID_INPUT', error: 'Input was not an array.' }], templatesFolderId: null };
     }
 
     const results: DocInfo[] = docIds.map((id) => {
@@ -97,7 +97,9 @@ export const getGoogleDocNamesByIds = (docIds: string[]): DocInfo[] => {
         }
     });
 
-    return results;
+    const templatesFolderId = loiEnsureTemplatesFolder();
+
+    return { results, templatesFolderId };
 };
 
 

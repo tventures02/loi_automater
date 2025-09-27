@@ -118,6 +118,7 @@ const SidebarContainer = () => {
         }
     });
     const [selectedTemplate, setSelectedTemplate] = useState('');
+    const [templatesFolderId, setTemplatesFolderId] = useState(null);
     const [currentStep, setCurrentStep] = useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -227,7 +228,9 @@ const SidebarContainer = () => {
             const getTemplates = async (user: User) => {
                 try {
                     setIsGettingTemplates(true);
-                    const docInfos = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
+                    const {results, templatesFolderId} = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
+                    const docInfos = results;
+                    setTemplatesFolderId(templatesFolderId);
                     if (isDev) console.log("docInfos", docInfos);
 
                     const validDocs = docInfos.filter(doc => doc.name).map(doc => ({ id: doc.id, name: doc.name }));
@@ -677,7 +680,7 @@ const SidebarContainer = () => {
                                     isGettingTemplates={isGettingTemplates}
                                     isLoadingContent={isLoadingContent}
                                     fetchTemplateContent={fetchTemplateContent}
-                                    
+                                    templatesFolderId={templatesFolderId}
                                 />
                                 <DataSourcePicker
                                     sheets={sheetNames}
