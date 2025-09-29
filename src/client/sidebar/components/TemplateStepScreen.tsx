@@ -87,6 +87,7 @@ const TemplateStepScreen = ({
                 app: CONSTANTS.APP_CODE,
             }
             const saveResp = await backendCall(dataToServer, 'loiApi/addDocTemplate', user.idToken);
+            if (docData.id) localStorage.setItem("loi:selectedTemplateId", docData.id);
             if (!saveResp.success) {
                 // handleError('Error: Problem saving Google Doc. Please try again.');
                 // return;
@@ -204,6 +205,7 @@ const TemplateStepScreen = ({
                                     return;
                                 }
                                 setSelectedTemplate(event.target.value);
+                                if (event.target.value) localStorage.setItem("loi:selectedTemplateId", event.target.value);
                                 try {
                                     sendToAmplitude(CONSTANTS.AMPLITUDE.SELECTED_TEMPLATE, { docTitle: templates.find(template => template.id === event.target.value)?.name }, { email: user.email });
                                 } catch (error) {}
