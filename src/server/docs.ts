@@ -592,6 +592,12 @@ export const generateLOIChunk = (payload) => {
                     bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
                 }
 
+                if (typeof eIdx === 'number' && eIdx >= 0) {
+                    var emailVal = row[eIdx] || '';
+                    bodyResolved = bodyResolved.replace(/{{\s*email\s*}}/gi, emailVal);
+                    bodyResolved = bodyResolved.replace(/{{\s*__email\s*}}/gi, emailVal);
+                }
+
                 // Queue row in Sender Queue
                 const now = new Date();
                 queueBatch.push({
@@ -854,6 +860,7 @@ export const queueList = (payload) => {
         const iSubject = head[normHeader('subject')];
         const iSourceRow = head[normHeader('sourceRow')];
         const iAttachPdf = head[normHeader('attachPdf')];
+        const iBody = head[normHeader('body')];
 
         // Build objects; sort by createdAt desc, then id
         const items = vals.map((row, index) => {
@@ -869,6 +876,7 @@ export const queueList = (payload) => {
                 sourceRow: row[iSourceRow] || '',
                 attachPdf: String(row[iAttachPdf] || '')?.toLowerCase() === 'true' || false,
                 queueTabRow: index + 2,
+                emailBody: row[iBody] || '',
             }
             return queueItem;
         })

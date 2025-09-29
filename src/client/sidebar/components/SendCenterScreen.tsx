@@ -92,6 +92,7 @@ export default function SendCenterScreen({
     }>({ active: false, mode: "real", planned: 0, sent: 0, failed: 0, loops: 0, lastBatch: 0 });
     const pauseRef = useRef(false);
     const [pauseRequested, setPauseRequested] = useState(false);
+    const [iQueueEmailBodyPreview, setIQueueEmailBodyPreview] = useState<number | null>(null);
     const requestPause = () => { pauseRef.current = true; setPauseRequested(true); };
     const resetPause = () => { pauseRef.current = false; setPauseRequested(false); };
 
@@ -555,7 +556,7 @@ export default function SendCenterScreen({
                                 <InlineSpinner /> Loading…
                             </div>
                         ) : filtered.length === 0 ? (
-                            <div className="px-3 pb-3 text-xs text-gray-600">No items.</div>
+                            <div className="px-3 pb-3 text-xs text-gray-600">No queued jobs.</div>
                         ) : (
                             <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
@@ -563,8 +564,15 @@ export default function SendCenterScreen({
                                         return (
                                             <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
                                                 <div className="min-w-0">
-                                                    <div className="text-gray-900 truncate">{item.recipient}</div>
-                                                    <div className="text-[11px] text-gray-600 truncate flex">
+                                                    <div className="text-[11px] text-gray-600 flex">
+                                                        <b>Recipient: </b>
+                                                    </div>
+                                                    <div className="text-gray-900 truncate mb-1">{item.recipient}</div>
+
+                                                    <div className="text-[11px] text-gray-600 flex">
+                                                        <b>Subject: </b>
+                                                    </div>
+                                                    <div className="text-[11px] text-gray-600 truncate flex mb-1">
                                                         <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
                                                             {item.subject || "(no subject)"}
                                                         </span>
@@ -572,12 +580,36 @@ export default function SendCenterScreen({
                                                             {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
                                                         </span>
                                                     </div>
+
+                                                    {
+                                                        item.emailBody && (
+                                                            <>
+                                                                <div className="text-[11px] text-gray-600 flex">
+                                                                    <b>Email Body: </b>
+                                                                </div>
+                                                                <div className="text-[11px] text-gray-600 flex mb-1">
+                                                                    {iQueueEmailBodyPreview === index ? (
+                                                                        <div className="text-gray-600 whitespace-pre-line">
+                                                                            {item.emailBody}
+                                                                        </div>
+                                                                    ) :
+                                                                        <div className="text-gray-600" >
+                                                                            {item.emailBody?.slice(0, 20)}{item.emailBody?.slice(20).length > 0 ? '...' : ''}
+                                                                            <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => setIQueueEmailBodyPreview(index)}>
+                                                                                Show all
+                                                                            </a>
+                                                                        </div>
+                                                                    }
+                                                                </div>
+                                                            </>
+                                                        )
+                                                    }
                                                     <div className="text-gray-600 text-[11px]" >Queue tab row:
                                                         <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a></div>
                                                     <div className="text-[11px] text-gray-600 truncate">
                                                         {item.docUrl ? (
                                                             <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                                Open doc
+                                                                Open doc attachment
                                                             </a>
                                                         ) : null}
                                                     </div>
@@ -733,7 +765,7 @@ export default function SendCenterScreen({
                 primaryDisabled={primaryDisabled}
                 primaryLoading={sending}
                 leftSlot={null}
-                helperText={loading ? null : queuedTotal === 0 ? <span className="text-amber-600">⚠ No queued items to send. Generate some LOIs first.</span> : undefined}
+                helperText={loading ? null : queuedTotal === 0 ? <span className="text-amber-600">⚠ No queued jobs to send. Generate some LOIs first.</span> : undefined}
                 currentStep="send"
                 mode={mode}
                 fixYPos={true}

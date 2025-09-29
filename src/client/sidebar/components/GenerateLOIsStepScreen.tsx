@@ -69,6 +69,12 @@ type Props = {
     setUseLOIAsBody: React.Dispatch<React.SetStateAction<boolean>>; 
     setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
     onRefresh?: () => void;
+    emailSubjectTpl: string;
+    setEmailSubjectTpl: React.Dispatch<React.SetStateAction<string>>;
+    emailBodyTpl: string;
+    setEmailBodyTpl: React.Dispatch<React.SetStateAction<string>>;
+    pattern: string;
+    setPattern: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export type PreflightResult = {
@@ -97,7 +103,6 @@ export type GenerateSummary = {
     statuses?: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
 };
 
-const DEFAULT_PATTERN = "LOI - {{email}}";
 const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 50;
 const DEFAULT_BATCH_SIZE = 100;
 
@@ -157,8 +162,14 @@ export default function GenerateLOIsStepScreen({
     setUseLOIAsBody,
     setCurrentStep,
     onRefresh,
+    emailSubjectTpl,
+    setEmailSubjectTpl,
+    emailBodyTpl,
+    setEmailBodyTpl,
+    pattern,
+    setPattern,
 }: Props) {
-    const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
+   
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
     const [isPreflighting, setIsPreflighting] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -188,8 +199,6 @@ export default function GenerateLOIsStepScreen({
     const failStopThresholdRef = useRef(failStopThreshold);
 
     /* -------- Email settings state -------- */
-    const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
-    const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\nJohn Smith");
     const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
     const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
     /* -------- /Email settings state -------- */
@@ -699,7 +708,7 @@ export default function GenerateLOIsStepScreen({
                                     value={emailBodyTpl}
                                     onChange={(e) => setEmailBodyTpl(e.target.value)}
                                     className="w-full h-28 rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 whitespace-pre-wrap"
-                                    placeholder="Hi {{AgentName}}, …"
+                                    placeholder="Hi {{agent_name}}, …"
                                 />
                             </>
                         ) : (
@@ -752,7 +761,7 @@ export default function GenerateLOIsStepScreen({
                             value={pattern}
                             onChange={(e) => setPattern(e.target.value)}
                             className="w-full rounded-md !bg-gray-50 border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 !mb-0"
-                            placeholder={DEFAULT_PATTERN}
+                            placeholder={CONSTANTS.DEFAULT_PATTERN}
                         />
                         {preflight?.sampleFileName && (
                             <div className="text-[11px] mt-1 text-gray-600">Example: {preflight.sampleFileName}</div>

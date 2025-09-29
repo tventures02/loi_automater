@@ -38,6 +38,7 @@ export type QueueItem = {
     sourceRow?: string;
     queueTabRow?: number;
     attachPdf?: boolean;
+    emailBody?: string;
 };
 
 export type SendSummary = {
@@ -82,6 +83,9 @@ const SidebarContainer = () => {
     // States for generate LOIs step
     const [attachPdf, setAttachPdf] = useState<boolean>(true);
     const [useLOIAsBody, setUseLOIAsBody] = useState<boolean>(false);
+    const [pattern, setPattern] = useState<string>(CONSTANTS.DEFAULT_PATTERN);
+    const [emailSubjectTpl, setEmailSubjectTpl] = useState<string>("Letter of Intent – {{address}}");
+    const [emailBodyTpl, setEmailBodyTpl] = useState<string>("Hi {{agent_name}},\n\nPlease find attached our Letter of Intent for {{address}}.\n\nBest regards,\nJohn Smith");
 
     // States for send screen
     const [sendData, setSendData] = useState<{
@@ -745,6 +749,12 @@ const SidebarContainer = () => {
                                 setUseLOIAsBody={setUseLOIAsBody}
                                 setCurrentStep={setCurrentStep}
                                 onRefresh={() => refreshSendData(true)} // force refresh
+                                emailSubjectTpl={emailSubjectTpl}
+                                setEmailSubjectTpl={setEmailSubjectTpl}
+                                emailBodyTpl={emailBodyTpl}
+                                setEmailBodyTpl={setEmailBodyTpl}
+                                pattern={pattern}
+                                setPattern={setPattern}
                             />
                         )}
 
