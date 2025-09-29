@@ -726,6 +726,7 @@ const SidebarContainer = () => {
                                 useLOIAsBody={useLOIAsBody}
                                 setUseLOIAsBody={setUseLOIAsBody}
                                 setCurrentStep={setCurrentStep}
+                                onRefresh={() => refreshSendData(true)} // force refresh
                             />
                         )}
 

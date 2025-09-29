@@ -240,6 +240,8 @@ export const preflightGenerateLOIs = (payload) => {
     if (sheet.getName().startsWith('Sender Queue')) throw new Error('Sender Queue is not a raw data sheet.');
     const queueExistsFlag = queueExists();
     const outputFolderId = loiEnsureOutputFolder();
+    const { sh } = queueEnsureSheet();
+    const qLastRow = sh.getLastRow();
 
     const FREE_CAP = CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET || 100; // safety
     const isPremium = !!(user?.subscriptionStatusActive);
@@ -261,6 +263,7 @@ export const preflightGenerateLOIs = (payload) => {
             outputFolderId,
             freeRemainingForSheet,                       // how many more rows this sheet can still create on free
             sheetQueueCount: 0,
+            qLastRow,
         };
     }
 
@@ -281,6 +284,7 @@ export const preflightGenerateLOIs = (payload) => {
             outputFolderId,
             freeRemainingForSheet,                       // how many more rows this sheet can still create on free
             sheetQueueCount: 0,
+            qLastRow,
         };
     }
     const emailIndex = colToNumber(emailColLetter) - 1;
@@ -331,6 +335,7 @@ export const preflightGenerateLOIs = (payload) => {
         outputFolderId,
         freeRemainingForSheet,                       // how many more rows this sheet can still create on free
         sheetQueueCount: existingForSheet,
+        qLastRow,
     };
 };
 
@@ -1381,7 +1386,74 @@ export const queueClearAll = (removeSent: boolean = false) => {
         lock.releaseLock();
     }
 };
-  
+
+/**
+ * Delete a specific block of rows in the Sender Queue by DATA row index,
+ * and return the collected docIds from those rows (if a "docId" column exists).
+ *
+ * - Data row 1 corresponds to sheet row 2 (header is row 1).
+ * - Never deletes the header row.
+ *
+ * @param startDataRow 1-based index into data rows (>=1)
+ * @param count        number of rows to delete (>=1)
+ * @return {{ cleared: number, remaining: number, docIds: string[] }}
+ */
+export const deleteJobsInQueueGivenRows = (startDataRow: number, count: number) => {
+    const { sh } = queueEnsureSheet();
+    const lastRow = sh.getLastRow();
+    if (lastRow <= 1) return { cleared: 0, remaining: 0, docIds: [] };
+
+    // Validate inputs
+    if (!Number.isFinite(startDataRow) || !Number.isFinite(count)) {
+        throw new Error('Invalid range: startDataRow and count must be numbers.');
+    }
+    if (startDataRow < 1) throw new Error('Invalid range: startDataRow must be >= 1.');
+    if (count < 1) throw new Error('Invalid range: count must be >= 1.');
+
+    const lock = LockService.getDocumentLock();
+    if (!lock.tryLock(10_000)) {
+        throw new Error('Another operation is in progress. Try again soon.');
+    }
+
+    try {
+        const startSheetRow = 1 + startDataRow; // data row 1 => sheet row 2
+        if (startSheetRow > lastRow) {
+            return { cleared: 0, remaining: Math.max(0, lastRow - 1), docIds: [] };
+        }
+
+        // Clamp to existing rows (and never touch header)
+        const maxDeletable = lastRow - startSheetRow + 1;
+        const toDelete = Math.max(0, Math.min(count, maxDeletable));
+        if (toDelete === 0) {
+            return { cleared: 0, remaining: Math.max(0, lastRow - 1), docIds: [] };
+        }
+
+        // Collect docIds (best-effort: skip if header missing)
+        let docIds: string[] = [];
+        try {
+            const head = headerIndexMap(sh);
+            const iDoc = head[normHeader('docId')];
+            if (iDoc != null) {
+                const raw = sh.getRange(startSheetRow, iDoc + 1, toDelete, 1).getValues(); // [[val],...]
+                const isProbablyDriveId = (s: string) => /^[A-Za-z0-9_-]{10,}$/.test(s);
+                docIds = raw
+                    .map(r => String(r[0] ?? '').trim())
+                    .filter(v => v && isProbablyDriveId(v));
+            }
+        } catch (_e) {
+            // ignore—return empty docIds if header lookup or read fails
+            docIds = [];
+        }
+
+        // Delete the block
+        sh.deleteRows(startSheetRow, toDelete);
+
+        const remaining = Math.max(0, sh.getLastRow() - 1);
+        return { cleared: toDelete, remaining, docIds };
+    } finally {
+        lock.releaseLock();
+    }
+};
 
 /**
    * Build a plain-text email body from a Google Doc, preserving paragraph breaks,
@@ -1795,6 +1867,57 @@ export const queueDeleteDocsSimple = (opts?: {
     } finally {
         lock.releaseLock();
     }
+};
+
+
+/**
+ * Trash the provided Google Drive file IDs using Advanced Drive Service.
+ * Requires: Resources → Advanced Google services… → Drive API (v2) = ON
+ * Scopes: drive.file (works for files your app created/has access to) or drive
+ *
+ * @param {string[]} ids
+ * @return {{ processed: number, trashed: number, errors: Array<{id: string, message: string}> }}
+ */
+export const queueDeleteDocsByIds = (ids: string[]) => {
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return { processed: 0, trashed: 0, errors: [] };
+    }
+
+    const isProbablyDriveId = (s: string) => /^[A-Za-z0-9_-]{10,}$/.test(String(s || '').trim());
+
+    const errors: Array<{ id: string; message: string }> = [];
+    let trashed = 0;
+
+    const retry = <T>(fn: () => T, attempts = 3): T => {
+        let lastErr: any;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                return fn();
+            } catch (e) {
+                lastErr = e;
+                if (i < attempts - 1) Utilities.sleep(250 * (i + 1)); // backoff
+            }
+        }
+        throw lastErr;
+    };
+
+    for (const raw of ids) {
+        const id = String(raw || '').trim();
+        if (!isProbablyDriveId(id)) {
+            errors.push({ id, message: 'Invalid ID format' });
+            continue;
+        }
+
+        try {
+            // Advanced Drive Service (v2)
+            retry(() => Drive.Files.trash(id));
+            trashed++;
+        } catch (e: any) {
+            errors.push({ id, message: String(e && e.message ? e.message : e) });
+        }
+    }
+
+    return { processed: ids.length, trashed, errors };
 };
 
 

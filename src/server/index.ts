@@ -35,7 +35,9 @@ import {
     resetLoiUserPropsDev,
     getLoiUserPropsDev,
     queuePurgeSentAndCompact,
-    setLoiDateKeyToYesterdayDev
+    setLoiDateKeyToYesterdayDev,
+    queueDeleteDocsByIds,
+    deleteJobsInQueueGivenRows,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -70,5 +72,7 @@ export {
     resetLoiUserPropsDev,
     getLoiUserPropsDev,
     queuePurgeSentAndCompact,
-    setLoiDateKeyToYesterdayDev
+    setLoiDateKeyToYesterdayDev,
+    queueDeleteDocsByIds,
+    deleteJobsInQueueGivenRows,
 };

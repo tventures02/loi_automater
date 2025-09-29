@@ -224,6 +224,7 @@ const TemplateStepScreen = ({
             {/* Template content preview / editor */}
             {selectedTemplate && !isCreatingDoc && templateExists && (
                 <div className="mt-1 !mb-1">
+                    <div className="text-[10px] text-gray-600 mb-2">Template preview (text only)</div>
                     <div className={`
             rounded-lg border border-gray-200 bg-gray-50}
             transition-colors

@@ -258,7 +258,7 @@ export default function ConfirmGenerateDialog({
                                         ? "Creating…"
                                         : willCreateDocs
                                             ? `Yes, create ${count || ""} Doc${count === 1 ? "" : "s"}`
-                                            : "Yes, add to Sender Queue"}
+                                            : "Yes, create LOI jobs"}
                                 </span>
                             </div>
                         </div>
