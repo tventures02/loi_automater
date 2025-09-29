@@ -31,6 +31,8 @@ type AggregateResult = {
     errors: Array<{ id: string; message: string }>;
 };
 
+const DELETE_JOB_CHUNK_SIZE = 200;
+
 type Props = {
     /** Placeholder -> column letter map. Must include __email for recipient column */
     mapping: Record<string, string>; // e.g., { Address: "A", AgentName: "B", Offer: "C", __email: "H" }
@@ -481,8 +483,10 @@ export default function GenerateLOIsStepScreen({
                 totalRowsProcessed: totals.totalRowsProcessed,
                 done,
             };
-            console.log('final Summary')
-            console.log(finalSummary)
+            if (isDev) {
+                console.log('final Summary')
+                console.log(finalSummary)
+            }
             setSummary((prev) => prev ? { ...prev, ...finalSummary } : null);
 
             created = totals.created;
@@ -528,13 +532,10 @@ export default function GenerateLOIsStepScreen({
         setClearing(true);
 
         const deleteDocs = async (docIds: string[]) => {
-            const chunkSize = 200;
-
-
             // Make contiguous chunks of IDs
             const chunks: string[][] = [];
-            for (let i = 0; i < docIds.length; i += chunkSize) {
-              chunks.push(docIds.slice(i, i + chunkSize));
+            for (let i = 0; i < docIds.length; i += DELETE_JOB_CHUNK_SIZE) {
+              chunks.push(docIds.slice(i, i + DELETE_JOB_CHUNK_SIZE));
             }
       
             const aggregate: AggregateResult = { processed: 0, trashed: 0, errors: [] };
@@ -568,7 +569,9 @@ export default function GenerateLOIsStepScreen({
             const docIds = res.docIds;
             if (docIds.length) {
                 const aggregate = await deleteDocs(docIds);
-                // console.log('aggregate', aggregate);
+                if (isDev) {
+                    console.log('aggregate', aggregate);
+                }
             }
 
             setSummary(null)
@@ -578,13 +581,12 @@ export default function GenerateLOIsStepScreen({
             console.error("Failed to clear created jobs", e);
             setSnackbar({ open: true, message: "Failed to delete created jobs. Please try again.", severity: "error" });
             try {
-                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClearQueue)' }, { email: user.email });
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'generateLOIsStepScreen (handleClearRecentJobs)' }, { email: user.email });
             } catch (error) {}
         } finally {
             setClearing(false);
             setOpenClear(false);
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
-            // setQueueOpen(false);
         }
     };
 
