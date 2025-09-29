@@ -565,7 +565,9 @@ export default function GenerateLOIsStepScreen({
 
         try {
             const res = await serverFunctions.deleteJobsInQueueGivenRows(preflight?.qLastRow, summary.created);
-            // console.log('res', res);
+            if (isDev) {
+                console.log('res', res);
+            }
             const docIds = res.docIds;
             if (docIds.length) {
                 const aggregate = await deleteDocs(docIds);
