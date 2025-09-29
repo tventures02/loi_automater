@@ -860,6 +860,7 @@ export const queueList = (payload) => {
         const iSubject = head[normHeader('subject')];
         const iSourceRow = head[normHeader('sourceRow')];
         const iAttachPdf = head[normHeader('attachPdf')];
+        const iBody = head[normHeader('body')];
 
         // Build objects; sort by createdAt desc, then id
         const items = vals.map((row, index) => {
@@ -875,6 +876,7 @@ export const queueList = (payload) => {
                 sourceRow: row[iSourceRow] || '',
                 attachPdf: String(row[iAttachPdf] || '')?.toLowerCase() === 'true' || false,
                 queueTabRow: index + 2,
+                emailBody: row[iBody] || '',
             }
             return queueItem;
         })

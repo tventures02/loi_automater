@@ -38,6 +38,7 @@ export type QueueItem = {
     sourceRow?: string;
     queueTabRow?: number;
     attachPdf?: boolean;
+    emailBody?: string;
 };
 
 export type SendSummary = {
