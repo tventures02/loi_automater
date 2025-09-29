@@ -592,6 +592,12 @@ export const generateLOIChunk = (payload) => {
                     bodyResolved = renderStringTpl_(emailBodyTpl, row, tokenCols);
                 }
 
+                if (typeof eIdx === 'number' && eIdx >= 0) {
+                    var emailVal = row[eIdx] || '';
+                    bodyResolved = bodyResolved.replace(/{{\s*email\s*}}/gi, emailVal);
+                    bodyResolved = bodyResolved.replace(/{{\s*__email\s*}}/gi, emailVal);
+                }
+
                 // Queue row in Sender Queue
                 const now = new Date();
                 queueBatch.push({
