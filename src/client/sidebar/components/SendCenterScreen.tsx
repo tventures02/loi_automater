@@ -691,7 +691,7 @@ export default function SendCenterScreen({
                             action={async () => {
                                 setSendData(s => ({ ...s, loading: true }));
                                 const res = await serverFunctions.queuePurgeSentAndCompact();
-                                console.log('res', res);
+                                // console.log('res', res);
                                 refreshSendData(true);
                                 setSendData(s => ({ ...s, loading: false }));
                             }}
@@ -706,7 +706,7 @@ export default function SendCenterScreen({
                             action={async () => {
                                 setSendData(s => ({ ...s, loading: true }));
                                 const res = await serverFunctions.queueClearAll();
-                                console.log('res', res);
+                                // console.log('res', res);
                                 refreshSendData(true);
                                 setSendData(s => ({ ...s, loading: false }));
                             }}

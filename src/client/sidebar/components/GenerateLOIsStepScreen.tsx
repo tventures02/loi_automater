@@ -4,12 +4,13 @@ import { serverFunctions } from "../../utils/serverFunctions";
 import { QueueStatus } from "./Sidebar";
 import { MAX_SHEET_NAME_LENGTH } from "./MappingStepScreen";
 import ConfirmGenerateDialog from "./ConfirmGenerateDialog";
-import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, PencilIcon, QuestionMarkCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, DocumentIcon, EnvelopeIcon, PaperClipIcon, PencilIcon, QuestionMarkCircleIcon, SparklesIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Alert, Snackbar, Tooltip } from "@mui/material";
 import { Settings, User } from "../../utils/types";
 import CONSTANTS from "../../utils/constants";
 import { sendToAmplitude } from "../../utils/amplitude";
 import CtaCard from "./CtaCard";
+import ConfirmClearRecentJobsModal from "./ConfirmClearRecentJobsModal";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
@@ -17,6 +18,20 @@ const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 const FREE_MAX_LETTER = CONSTANTS.FREE_MAX_LETTER;
 const colToNum = (L?: string) => L ? L.trim().toUpperCase().charCodeAt(0) - 64 : 0;
 const overFree = (L?: string) => colToNum(L) > colToNum(FREE_MAX_LETTER);
+
+type BatchResult = {
+    processed: number;
+    trashed: number;
+    errors: Array<{ id: string; message: string }>;
+};
+
+type AggregateResult = {
+    processed: number;
+    trashed: number;
+    errors: Array<{ id: string; message: string }>;
+};
+
+const DELETE_JOB_CHUNK_SIZE = 200;
 
 type Props = {
     /** Placeholder -> column letter map. Must include __email for recipient column */
@@ -53,6 +68,7 @@ type Props = {
     useLOIAsBody: boolean;
     setUseLOIAsBody: React.Dispatch<React.SetStateAction<boolean>>; 
     setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
+    onRefresh?: () => void;
 };
 
 export type PreflightResult = {
@@ -66,6 +82,7 @@ export type PreflightResult = {
     outputFolderId: string;
     freeRemainingForSheet: number;
     sheetQueueCount: number;
+    qLastRow: number;
 };
 
 export type GenerateSummary = {
@@ -139,6 +156,7 @@ export default function GenerateLOIsStepScreen({
     useLOIAsBody,
     setUseLOIAsBody,
     setCurrentStep,
+    onRefresh,
 }: Props) {
     const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -155,6 +173,8 @@ export default function GenerateLOIsStepScreen({
     const [autoContinue, setAutoContinue] = useState(true);
     const [batchSize, setBatchSize] = useState(DEFAULT_BATCH_SIZE);
     const [failStopThreshold, setFailStopThreshold] = useState<number>(5); // 0 = ignore
+    const [openClear, setOpenClear] = useState(false);
+    const [clearing, setClearing] = useState(false);
     const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
     const [innerPct, setInnerPct] = useState(0);
 
@@ -276,6 +296,7 @@ export default function GenerateLOIsStepScreen({
                         outputFolderId: "",
                         freeRemainingForSheet: 0,
                         sheetQueueCount: 0,
+                        qLastRow: 0,
                     });
                     try {
                         sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: error?.message || JSON.stringify(error), where: 'generateLOIsStepScreen (preflightGenerateLOIs)' }, { email: user.email });
@@ -425,7 +446,8 @@ export default function GenerateLOIsStepScreen({
                 }
 
                 // Update on-screen partial summary if you like:
-                setSummary({
+                const updatedSummary = {
+                    ...summary,
                     created: totals.created,
                     skippedInvalid: totals.skippedInvalid,
                     failed: totals.failed,
@@ -435,7 +457,8 @@ export default function GenerateLOIsStepScreen({
                     outputFolderId: outputFolderId,
                     statuses: [],
                     totalRowsProcessed: totals.totalRowsProcessed,
-                });
+                };
+                setSummary(updatedSummary);
 
                 // stop if too many failures in the last batch
                 if (failStopThresholdRef.current > 0 && res.failed >= failStopThresholdRef.current) {
@@ -460,6 +483,10 @@ export default function GenerateLOIsStepScreen({
                 totalRowsProcessed: totals.totalRowsProcessed,
                 done,
             };
+            if (isDev) {
+                console.log('final Summary')
+                console.log(finalSummary)
+            }
             setSummary((prev) => prev ? { ...prev, ...finalSummary } : null);
 
             created = totals.created;
@@ -499,6 +526,71 @@ export default function GenerateLOIsStepScreen({
             container.scrollIntoView({ behavior: "smooth", block: "end" });
         }
     }, [summary]);
+
+    const handleClearRecentJobs = async () => {
+        if (clearing) return;
+        setClearing(true);
+
+        const deleteDocs = async (docIds: string[]) => {
+            // Make contiguous chunks of IDs
+            const chunks: string[][] = [];
+            for (let i = 0; i < docIds.length; i += DELETE_JOB_CHUNK_SIZE) {
+              chunks.push(docIds.slice(i, i + DELETE_JOB_CHUNK_SIZE));
+            }
+      
+            const aggregate: AggregateResult = { processed: 0, trashed: 0, errors: [] };
+      
+            try {
+              for (let idx = 0; idx < chunks.length; idx++) {
+      
+                const batch = chunks[idx];
+      
+                const batchResult: BatchResult = await serverFunctions.queueDeleteDocsByIds(batch);
+      
+                aggregate.processed += batchResult.processed || 0;
+                aggregate.trashed += batchResult.trashed || 0;
+                if (Array.isArray(batchResult.errors) && batchResult.errors.length) {
+                  aggregate.errors.push(...batchResult.errors);
+                }
+      
+                // gentle pacing between batches (optional)
+                await new Promise((r) => setTimeout(r, 150));
+              }
+      
+              return aggregate;
+            } catch (e: any) {
+              throw e;
+            }
+        }
+
+        try {
+            const res = await serverFunctions.deleteJobsInQueueGivenRows(preflight?.qLastRow, summary.created);
+            if (isDev) {
+                console.log('res', res);
+            }
+            const docIds = res.docIds;
+            if (docIds.length) {
+                const aggregate = await deleteDocs(docIds);
+                if (isDev) {
+                    console.log('aggregate', aggregate);
+                }
+            }
+
+            setSummary(null)
+            onRefresh?.();
+            setSnackbar({ open: true, message: "Created jobs were successfully deleted.", severity: "success" });
+        } catch (e: any) {
+            console.error("Failed to clear created jobs", e);
+            setSnackbar({ open: true, message: "Failed to delete created jobs. Please try again.", severity: "error" });
+            try {
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'generateLOIsStepScreen (handleClearRecentJobs)' }, { email: user.email });
+            } catch (error) {}
+        } finally {
+            setClearing(false);
+            setOpenClear(false);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
+        }
+    };
 
     const allTokensMapped = placeholders.length > 0 && placeholders.every((ph) => !!mapping?.[ph]);
     const hasAtLeastOneMapped = placeholders.some((ph) => !!mapping[ph]);
@@ -920,11 +1012,32 @@ export default function GenerateLOIsStepScreen({
                         <div>Skipped (invalid): {summary.skippedInvalid}</div>
                         <div>Skipped (duplicates): {summary.duplicates}</div>
                         <div>Failed: {summary.failed}</div>
-                        
-                        {
-                            attachPdf && outputFolderId && <div><a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`}
-                                target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">Preview created LOIs</a></div>
-                        }
+
+                        <div className="flex items-center justify-start gap-1 mt-2">
+                            {
+                                attachPdf && outputFolderId && (
+                                    <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => window.open(`https://drive.google.com/drive/u/0/folders/${outputFolderId}`, '_blank')}
+                                    className="select-none rounded-md border border-gray-200 px-4 py-2 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer bg-white"
+                                >
+                                    Preview created LOIs
+                                </div>
+                                )
+                            }
+                            {summary?.created > 0 && !isGenerating && preflight?.qLastRow && <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setOpenClear(true)}
+                                className={`select-none !w-auto rounded-md px-4 py-2 text-[11px] ring-1 ring-red-300 text-red-700 hover:bg-red-50 cursor-pointer bg-white`}
+                            >
+                                <div className="flex items-center gap-1">
+                                    Delete
+                                </div>
+                            </div>
+                            }
+                        </div>
                     </div>
                 )}
 
@@ -938,6 +1051,16 @@ export default function GenerateLOIsStepScreen({
                     )
                 }
             </div>
+
+            {openClear && (
+                <ConfirmClearRecentJobsModal
+                    summary={summary}
+                    clearing={clearing}
+                    onCancel={() => { setOpenClear(false); }}
+                    onConfirm={() => handleClearRecentJobs()}
+                    attachPdf={attachPdf}
+                />
+            )}
 
             {!isPremium && !isPreflighting && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
                 <CtaCard message="Upgrade to create unlimited LOIs!" user={user} />

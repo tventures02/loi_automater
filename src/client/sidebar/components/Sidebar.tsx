@@ -240,10 +240,28 @@ const SidebarContainer = () => {
                     if (isDev) console.log("invalidDocIds", invalidDocIds);
 
                     setTemplates(validDocs); // Show valid docs immediately
-                    // If nothing selected yet, default to first
-                    if (!selectedTemplate && validDocs.length > 0) {
-                        setSelectedTemplate(validDocs[0].id);
-                        fetchTemplateContent(validDocs[0].id);
+                    
+                    const savedTemplateId = localStorage.getItem("loi:selectedTemplateId");
+                    let selectedTemplateId = selectedTemplate;
+                    if (!selectedTemplateId) {
+                        if (savedTemplateId) {
+                            if (savedTemplateId && validDocs.some(doc => doc.id === savedTemplateId)) {
+                                selectedTemplateId = savedTemplateId;
+                            }
+                            else {
+                                localStorage.removeItem("loi:selectedTemplateId");
+                            }
+                        }
+
+                        // If nothing selected yet, default to first
+                        if (validDocs.length > 0 && !selectedTemplateId) {
+                            selectedTemplateId = validDocs[0].id;
+                        }
+                    }
+
+                    if (selectedTemplateId) {
+                        setSelectedTemplate(selectedTemplateId);
+                        fetchTemplateContent(selectedTemplateId);
                     }
 
                     // 3. If any are invalid, tell the backend to remove them
@@ -726,6 +744,7 @@ const SidebarContainer = () => {
                                 useLOIAsBody={useLOIAsBody}
                                 setUseLOIAsBody={setUseLOIAsBody}
                                 setCurrentStep={setCurrentStep}
+                                onRefresh={() => refreshSendData(true)} // force refresh
                             />
                         )}
 
