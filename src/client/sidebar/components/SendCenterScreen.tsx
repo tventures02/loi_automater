@@ -427,14 +427,19 @@ export default function SendCenterScreen({
         [filtered, visibleCount]
     );
 
+    const handleOpenQueue = () => {
+        serverFunctions.showSendQueueTab();
+        setQueueOpen(true);
+    }
+
     if (!user?.email) return (
         <div className="space-y-3 pb-3">
             <h2 className="text-sm font-semibold text-gray-900">Send Emails</h2>
             <div className="rounded-xl border border-gray-200 p-3">
                 <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
-                    <Tooltip title={`Open Sender Queue tab`}>
-                        <LinkIcon className="w-3 h-3 cursor-pointer" onClick={() => serverFunctions.showSendQueueTab()} />
+                    <Tooltip title={`Open Sender Queue`}>
+                        <LinkIcon className="w-3 h-3 cursor-pointer" onClick={handleOpenQueue} />
                     </Tooltip>
                 </div>
             </div>
@@ -466,8 +471,8 @@ export default function SendCenterScreen({
                     <>
                         <div className="flex items-center justify-between mb-3">
                             <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
-                            <Tooltip title={`Open Sender Queue tab`}>
-                                <LinkIcon className="w-3 h-3 cursor-pointer" onClick={() => serverFunctions.showSendQueueTab()} />
+                            <Tooltip title={`Open Sender Queue`}>
+                                <LinkIcon className="w-3 h-3 cursor-pointer" onClick={handleOpenQueue} />
                             </Tooltip>
                         </div>
                         <div className="flex items-end justify-between">
@@ -556,7 +561,7 @@ export default function SendCenterScreen({
                                 <InlineSpinner /> Loading…
                             </div>
                         ) : filtered.length === 0 ? (
-                            <div className="px-3 pb-3 text-xs text-gray-600">No queued jobs.</div>
+                            <div className="px-3 pb-3 text-xs text-gray-600">No {filter === "all" ? "" : `${filter} `}jobs.</div>
                         ) : (
                             <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
                                 <ul className="divide-y divide-gray-100">
@@ -573,14 +578,10 @@ export default function SendCenterScreen({
                                                         <b>Subject: </b>
                                                     </div>
                                                     <div className="text-[11px] text-gray-600 truncate flex mb-1">
-                                                        <span className="w-[90%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
+                                                        <span className="w-[100%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
                                                             {item.subject || "(no subject)"}
                                                         </span>
-                                                        <span className="w-[10%] text-right">
-                                                            {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
-                                                        </span>
                                                     </div>
-
                                                     {
                                                         item.emailBody && (
                                                             <>
@@ -604,14 +605,27 @@ export default function SendCenterScreen({
                                                             </>
                                                         )
                                                     }
-                                                    <div className="text-gray-600 text-[11px]" >Queue tab row:
-                                                        <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a></div>
-                                                    <div className="text-[11px] text-gray-600 truncate">
+
+                                                    {/* Attachment */}
+                                                    <div className="text-[11px] text-gray-600 truncate mb-1">
                                                         {item.docUrl ? (
-                                                            <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                                Open doc attachment
-                                                            </a>
+                                                            <>
+                                                                <div className="flex">
+                                                                    <b>Attachment: </b>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
+                                                                        Open doc
+                                                                    </a>
+                                                                    {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
+                                                                </div>
+                                                            </>
                                                         ) : null}
+                                                    </div>
+
+                                                    {/* Queue tab row */}
+                                                    <div className="text-gray-600 text-[11px]" >Queue tab row:
+                                                        <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a>
                                                     </div>
                                                     {item.status === "failed" && item.lastError ? (
                                                         <div className="text-[11px] text-red-600 truncate mt-0.5">{item?.lastError?.includes('Error:') ? item.lastError : `Error: ${item.lastError}`}</div>

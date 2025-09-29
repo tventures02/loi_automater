@@ -13,7 +13,7 @@ export default function ConfirmClearQueueModal({
     onConfirm: (deleteDocs: boolean, removeSent: boolean) => void;
     clearing: boolean;
 }) {
-    const [deleteDocs, setDeleteDocs] = useState(false);
+    const [deleteDocs, setDeleteDocs] = useState(true);
     const [removeSent, setRemoveSent] = useState(false);
     const { total, sent } = summary || {};
     const count = removeSent ? sent : total;
