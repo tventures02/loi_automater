@@ -5,7 +5,7 @@ export async function initiateTokenPurchase(
     verType: 'idToken' | 'accessToken',
     source: string = CONSTANTS.APP_SOURCE_CODE // Or appropriate client
 ): Promise<{ success: boolean; purchaseCode?: string; error?: string }> {
-    const app = 'flashcardlab';
+    const app = 'sheets_loi';
     try {
         const response = await fetch(`${process.env.REACT_APP_TV_BACKEND}tvapi/purchase-token/initiate`, {
             method: 'POST',

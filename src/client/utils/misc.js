@@ -92,7 +92,7 @@ export function parseHTMLData() {
 
 
 export const generatePricingPageUrl = async (emailIn = '', token = '', getUserData) => {
-    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://flashcardlab.co/';
+    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://tidsiventures.com/';
     const appSlug = CONSTANTS.APP_SLUG;
     let purchaseResp = null;
 
