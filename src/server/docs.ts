@@ -383,6 +383,12 @@ function countQueueForSheet(sheetName: string) {
     return n;
 }
 
+function isDocsDailyQuotaError_(err) {
+    const s = String(err && (err.message || err));
+    // Common patterns seen from Apps Script when hitting daily quotas
+    return /Service invoked too many times|Quota exceeded|User rate limit exceeded|Daily limit exceeded/i.test(s);
+}
+
 export const generateLOIChunk = (payload) => {
 
     const {
@@ -560,11 +566,32 @@ export const generateLOIChunk = (payload) => {
                 let docInfo = { fileId: '', fileUrl: '' };
                 if (attachPdf) {
                     const fileName = renderName(filenamePattern, row, tokenCols, eIdx);
-                    docInfo = generateLOIDocFromTemplate(templateId, {
-                        fileName,
-                        placeholders,
-                        outFolderId,
-                    });
+                    try {
+                        docInfo = generateLOIDocFromTemplate(templateId, {
+                            fileName,
+                            placeholders,
+                            outFolderId,
+                        });
+                    } catch (err) {
+                        // If we hit the daily quota, STOP the run cleanly and return structured metadata
+                        const msg = String(err && err.message || '');
+                        if (msg.startsWith('QUOTA_DOCS_CREATE_DAILY|')) {
+                            return {
+                                created, skippedInvalid, failed, duplicates,
+                                nextOffset: startRow + i,            // stop at the row that failed
+                                done: true,                          // pause this session
+                                totalRows,
+                                outputFolderId: outFolderId,
+                                quotaDocsExceeded: true,
+                                quota: { type: 'docsCreateDaily' },
+                                ...(includeStatuses ? { statuses } : {})
+                            };
+                        }
+                        // Non-quota error -> treat as per-row failure (your existing logic)
+                        failed++;
+                        if (includeStatuses) statuses.push({ row: sourceRow, status: "failed", message: String(err) });
+                        continue; // move on to next row
+                    }
                 }
 
                 // Compute SUBJECT and BODY now (so future sends don’t depend on changed templates)
@@ -657,6 +684,8 @@ export const generateLOIChunk = (payload) => {
             ...(includeStatuses ? { statuses } : {}),
         };
     } catch (error) {
+        const m = String(error && error.message || '');
+        if (m.startsWith('QUOTA_DOCS_CREATE_DAILY|')) throw error; // let client see it
         console.error(`Error generating LOIs: ${error.toString()}`);
         throw new Error('There was an error generating LOIs.');
     }
@@ -682,30 +711,42 @@ function generateLOIDocFromTemplate(templateId, opts) {
         throw new Error('generateLOIDocFromTemplate: outFolderId and fileName are required.');
     }
 
-    const copy = Drive.Files.copy(
-        {
-            title: fileName,
-            parents: [{ id: outFolderId }],
-        },
-        templateId
-    );
+    // Dev errors
+    // throw new Error('QUOTA_DOCS_CREATE_DAILY|' + `Resets tomorrow.`);
+    // throw new Error(`Resets tomorrow.`);
+    // End dev errors
 
-    const newDocId = copy.id;
-    const newDoc = DocumentApp.openById(newDocId);
-    const body = newDoc.getBody();
+    try {
+        const copy = Drive.Files.copy(
+            {
+                title: fileName,
+                parents: [{ id: outFolderId }],
+            },
+            templateId
+        );
 
-    // Replace placeholders with actual data
-    const map = opts.placeholders || {};
-    for (var key in map) {
-        var value = String(map[key] ?? '');
-        body.replaceText('{{\\s*' + escapeRegExp(key) + '\\s*}}', value);
-        body.replaceText('<\\s*' + escapeRegExp(key) + '\\s*>', value);
-        body.replaceText('<\\s*' + escapeRegExp(String(key).toLowerCase()) + '\\s*>', value);
+        const newDocId = copy.id;
+        const newDoc = DocumentApp.openById(newDocId);
+        const body = newDoc.getBody();
+
+        // Replace placeholders with actual data
+        const map = opts.placeholders || {};
+        for (var key in map) {
+            var value = String(map[key] ?? '');
+            body.replaceText('{{\\s*' + escapeRegExp(key) + '\\s*}}', value);
+            body.replaceText('<\\s*' + escapeRegExp(key) + '\\s*>', value);
+            body.replaceText('<\\s*' + escapeRegExp(String(key).toLowerCase()) + '\\s*>', value);
+        }
+
+        newDoc.saveAndClose();
+
+        return { fileId: newDocId, fileUrl: newDoc.getUrl() };
+    } catch (error) {
+        if (isDocsDailyQuotaError_(error)) {
+            throw new Error('QUOTA_DOCS_CREATE_DAILY|' + `Resets tomorrow.`);
+        }
+        throw error;
     }
-
-    newDoc.saveAndClose();
-
-    return { fileId: newDocId, fileUrl: newDoc.getUrl() };
 }
 
 // Helper: convert 'A'..'Z'..'AA' -> number

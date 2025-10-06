@@ -11,6 +11,7 @@ import CONSTANTS from "../../utils/constants";
 import { sendToAmplitude } from "../../utils/amplitude";
 import CtaCard from "./CtaCard";
 import ConfirmClearRecentJobsModal from "./ConfirmClearRecentJobsModal";
+import AlertModal from "./AlertModal";
 
 const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 
@@ -186,8 +187,9 @@ export default function GenerateLOIsStepScreen({
     const [failStopThreshold, setFailStopThreshold] = useState<number>(5); // 0 = ignore
     const [openClear, setOpenClear] = useState(false);
     const [clearing, setClearing] = useState(false);
-    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
+    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" | "warning" }>({ open: false, message: "", severity: "success" });
     const [innerPct, setInnerPct] = useState(0);
+    const [alertModalState, setAlertModalState] = useState<{ open: boolean, message: string, title: string }>({ open: false, message: "", title: "" });
 
     const isPremium = user.subscriptionStatusActive;
     const emailColumn = mapping?.__email || "";
@@ -439,6 +441,35 @@ export default function GenerateLOIsStepScreen({
                     stopFakeInnerProgress(true);                 // snap to 100% and reset
                 });
 
+                if (isDev) console.log('res', res)
+                // Detect daily document-creation hard limit (structured by server)
+                if (res?.quotaDocsExceeded && res?.quota?.type === 'docsCreateDaily') {
+                    setAutoContinue(false);
+
+                    // snapshot progress
+                    const updatedSummary = {
+                        ...summary,
+                        created: totals.created,
+                        skippedInvalid: totals.skippedInvalid,
+                        failed: totals.failed,
+                        duplicates: totals.duplicates,
+                        nextOffset: res.nextOffset,
+                        done: true,
+                        totalRowsProcessed: totals.totalRowsProcessed,
+                        quota: res.quota
+                    };
+                    setSummary(updatedSummary);
+
+                    setAlertModalState({ 
+                        open: true, 
+                        message: "You’ve reached Google’s daily limit for creating Docs, not a Bulk LOI Sender related issue.\n\n You can continue creating attached PDFs after 24 hours when the quota resets (250 docs for consumer accounts, 1,500 for premium Google Workspace accounts).\n\n Don't worry, you can continue creating LOI Jobs without PDFs.\n\n For more info, contact Bulk LOI Sender support.",
+                        title: "Oops! Google Docs Quota Reached" 
+                    });
+                    created = res.created || totals.created;
+                    setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. ${!isPremium && created === 0 ? `Upgrade to create unlimited LOIs. ` : ''} ${created > 0 ? `Can continue to send.` : ''}`, severity: "warning" });
+                    break; // stop the do/while batching loop
+                }
+
                 totals.created += res.created;
                 totals.skippedInvalid += res.skippedInvalid;
                 totals.failed += res.failed;
@@ -472,7 +503,6 @@ export default function GenerateLOIsStepScreen({
                 // stop if too many failures in the last batch
                 if (failStopThresholdRef.current > 0 && res.failed >= failStopThresholdRef.current) {
                     setAutoContinue(false);
-                    setSnackbar({ open: true, message: `Paused: ${res.failed} failures in last batch (threshold ${failStopThresholdRef.current}).`, severity: "error" });
                     break;
                 }
 
@@ -503,7 +533,14 @@ export default function GenerateLOIsStepScreen({
             onValidChange?.("lois", true);
             setCanContinue({ ...canContinue, lois: true });
             setQueueStatus({ exists: true, empty: false });
-            setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. ${!isPremium && created === 0 ? `Upgrade to create unlimited LOIs. ` : ''}Continue to send.`, severity: "success" });
+            const failed = totals.failed || (res?.failed || 0);
+            const numFailedMsg = failed > 0 ? `${failed} LOIs failed to create. ` : '';
+            if (failed >= failStopThresholdRef.current) {
+                setSnackbar({ open: true, message: `Paused: ${failed} failures in last batch.`, severity: "error" });
+            }
+            else {
+                setSnackbar({ open: true, message: `${created ? `${created} ` : '0 '}LOIs created successfully. ${numFailedMsg} ${!isPremium && created === 0 ? `Upgrade to create unlimited LOIs. ` : ''} ${created > 0 ? `Can continue to send.` : ''}`, severity: failed > 0 ? "warning" : "success" });
+            }
             try {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.CREATED_LOIS, { 
                     summary: finalSummary,
@@ -631,6 +668,12 @@ export default function GenerateLOIsStepScreen({
                 emailPreview={emailPreview}
                 isPremium={isPremium}
                 onUpgradeClick={onUpgradeClick}
+            />
+            <AlertModal
+                open={alertModalState.open}
+                onCancel={() => setAlertModalState({ open: false, message: "", title: "" })}
+                message={alertModalState.message}
+                title={alertModalState.title}
             />
 
             <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
