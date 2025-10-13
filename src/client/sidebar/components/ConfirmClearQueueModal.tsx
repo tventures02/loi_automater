@@ -32,13 +32,13 @@ export default function ConfirmClearQueueModal({
                 </p>
 
                 <div className="mt-2 text-xs text-gray-600">
-                    {deleteDocs ? "Your associated LOI Google Docs are deleted along with the queue jobs." : ""}
+                    {deleteDocs ? "Your associated LOI Google Docs are also moved to the trash (recoverable for 30 days)." : ""}
                     {deleteDocs && clearing && <div className="text-red-500 mt-2 text-[11px]">Deleting Docs. This may take a while depending on the number of Docs...</div>}
                 </div>
 
                 {!clearing && (
                     <div className={`relative flex items-center gap-1 justify-end mt-2`}>
-                        <span className="text-[11px] text-gray-700 select-none">Delete associated LOI Docs</span>
+                        <span className="text-[11px] text-gray-700 select-none">Trash associated LOI Docs</span>
                         <span
                             role="switch"
                             aria-checked={deleteDocs}

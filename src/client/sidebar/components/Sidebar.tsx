@@ -759,6 +759,7 @@ const SidebarContainer = () => {
                                 setEmailBodyTpl={setEmailBodyTpl}
                                 pattern={pattern}
                                 setPattern={setPattern}
+                                outputFolderId={outputFolderId}
                             />
                         )}
 

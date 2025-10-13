@@ -1368,7 +1368,7 @@ export const queueUpdateStatus = (payload) => {
 
 
 /** Remove ALL rows from Sender Queue except the header row. */
-export const queueClearAll = (removeSent: boolean = false) => {
+export const queueClearAll = (statuses: string[] = []) => {
     const { sh } = queueEnsureSheet(); // existing helper
     const lastRow = sh.getLastRow();
     if (lastRow <= 1) return { cleared: 0, remaining: 0 };
@@ -1377,6 +1377,7 @@ export const queueClearAll = (removeSent: boolean = false) => {
     if (!lock.tryLock(10_000)) {
         throw new Error('Another operation is in progress. Try again soon.');
     }
+    const removeSent = statuses.length === 1 && statuses.includes('sent');
 
     try {
         if (!removeSent) {
@@ -1734,8 +1735,7 @@ export const loiEnsureOutputFolder = (): string => {
  */
 export const queueDeleteDocsSimple = (opts?: {
     sheetName?: string;              // default: LOI_QUEUE_NAME
-    removeSent?: boolean;            // if true, restrict to status === "sent"
-    statuses?: string[] | null;      // optional explicit filter (ignored when removeSent=true)
+    statuses: string[] | null;      // optional explicit filter (ignored when removeSent=true)
     permanentDelete?: boolean;       // default: false (Trash instead of permanent)
     throttleEvery?: number;          // default: 50 (sleep every N deletes)
     sleepMs?: number;                // default: 600ms (to be gentle on quotas)
@@ -1746,12 +1746,11 @@ export const queueDeleteDocsSimple = (opts?: {
     timeBudgetMs?: number;           // default: 270_000 (~4.5 min)
     dryRun?: boolean;                // default: false (when true, don't delete; just preview counts)
     sampleNames?: number;            // default: 0 (try to return up to N file names for UI)
+    kind?: 'archive' | 'trash' | 'delete';
 }) => {
     const {
         sheetName = LOI_QUEUE_NAME,
-        removeSent = false,
         statuses = null,
-        permanentDelete = false,
         throttleEvery = 50,
         sleepMs = 600,
 
@@ -1760,7 +1759,9 @@ export const queueDeleteDocsSimple = (opts?: {
         timeBudgetMs = 270_000, // ~4.5 min, leaving buffer for UI/network
         dryRun = false,
         sampleNames = 0,
+        kind = 'trash',
     } = opts || {};
+    const norm = (s: any) => String(s || "").trim().toLowerCase();
 
     const DOC_ID = "docId";
     const STATUS = "status";
@@ -1794,13 +1795,13 @@ export const queueDeleteDocsSimple = (opts?: {
         const docIdIdx = findIdx(DOC_ID);
         const statusIdx = findIdx(STATUS);
         if (docIdIdx < 0) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
-        if ((removeSent || (statuses && statuses.length)) && statusIdx < 0) {
+        if ((statuses && statuses.length) && statusIdx < 0) {
             throw new Error(`Header "${STATUS}" is required to filter by status in ${sheetName}`);
         }
 
-        // Effective status filter
-        const effectiveStatuses: string[] | null = removeSent ? ["sent"] : (statuses ? statuses : null);
-        const statusSet = effectiveStatuses ? new Set(effectiveStatuses.map(s => s.toLowerCase())) : null;
+        // status set
+        // statuses are like ["sent", "failed"] or ["sent"] or ["failed"] or ["sent", "failed", "queued", "paused"]
+        const statusSet = statuses ? new Set(statuses.map(s => s.toLowerCase())) : null;
 
         // Progressive scan: read the sheet in chunks, collect up to "limit" docIds
         const CHUNK_ROWS = 500;
@@ -1822,7 +1823,7 @@ export const queueDeleteDocsSimple = (opts?: {
                 if (!docId) continue;
 
                 if (statusSet && statusIdx >= 0) {
-                    const st = String(row[statusIdx] || "").trim().toLowerCase();
+                    const st = norm(row[statusIdx]);
                     if (!statusSet.has(st)) continue;
                 }
 
@@ -1886,14 +1887,17 @@ export const queueDeleteDocsSimple = (opts?: {
             if (!withinBudget()) return;
             Utilities.sleep(perIterSleepMs);
             try {
-                if (permanentDelete) {
+                if (kind === 'delete') {
                     // Requires Advanced Service: Drive API enabled
                     // @ts-ignore
                     Drive.Files.remove(id);
                     deleted++;
-                } else {
+                } else if (kind === 'trash') {
                     Drive.Files.trash(id);
                     trashed++;
+                } else if (kind === 'archive') {
+                    Drive.Files.trash(id);
+                    // TODO: archived++;
                 }
             } catch (e) {
                 // File might be gone, already trashed, or permission denied

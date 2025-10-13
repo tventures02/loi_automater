@@ -18,9 +18,9 @@ import JobWarning from "./JobWarning";
 import { sendToAmplitude } from "../../utils/amplitude";
 import {
     XCircleIcon,
-    InformationCircleIcon,
     ArrowTopRightOnSquareIcon
 } from "@heroicons/react/24/outline";
+import ConfirmDeleteDocsModal from "./ConfirmDeleteDocsModal";
 
 
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
@@ -79,8 +79,11 @@ export default function SendCenterScreen({
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [openClear, setOpenClear] = useState(false);
     const [fileCleanupOpen, setFileCleanupOpen] = useState(false);
-    const [cleanupLoading, setCleanupLoading] = useState(false);
-    const [includeFailedInCleanup, setIncludeFailedInCleanup] = useState(false);
+    const [cleanUpStates, setCleanUpStates] = useState<{
+        openConfirm: boolean;
+        kind: 'archive' | 'trash' | 'delete';
+        includeFailed: boolean;
+    }>({ openConfirm: false, kind: 'trash', includeFailed: false });
     const [clearing, setClearing] = useState(false);
     const [openMenu, setOpenMenu] = useState<{
         open: boolean;
@@ -334,7 +337,12 @@ export default function SendCenterScreen({
         }
     };
 
-    const handleClearQueue = async (deleteDocs: boolean = false, removeSent: boolean = false) => {
+    const handleClear = async (
+        deleteDocs: boolean = false,
+        statuses: string[] = [],
+        includeJobs: boolean = true,
+        kind: 'archive' | 'trash' | 'delete' = 'trash',
+    ) => {
         if (clearing) return;
         setClearing(true);
 
@@ -351,13 +359,13 @@ export default function SendCenterScreen({
 
                 while (nextToken !== null && loops < maxLoops) {
                     const res = await serverFunctions.queueDeleteDocsSimple({
-                        removeSent,            // true => only delete Docs for rows with status "sent"
+                        statuses,
                         startFromRow: nextToken,
                         limit: 200,            // tune as needed
                         timeBudgetMs: 270000,  // ~4.5 min; server will return early if needed
                         throttleEvery: 50,
                         sleepMs: 600,
-                        // permanentDelete: false, // keep default "trash"
+                        kind,
                     });
 
                     loops += 1;
@@ -384,8 +392,10 @@ export default function SendCenterScreen({
                 }
             }
 
-            // Now clear the sheet (all rows or only "sent" rows depending on removeSent)
-            await serverFunctions.queueClearAll(removeSent);
+            // Now clear the sheet (all rows or only "sent" rows depending on statuses)
+            if (includeJobs) {
+                await serverFunctions.queueClearAll(statuses);
+            }
 
             // Optimistic local reset; also call onRefresh to re-pull counts
             setSendData(s => ({ ...s, items: [] }));
@@ -395,92 +405,31 @@ export default function SendCenterScreen({
             }));
             onRefresh?.();
 
-            setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
+            if (cleanUpStates.openConfirm) {
+                setSnackbar({ open: true, message: "Clean up successful.", severity: "success" });
+            }
+            else {
+                setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
+            }
+            
         } catch (e: any) {
             console.error("Failed to clear queue", e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
             try {
-                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClearQueue)' }, { email: user.email });
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClear)' }, { email: user.email });
             } catch (error) { }
         } finally {
             setClearing(false);
             setFileCleanupOpen(false);
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
             setQueueOpen(false);
+            setCleanUpStates({ openConfirm: false, kind: 'trash', includeFailed: false });
         }
     };
 
     const eligibleSent = summary?.sent ?? 0;
     const eligibleFailed = summary?.failed ?? 0;
-    const totalCleanupEligible = eligibleSent + (includeFailedInCleanup ? eligibleFailed : 0);
-
-    const confirmAndRun = async (kind /* 'archive' | 'trash' | 'delete' */) => {
-        if (cleanupLoading) return;
-
-        if (totalCleanupEligible <= 0) {
-            setSnackbar({ open: true, severity: "info", message: "No eligible LOI Docs to clean up." });
-            return;
-        }
-
-        const label =
-            kind === "archive"
-                ? "Archive"
-                : kind === "trash"
-                    ? "Move to Trash"
-                    : "Delete forever";
-
-        // Quantified confirmations
-        let ok = false;
-        if (kind === "delete") {
-            const typed = window.prompt(
-                `Permanently delete ${totalCleanupEligible} document${totalCleanupEligible === 1 ? "" : "s"}? This cannot be undone.\n\nType DELETE to confirm.`
-            );
-            ok = typed === "DELETE";
-        } else if (kind === "trash") {
-            ok = window.confirm(
-                `Move ${totalCleanupEligible} document${totalCleanupEligible === 1 ? "" : "s"} to Google Drive Trash?\nYou can restore within 30 days.`
-            );
-        } else {
-            ok = window.confirm(
-                `Archive ${totalCleanupEligible} document${totalCleanupEligible === 1 ? "" : "s"} to your Archive folder?\nThis is non-destructive and reversible.`
-            );
-        }
-        if (!ok) return;
-
-        try {
-            setCleanupLoading(true);
-
-            // ---- PLACEHOLDER server calls (implement in Apps Script) ----
-            // Status scope: always includes 'sent'; optionally includes 'failed'
-            const status = includeFailedInCleanup ? ["sent", "failed"] : ["sent"];
-
-            if (kind === "archive") {
-                await serverFunctions.queueArchiveDocsSimple({ status });
-            } else if (kind === "trash") {
-                await serverFunctions.queueTrashDocsSimple({ status });
-            } else {
-                await serverFunctions.queueDeleteForeverDocsSimple({ status });
-            }
-            // -------------------------------------------------------------
-
-            setSnackbar({
-                open: true,
-                severity: "success",
-                message: `${label} started for ${totalCleanupEligible} doc${totalCleanupEligible === 1 ? "" : "s"}.`,
-            });
-            // Refresh UI so counts update
-            await refreshSendData(true);
-        } catch (e) {
-            setSnackbar({
-                open: true,
-                severity: "error",
-                message: `Cleanup failed: ${e?.message || e}`,
-            });
-        } finally {
-            setCleanupLoading(false);
-        }
-    };
-
+    const totalCleanupEligible = eligibleSent + (cleanUpStates.includeFailed ? eligibleFailed : 0);
 
     const handleGoToGenLOIs = () => {
         if (mode === "send") {
@@ -619,7 +568,7 @@ export default function SendCenterScreen({
                                         role="button"
                                         tabIndex={0}
                                         onClick={() => setOpenClear(true)}
-                                        className={`select-none !w-auto rounded-md px-2 py-1 text-[11px] ring-1 ${items.length === 0
+                                        className={`select-none !w-auto rounded-md px-2 py-1 text-[11px] ring-1 bg-red-50 ${items.length === 0
                                             ? "ring-gray-200 text-gray-400 cursor-not-allowed"
                                             : "ring-red-300 text-red-700 hover:bg-red-50 cursor-pointer"
                                             }`}
@@ -760,7 +709,7 @@ export default function SendCenterScreen({
                         className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                     >
                         <div className="flex items-center justify-between">
-                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File Cleanup {summary?.sent ? `(${summary?.sent})` : ""} </div>
+                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File Cleanup <span className="text-gray-500 text-[10px]">{summary?.sent ? `(${summary?.sent})` : ""}</span> </div>
                         </div>
                         <svg
                             className={`h-4 w-4 text-gray-500 transition-transform ${fileCleanupOpen ? "rotate-180" : ""}`}
@@ -771,26 +720,16 @@ export default function SendCenterScreen({
                     </div>
                     {fileCleanupOpen && (<>
                         <div className="px-3 pb-3">
-                            <div className="pb-3">
-                                <div className="text-xs text-gray-600 mt-1 flex gap-1">
-                                    Clean up the sent LOI Google Docs in your Drive.
+                            <div className="pb-3 flex gap-1 mt-1 ">
+                                <div className="text-[11px] text-gray-600">
+                                    Clean up the <b>SENT</b>{" "}
                                     <Tooltip title="Open LOI Docs folder">
-                                        <a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`} target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">
-                                            <ArrowTopRightOnSquareIcon className="w-3 h-3 inline-block cursor-pointer" />
+                                        <a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2">
+                                            LOI Google Docs (PDFs)
+                                            <ArrowTopRightOnSquareIcon className="w-3 h-3 inline-block cursor-pointer ml-1" />
                                         </a>
                                     </Tooltip>
-                                </div>
-                                {/* Options */}
-                                <div className={`relative flex items-center gap-1 justify-end mt-1`}>
-                                    <span className="text-[11px] text-gray-700 select-none">Include failed</span>
-                                    <span
-                                        role="switch"
-                                        aria-checked={includeFailedInCleanup}
-                                        onClick={() => setIncludeFailedInCleanup(!includeFailedInCleanup)}
-                                        className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${includeFailedInCleanup ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
-                                    >
-                                        <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${includeFailedInCleanup ? "translate-x-3.5" : ""}`} />
-                                    </span>
+                                    {" "}in your Drive. This does not alter the jobs in your queue.
                                 </div>
                             </div>
 
@@ -799,20 +738,20 @@ export default function SendCenterScreen({
                                 <Tooltip title="Move sent docs to Trash. Recoverable for 30 days." placement="top">
                                     <button
                                         type="button"
-                                        onClick={() => confirmAndRun("trash")}
-                                        disabled={cleanupLoading || totalCleanupEligible === 0}
+                                        onClick={() => setCleanUpStates({ ...cleanUpStates, openConfirm: true, kind: 'trash' })}
+                                        disabled={clearing || totalCleanupEligible === 0}
                                         className="flex items-center justify-center gap-2 rounded-md ring-1 ring-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
                                     >
                                         <TrashIcon className="w-4 h-4" />
-                                        Move {totalCleanupEligible} to Trash
+                                        Move {totalCleanupEligible} to trash
                                     </button>
                                 </Tooltip>
 
                                 <Tooltip title="Delete sent docs. Cannot be undone." placement="bottom">
                                     <button
                                         type="button"
-                                        onClick={() => confirmAndRun("delete")}
-                                        disabled={cleanupLoading || totalCleanupEligible === 0}
+                                        onClick={() => setCleanUpStates({ ...cleanUpStates, openConfirm: true, kind: 'delete' })}
+                                        disabled={clearing || totalCleanupEligible === 0}
                                         className="flex items-center justify-center gap-2 rounded-md ring-1 ring-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
                                     >
                                         <XCircleIcon className="w-4 h-4" />
@@ -984,10 +923,21 @@ export default function SendCenterScreen({
                     summary={summary}
                     clearing={clearing}
                     onCancel={() => { setOpenClear(false); }}
-                    onConfirm={(deleteDocs, removeSent) => handleClearQueue(deleteDocs, removeSent)}
+                    onConfirm={(deleteDocs, removeSent) => handleClear(deleteDocs, removeSent ? ["sent"] : ['all'])}
                 />
             )}
 
+            {
+                cleanUpStates.openConfirm && (
+                    <ConfirmDeleteDocsModal
+                        opts={{ ...cleanUpStates, includeJobs: false }}
+                        onCancel={() => setCleanUpStates({ ...cleanUpStates, openConfirm: false })}
+                        onConfirm={handleClear}
+                        deleting={clearing}
+                        totalCleanupEligible={totalCleanupEligible}
+                    />
+                )
+            }
         </div>
     );
 }
