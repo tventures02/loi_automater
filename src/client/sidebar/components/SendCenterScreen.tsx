@@ -347,15 +347,21 @@ export default function SendCenterScreen({
         setClearing(true);
 
         try {
+            let totalDeleted = 0;
+            let totalTrashed = 0;
+            let totalMissing = 0;
+            let totalCandidates = 0;
+            let loops = 0;
             if (deleteDocs) {
                 // Progressive deletion: loop until nextToken is null
                 let nextToken: number | null = 2;      // first data row
-                let totalDeleted = 0;
-                let totalTrashed = 0;
-                let totalMissing = 0;
-                let totalCandidates = 0;
-                let loops = 0;
                 let maxLoops = 10;
+                if (isDev) {
+                    console.log('statuses', statuses);
+                    console.log('kind', kind);
+                    console.log('deleteDocs', deleteDocs);
+                    console.log('includeJobs', includeJobs);
+                }
 
                 while (nextToken !== null && loops < maxLoops) {
                     const res = await serverFunctions.queueDeleteDocsSimple({
@@ -406,7 +412,7 @@ export default function SendCenterScreen({
             onRefresh?.();
 
             if (cleanUpStates.openConfirm) {
-                setSnackbar({ open: true, message: "Clean up successful.", severity: "success" });
+                setSnackbar({ open: true, message: `Successfully ${kind === 'trash' ? `moved ${totalTrashed} to trash` : `deleted ${totalDeleted} files`}.`, severity: "success" });
             }
             else {
                 setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
@@ -419,17 +425,18 @@ export default function SendCenterScreen({
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClear)' }, { email: user.email });
             } catch (error) { }
         } finally {
-            setClearing(false);
             setFileCleanupOpen(false);
             setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
-            setQueueOpen(false);
             setCleanUpStates({ openConfirm: false, kind: 'trash', includeFailed: false });
+            setQueueOpen(false);
+            setClearing(false);
+            setOpenClear(false);
         }
     };
 
-    const eligibleSent = summary?.sent ?? 0;
-    const eligibleFailed = summary?.failed ?? 0;
-    const totalCleanupEligible = eligibleSent + (cleanUpStates.includeFailed ? eligibleFailed : 0);
+    const eligibleSentForCleanUp = summary?.sentWithDoc ?? 0;
+    const eligibleFailedForCleanup = summary?.failedWithDoc ?? 0;
+    const totalCleanupEligible = eligibleSentForCleanUp + (cleanUpStates.includeFailed ? eligibleFailedForCleanup : 0);
 
     const handleGoToGenLOIs = () => {
         if (mode === "send") {
@@ -709,7 +716,8 @@ export default function SendCenterScreen({
                         className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                     >
                         <div className="flex items-center justify-between">
-                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center"><DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File Cleanup <span className="text-gray-500 text-[10px]">{summary?.sent ? `(${summary?.sent})` : ""}</span> </div>
+                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center">
+                                <DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File Cleanup <span className="text-gray-500 text-[10px]">{totalCleanupEligible ? `(${totalCleanupEligible})` : ""}</span> </div>
                         </div>
                         <svg
                             className={`h-4 w-4 text-gray-500 transition-transform ${fileCleanupOpen ? "rotate-180" : ""}`}
@@ -729,7 +737,7 @@ export default function SendCenterScreen({
                                             <ArrowTopRightOnSquareIcon className="w-3 h-3 inline-block cursor-pointer ml-1" />
                                         </a>
                                     </Tooltip>
-                                    {" "}in your Drive. This does not alter the jobs in your queue.
+                                    {" "}in your Drive.
                                 </div>
                             </div>
 
@@ -923,7 +931,7 @@ export default function SendCenterScreen({
                     summary={summary}
                     clearing={clearing}
                     onCancel={() => { setOpenClear(false); }}
-                    onConfirm={(deleteDocs, removeSent) => handleClear(deleteDocs, removeSent ? ["sent"] : ['all'])}
+                    onConfirm={(deleteDocs, statuses, includeJobs, kind) => handleClear(deleteDocs, statuses, includeJobs, kind)}
                 />
             )}
 

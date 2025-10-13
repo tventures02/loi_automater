@@ -49,6 +49,11 @@ export type SendSummary = {
     userEmail: string;
     total: number;
     missing: string[];
+    queuedWithDoc: number;
+    sentWithDoc: number;
+    failedWithDoc: number;
+    deletableDocsSent: number;
+    deletableDocsSentAndFailed: number;
 };
 
 export type QueueStatus = {
@@ -504,6 +509,11 @@ const SidebarContainer = () => {
                         userEmail: s.userEmail,
                         total: s.total,
                         missing: s.missing ?? [],
+                        queuedWithDoc: s.queuedWithDoc ?? 0,
+                        sentWithDoc: s.sentWithDoc ?? 0,
+                        failedWithDoc: s.failedWithDoc ?? 0,
+                        deletableDocsSent: s.deletableDocsSent ?? 0,
+                        deletableDocsSentAndFailed: s.deletableDocsSentAndFailed ?? 0,
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
                     lastFetched: Date.now(),

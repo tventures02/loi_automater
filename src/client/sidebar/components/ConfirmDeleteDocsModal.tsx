@@ -20,7 +20,7 @@ export default function ConfirDeleteDocsModal({
 
     let actionText = <>This will move <b>{totalCleanupEligible}</b> LOI Doc file{totalCleanupEligible !== 1 ? "s" : ""} to the trash in your Google Drive (recoverable for 30 days).</>
     if (kind === 'delete') {
-        actionText = <>This will delete <b>{totalCleanupEligible}</b> LOI Doc file{totalCleanupEligible !== 1 ? "s" : ""} from your Google Drive. <b>This cannot be undone.</b></>;
+        actionText = <>This will delete <b>{totalCleanupEligible}</b> LOI Doc file{totalCleanupEligible !== 1 ? "s" : ""} from your Google Drive. <b>This cannot be undone!</b></>;
     }
 
     return (

@@ -10,7 +10,7 @@ export default function ConfirmClearQueueModal({
 }: {
     summary: SendSummary;
     onCancel: () => void;
-    onConfirm: (deleteDocs: boolean, removeSent: boolean) => void;
+    onConfirm: (deleteDocs: boolean, statuses: string[], includeJobs?: boolean, kind?: 'archive' | 'trash' | 'delete') => void;
     clearing: boolean;
 }) {
     const [deleteDocs, setDeleteDocs] = useState(true);
@@ -38,20 +38,6 @@ export default function ConfirmClearQueueModal({
 
                 {!clearing && (
                     <div className={`relative flex items-center gap-1 justify-end mt-2`}>
-                        <span className="text-[11px] text-gray-700 select-none">Trash associated LOI Docs</span>
-                        <span
-                            role="switch"
-                            aria-checked={deleteDocs}
-                            onClick={() => setDeleteDocs(!deleteDocs)}
-                            className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${deleteDocs ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
-                        >
-                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${deleteDocs ? "translate-x-3.5" : ""}`} />
-                        </span>
-                    </div>
-                )}
-
-                {!clearing && (
-                    <div className={`relative flex items-center gap-1 justify-end mt-2`}>
                         <span className="text-[11px] text-gray-700 select-none">Remove all LOI jobs</span>
                         <span
                             role="switch"
@@ -60,6 +46,20 @@ export default function ConfirmClearQueueModal({
                             className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${removeAll ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
                         >
                             <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${removeAll ? "translate-x-3.5" : ""}`} />
+                        </span>
+                    </div>
+                )}
+
+                {!clearing && (
+                    <div className={`relative flex items-center gap-1 justify-end mt-2`}>
+                        <span className="text-[11px] text-gray-700 select-none">Trash associated LOI Docs</span>
+                        <span
+                            role="switch"
+                            aria-checked={deleteDocs}
+                            onClick={() => setDeleteDocs(!deleteDocs)}
+                            className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${deleteDocs ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                        >
+                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${deleteDocs ? "translate-x-3.5" : ""}`} />
                         </span>
                     </div>
                 )}
@@ -76,7 +76,7 @@ export default function ConfirmClearQueueModal({
                     <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => onConfirm(deleteDocs, !removeAll)}
+                        onClick={() => { if (count > 0) onConfirm(deleteDocs, removeAll ? ["all"] : ['sent'], true, 'trash') }}
                         className={`select-none flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium bg-red-600 text-white hover:bg-red-700 ${clearing ? "opacity-50 !cursor-not-allowed" : "cursor-pointer"}`}
                     >
                         {clearing ? <><InlineSpinner />Clearing…</> : "Clear queue"}

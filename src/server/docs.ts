@@ -858,25 +858,44 @@ export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number 
     const lastRow = sh.getLastRow();
 
     let queued = 0, sent = 0, failed = 0;
+    let queuedWithDoc = 0, sentWithDoc = 0, failedWithDoc = 0;
     if (lastRow > 1) {
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
         const iStatus = head['status'];
+        const iDocId = head['docid'] ?? head['docId'] ?? head['doc_id']; // 
+        const hasDocIdCol = typeof iDocId === 'number' && iDocId >= 0;   // 
 
         for (let r = 0; r < vals.length; r++) {
             const row = vals[r];
             const status = String(row[iStatus] || '').toLowerCase();
-            if (status === 'queued') queued++;
+            const docId = hasDocIdCol ? String(row[iDocId] || '').trim() : '';
+
+            if (status === 'queued') {
+                queued++;
+                if (docId) queuedWithDoc++;
+            }
             else if (status === 'sent') {
                 sent++
+                if (docId) sentWithDoc++;
             }
             else if (status === 'failed') {
                 failed++
+                if (docId) failedWithDoc++;
             }
         }
     }
     const creditsObj = getSendCreditsLeft({ isPremium, freeDailyCap });
     const remaining = creditsObj.creditsLeft;
-    return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1, missing: qSheetRes.missing };
+    return { 
+        remaining, 
+        queued, sent, failed,
+        queuedWithDoc, sentWithDoc, failedWithDoc,
+        deletableDocsSent: sentWithDoc,
+        deletableDocsSentAndFailed: sentWithDoc + failedWithDoc,
+        userEmail: Session.getActiveUser().getEmail(),
+        total: lastRow - 1, 
+        missing: qSheetRes.missing 
+    };
 };
 
 export const queueList = (payload) => {
@@ -1769,10 +1788,11 @@ export const queueDeleteDocsSimple = (opts?: {
     const t0 = Date.now();
     const withinBudget = () => (Date.now() - t0) < timeBudgetMs;
 
-    const { sh } = queueEnsureSheet();
+    let { sh } = queueEnsureSheet();
     if (sh.getName() !== sheetName) {
         const target = SpreadsheetApp.getActive().getSheetByName(sheetName);
         if (!target) throw new Error(`Sheet "${sheetName}" not found`);
+        sh = target;
     }
 
     const lock = LockService.getDocumentLock();
@@ -1786,6 +1806,7 @@ export const queueDeleteDocsSimple = (opts?: {
                 deleted: 0, trashed: 0, missing: 0, candidates: 0,
                 nextToken: null, timeBudgetHit: false, scannedRows: 0, elapsedMs: Date.now() - t0,
                 previewNames: [] as string[],
+                clearedDocIdCells: 0,
             };
         }
 
@@ -1802,11 +1823,21 @@ export const queueDeleteDocsSimple = (opts?: {
         // status set
         // statuses are like ["sent", "failed"] or ["sent"] or ["failed"] or ["sent", "failed", "queued", "paused"]
         const statusSet = statuses ? new Set(statuses.map(s => s.toLowerCase())) : null;
+        if (statusSet && statusSet.has("all")) {
+            statusSet.clear();
+            statusSet.add("sent");
+            statusSet.add("failed");
+            statusSet.add("queued");
+            statusSet.add("paused");
+        }
 
         // Progressive scan: read the sheet in chunks, collect up to "limit" docIds
         const CHUNK_ROWS = 500;
         const ids: string[] = [];
         const seen = new Set<string>(); // dedupe within this call
+        // Track all sheet row numbers (1-based) that reference each docId we process
+        const idToRows = new Map<string, number[]>();
+
         let nextToken: number | null = null;
         let scannedRows = 0;
         let attachNames: string[] = [];
@@ -1819,6 +1850,7 @@ export const queueDeleteDocsSimple = (opts?: {
             for (let i = 0; i < data.length && ids.length < limit; i++) {
                 scannedRows++;
                 const row = data[i];
+                const rowNum = r + i;
                 const docId = String(row[docIdIdx] || "").trim();
                 if (!docId) continue;
 
@@ -1826,6 +1858,11 @@ export const queueDeleteDocsSimple = (opts?: {
                     const st = norm(row[statusIdx]);
                     if (!statusSet.has(st)) continue;
                 }
+
+                // Always record the row → docId mapping
+                const list = idToRows.get(docId) || [];
+                list.push(rowNum);
+                idToRows.set(docId, list);
 
                 if (!seen.has(docId)) {
                     seen.add(docId);
@@ -1878,33 +1915,75 @@ export const queueDeleteDocsSimple = (opts?: {
                 scannedRows,
                 elapsedMs: Date.now() - t0,
                 previewNames: attachNames,
+                clearedDocIdCells: 0,
             };
         }
 
         // Delete (Trash by default), throttled
         let trashed = 0, deleted = 0, missing = 0;
+        const rowsToClear = new Set<number>();
         ids.forEach((id, i) => {
             if (!withinBudget()) return;
             Utilities.sleep(perIterSleepMs);
+            let success = false;
             try {
                 if (kind === 'delete') {
                     // Requires Advanced Service: Drive API enabled
                     // @ts-ignore
                     Drive.Files.remove(id);
                     deleted++;
+                    success = true;
                 } else if (kind === 'trash') {
                     Drive.Files.trash(id);
                     trashed++;
+                    success = true;
                 } else if (kind === 'archive') {
                     Drive.Files.trash(id);
                     // TODO: archived++;
                 }
             } catch (e) {
-                // File might be gone, already trashed, or permission denied
-                missing++;
+                // Could be already deleted/trashed or permission issues
+                // Treat truly missing as "clearable", permission-denied stays "missing"
+                try {
+                    const file = Drive.Files.get(id);
+                    const alreadyTrashed = !!(file?.labels && file.labels.trashed === true);
+                    if (alreadyTrashed) success = true; // consider clearable
+                } catch (getErr) {
+                    // If not found, also clear
+                    const msg = String(getErr || "");
+                    if (msg.includes("File not found") || msg.includes("404")) success = true;
+                }
+                if (!success) missing++;
             }
+
+            if (success) {
+                const rows = idToRows.get(id) || [];
+                rows.forEach(n => rowsToClear.add(n));
+            }
+
             if ((i + 1) % throttleEvery === 0) Utilities.sleep(sleepMs);
         });
+
+        // Clear docId cells for the affected rows (batched by contiguous ranges)
+        let clearedDocIdCells = 0;
+        if (rowsToClear.size && withinBudget()) {
+            const sorted = Array.from(rowsToClear.values()).sort((a, b) => a - b);
+            let idx = 0;
+            while (idx < sorted.length && withinBudget()) {
+                const start = sorted[idx];
+                let end = start;
+                while (idx + 1 < sorted.length && sorted[idx + 1] === end + 1) {
+                    idx++;
+                    end++;
+                }
+                const num = end - start + 1;
+                const cols = kind === 'trash' ? 1 : 2;
+                const values = Array.from({ length: num }, () => kind === 'trash' ? [""] : ["", ""]); // two blanks per row
+                sh.getRange(start, docIdIdx + 1, num, cols).setValues(values); // <- width 2 (docId + docUrl)                
+                clearedDocIdCells += num;
+                idx++;
+            }
+        }
 
         return {
             deleted,
@@ -1916,6 +1995,7 @@ export const queueDeleteDocsSimple = (opts?: {
             scannedRows,
             elapsedMs: Date.now() - t0,
             previewNames: attachNames,
+            clearedDocIdCells,
         };
     } finally {
         lock.releaseLock();

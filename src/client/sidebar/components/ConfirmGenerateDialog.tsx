@@ -63,7 +63,7 @@ export default function ConfirmGenerateDialog({
     const sheetNameShort = sheetName?.length > 20 ? sheetName.slice(0, 20) + "..." : sheetName;
     const count = isPremium ? eligibleCount ?? 0 : Math.min(eligibleCount ?? 0, CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET);
     const willCreateDocs = !!attachPdf; // with new server behavior, we only create Docs when attaching PDFs
-    const docNoun = `Google Doc${count === 1 ? "" : "s"}`;
+    const docNoun = `Doc${count === 1 ? "" : "s"}`;
     const itemNoun = `${count} job${count === 1 ? "" : "s"}`;
     const emailBodySourceText = useLOIAsBody ? "from your LOI doc template" : "from your text template";
 
@@ -103,7 +103,7 @@ export default function ConfirmGenerateDialog({
                             <p className="mt-1 text-xs leading-5 text-gray-600">
                                 {willCreateDocs ? (
                                     <>
-                                        This will create <b>{count || "—"}</b> {docNoun} in your Drive subfolder 
+                                        This will create <b>{count || "—"}</b> {docNoun} in your "LOIs" Drive subfolder 
                                         and jobs will be added to the <b>Sender Queue</b>. You can review before sending.
                                     </>
                                 ) : (
