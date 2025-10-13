@@ -14,9 +14,9 @@ export default function ConfirmClearQueueModal({
     clearing: boolean;
 }) {
     const [deleteDocs, setDeleteDocs] = useState(true);
-    const [removeSent, setRemoveSent] = useState(false);
+    const [removeAll, setRemoveAll] = useState(false);
     const { total, sent } = summary || {};
-    const count = removeSent ? sent : total;
+    const count = removeAll ? total : sent;
 
     if (total === 0) return null;
 
@@ -28,7 +28,7 @@ export default function ConfirmClearQueueModal({
             <div className="relative w-full max-w-sm rounded-xl bg-white shadow-lg ring-1 ring-black/5 p-4">
                 <div className="text-sm font-semibold text-gray-900">Clear queue</div>
                 <p className="mt-2 text-xs text-gray-600">
-                    This will permanently remove <b>{count}</b> job{count !== 1 ? "s" : ""} from the <span className="font-mono">Sender Queue</span>.
+                    This will permanently remove <b>{count}</b> {removeAll ? "" : "already sent "} job{count !== 1 ? "s" : ""} from the <span className="font-mono">Sender Queue</span>.
                 </p>
 
                 <div className="mt-2 text-xs text-gray-600">
@@ -52,14 +52,14 @@ export default function ConfirmClearQueueModal({
 
                 {!clearing && (
                     <div className={`relative flex items-center gap-1 justify-end mt-2`}>
-                        <span className="text-[11px] text-gray-700 select-none">Only remove sent LOIs</span>
+                        <span className="text-[11px] text-gray-700 select-none">Remove all LOI jobs</span>
                         <span
                             role="switch"
-                            aria-checked={removeSent}
-                            onClick={() => setRemoveSent(!removeSent)}
-                            className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${removeSent ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
+                            aria-checked={removeAll}
+                            onClick={() => setRemoveAll(!removeAll)}
+                            className={`ml-0 inline-flex h-5 w-9 items-center rounded-full ${removeAll ? "bg-gray-900" : "bg-gray-300"} cursor-pointer`}
                         >
-                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${removeSent ? "translate-x-3.5" : ""}`} />
+                            <span className={`ml-1 h-4 w-4 rounded-full bg-white transition ${removeAll ? "translate-x-3.5" : ""}`} />
                         </span>
                     </div>
                 )}
@@ -76,7 +76,7 @@ export default function ConfirmClearQueueModal({
                     <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => onConfirm(deleteDocs, removeSent)}
+                        onClick={() => onConfirm(deleteDocs, !removeAll)}
                         className={`select-none flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium bg-red-600 text-white hover:bg-red-700 ${clearing ? "opacity-50 !cursor-not-allowed" : "cursor-pointer"}`}
                     >
                         {clearing ? <><InlineSpinner />Clearing…</> : "Clear queue"}

@@ -1,3 +1,5 @@
+import { loiEnsureOutputFolder } from "./docs";
+
 const CONSTANTS = require('../client/utils/constants.js');
 
 export const getUserEmail = () => {
@@ -43,11 +45,13 @@ export const getInitData = () => {
     var body = idToken.split('.')[1];
     var decoded = Utilities.newBlob(Utilities.base64Decode(body)).getDataAsString();
     var payload = JSON.parse(decoded);
+    const outputFolderId = loiEnsureOutputFolder();
 
     return {
         email: Session.getActiveUser().getEmail(), // requires permissions update in appsscript.json (https://developers.google.com/apps-script/concepts/scopes)
         sheetNames,
         idToken,
         aud: payload.aud,
+        outputFolderId,
     }
 }

@@ -123,6 +123,7 @@ const SidebarContainer = () => {
     });
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [templatesFolderId, setTemplatesFolderId] = useState(null);
+    const [outputFolderId, setOutputFolderId] = useState(null);
     const [currentStep, setCurrentStep] = useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -155,7 +156,9 @@ const SidebarContainer = () => {
                     const {
                         idToken,
                         aud,
+                        outputFolderId,
                     } = data;
+                    setOutputFolderId(outputFolderId || null);
                     sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, { email: data.email });
                     localEmail = data.email;
 
@@ -232,7 +235,7 @@ const SidebarContainer = () => {
             const getTemplates = async (user: User) => {
                 try {
                     setIsGettingTemplates(true);
-                    const {results, templatesFolderId} = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
+                    const { results, templatesFolderId } = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
                     const docInfos = results;
                     setTemplatesFolderId(templatesFolderId);
                     if (isDev) console.log("docInfos", docInfos);
@@ -684,6 +687,7 @@ const SidebarContainer = () => {
                         setCurrentStep={setCurrentStep}
                         user={user}
                         onUpgradeClick={onUpgradeClick}
+                        outputFolderId={outputFolderId}
                     />
                 ) : (
                     <>
@@ -770,6 +774,7 @@ const SidebarContainer = () => {
                                 setCurrentStep={setCurrentStep}
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
+                                outputFolderId={outputFolderId}
                             />
                         )}
                     </>
