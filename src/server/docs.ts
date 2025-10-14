@@ -858,25 +858,49 @@ export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number 
     const lastRow = sh.getLastRow();
 
     let queued = 0, sent = 0, failed = 0;
+    let queuedWithDoc = 0, sentWithDoc = 0, failedWithDoc = 0;
     if (lastRow > 1) {
         const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
         const iStatus = head['status'];
+        const iDocId = head['docid'] ?? head['docId'] ?? head['doc_id']; // 
+        const hasDocIdCol = typeof iDocId === 'number' && iDocId >= 0;   // 
 
         for (let r = 0; r < vals.length; r++) {
             const row = vals[r];
             const status = String(row[iStatus] || '').toLowerCase();
-            if (status === 'queued') queued++;
+            const docId = hasDocIdCol ? String(row[iDocId] || '').trim() : '';
+
+            if (status === 'queued') {
+                queued++;
+                if (docId) queuedWithDoc++;
+            }
             else if (status === 'sent') {
                 sent++
+                if (docId) sentWithDoc++;
             }
             else if (status === 'failed') {
                 failed++
+                if (docId) failedWithDoc++;
             }
         }
     }
     const creditsObj = getSendCreditsLeft({ isPremium, freeDailyCap });
     const remaining = creditsObj.creditsLeft;
-    return { remaining, queued, sent, failed, userEmail: Session.getActiveUser().getEmail(), total: lastRow - 1, missing: qSheetRes.missing };
+    return {
+        remaining,
+        queued, sent, failed,
+        queuedWithDoc, sentWithDoc, failedWithDoc,
+        deletableDocsSent: sentWithDoc,
+        deletableDocsSentAndFailed: sentWithDoc + failedWithDoc,
+        userEmail: Session.getActiveUser().getEmail(),
+        total: lastRow - 1,
+        missing: qSheetRes.missing,
+        gmailHardRemaining: MailApp.getRemainingDailyQuota(),
+    };
+};
+
+export const getGmailRemaining = () => {
+    return MailApp.getRemainingDailyQuota();
 };
 
 export const queueList = (payload) => {
@@ -941,6 +965,7 @@ export const sendNextBatch = (payload) => {
     else if (!isFinite(payload.count)) {
         throw new Error('Invalid number of emails to send provided.');
     }
+
     const startFromRow = Number(payload?.startFromRow) || 2; // The cursor
     const isPremium = !!payload?.isPremium;         // from client
     const T_BUDGET_MS = Number(payload?.timeBudgetMs || 240_000); // 4 min
@@ -966,8 +991,26 @@ export const sendNextBatch = (payload) => {
     const testMode = !!payload?.testMode;          // test mode now consumes credits
     const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
     const freeDailyCap = Number(payload?.freeDailyCap ?? 10);
-    const gmailRemaining = MailApp.getRemainingDailyQuota();
-    // console.log('gmailRemaining', gmailRemaining);
+    // Purposely get the remaining quota from MailApp to ensure it's updated
+    const gmailHardRemaining = MailApp.getRemainingDailyQuota();
+
+    // Check if we're out of quota
+    if (gmailHardRemaining <= 0) {
+        const creditsUi = getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }); // uses smoothed meter for UI
+        return {
+            sent: 0,
+            failed: 0,
+            attempted: 0,
+            testMode: !!payload?.testMode,
+            creditsLeft: creditsUi.creditsLeft,
+            plan: creditsUi.plan,
+            dailyCap: isPremium ? creditsUi.gmailRemaining : freeDailyCap,
+            batchCap: payload?.attachPDFBatchCap || payload?.noAttachBatchCap, // optional
+            nextToken: Number(payload?.startFromRow) || 2,
+            quotaExhausted: true,
+        };
+    }
+    // console.log('gmailHardRemaining', gmailHardRemaining);
     // console.log('isPremium', isPremium);
     // console.log('freeDailyCap', freeDailyCap);
 
@@ -984,6 +1027,10 @@ export const sendNextBatch = (payload) => {
         const iBody = head[normHeader('body')];        // optional (plain text)
         const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
         const iUseDocBody = coalesce(head[normHeader('useLOIAsBody')], head[normHeader('useDocBody')]); // legacy fallback if needed
+        const postSendAction = ((): 'keep' | 'trash' | 'delete' => {
+            const v = String(payload?.postSendAction || 'keep').toLowerCase();
+            return (v === 'trash' || v === 'delete') ? v : 'keep';
+        })();
 
         // Read all data rows
         const numRows = lastRow - startFromRow + 1;
@@ -1013,7 +1060,7 @@ export const sendNextBatch = (payload) => {
         const requested = Math.max(1, Math.min(1000, requestedRaw));
         const attachHeavy = queuedAttachCount > 0;
         const serverBatchCap = attachHeavy ? attachPDFBatchCap : noAttachBatchCap;
-        const ask = Math.min(requested, gmailRemaining, queuedCount, serverBatchCap);
+        const ask = Math.min(requested, gmailHardRemaining, queuedCount, serverBatchCap);
         let sent = 0, failed = 0, attempted = 0, timeBudgetHit = false;
         let nextToken = null;
 
@@ -1023,7 +1070,7 @@ export const sendNextBatch = (payload) => {
 
         // Reserve credits (test mode included; we’ll commit after)
         const { plan, used, granted } = _reserveCredits_({ ask, isPremium, freeDailyCap });
-        const dailyCap = isPremium ? gmailRemaining : freeDailyCap; // only used for client display
+        const dailyCap = isPremium ? gmailHardRemaining : freeDailyCap; // only used for client display
 
         // console.log('granted', granted);
         // console.log('dailyCap', dailyCap);
@@ -1141,9 +1188,13 @@ export const sendNextBatch = (payload) => {
             const defaultBodyMaker = (docUrl) => String(payload?.bodyTemplate || `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
             const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
             const activeUserEmail = Session.getActiveUser().getEmail();
+            let hardLeft = gmailHardRemaining;
+            let quotaExhaustedMidBatch = false;
 
             const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
             for (let k = 0; k < batch.length; k++) {
+                if (hardLeft <= 0) { quotaExhaustedMidBatch = true; break; }
+
                 // Time budget guard (leave time to finalize)
                 if ((Date.now() - t0) > (T_BUDGET_MS - T_GUARD_MS)) { timeBudgetHit = true; break; }
 
@@ -1174,7 +1225,7 @@ export const sendNextBatch = (payload) => {
                     const to = testMode ? previewTo || activeUserEmail : item.email;
 
                     // ATTACHMENTS
-                    const wantAttach = item.attachPdf && !!item.docId;
+                    const wantAttach = item.attachPdf;
 
                     let attachments = null;
                     if (wantAttach) {
@@ -1183,6 +1234,7 @@ export const sendNextBatch = (payload) => {
                     }
 
                     MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    hardLeft--;
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;
@@ -1269,8 +1321,84 @@ export const sendNextBatch = (payload) => {
                 }
             })();
 
+            // ─────────────────────────────────────────────────────────────
+            // POST-SEND FILE DISPOSITION: 'keep' | 'trash' | 'delete'
+            // Runs only for successfully sent items, after statuses are finalized
+            // Requires Advanced Drive Service (Drive API) enabled.
+            // ─────────────────────────────────────────────────────────────
+            (function postSendFileDisposition() {
+                if (testMode) return;                      // never mutate files in test mode
+                if (postSendAction === 'keep') return;    // no-op
+                if (iDocId == null) return;                // can't clear cells without docId column
+
+                // Collect docIds/rows for items that actually sent OK
+                const idsToDispose: string[] = [];
+                const rowsToClear: number[] = [];
+
+                for (const b of batch) {
+                    const res = resultsByRow.get(b.rowIndex);
+                    if (res?.ok && b.docId) {
+                        idsToDispose.push(b.docId);
+                        rowsToClear.push(b.rowIndex);
+                    }
+                }
+                if (!idsToDispose.length) return;
+
+                // 1) Drive operations (best effort, throttled)
+                idsToDispose.forEach((id, idx) => {
+                    try {
+                        if (postSendAction === 'delete') {
+                            // permanent delete
+                            // @ts-ignore Advanced Drive Service
+                            Drive.Files.remove(id);
+                        } else {
+                            // move to Trash
+                            // @ts-ignore Advanced Drive Service
+                            Drive.Files.trash(id);
+                        }
+                    } catch (e) {
+                        // ignore (already deleted/trashed/permission issues)
+                    }
+                    // Gentle throttling
+                    if ((idx + 1) % 50 === 0) Utilities.sleep(600); else Utilities.sleep(20);
+                });
+
+                // 2) Clear docId + docUrl cells for those rows (batched)
+                if (!rowsToClear.length) return;
+
+                // Sort & coalesce contiguous row ranges to minimize writes
+                const sorted = Array.from(new Set(rowsToClear)).sort((a, b) => a - b);
+
+                const clearBlock = (start: number, end: number) => {
+                    const num = end - start + 1;
+                    const isTrash = postSendAction === 'trash';
+
+                    if (iDocUrl != null && iDocUrl === iDocId + 1) {
+                        const vals = Array.from({ length: num }, () => isTrash ? [""] : ["", ""]);
+                        sh.getRange(start, iDocId + 1, num, isTrash ? 1 : 2).setValues(vals);
+                    }
+                };
+
+                let i = 0;
+                while (i < sorted.length) {
+                    let start = sorted[i];
+                    let end = start;
+                    while (i + 1 < sorted.length && sorted[i + 1] === end + 1) {
+                        end = sorted[i + 1];
+                        i++;
+                    }
+                    clearBlock(start, end);
+                    i++;
+                }
+
+                SpreadsheetApp.flush();
+            })();
+
+
             // Commit usage (consume sent; release any unused portion of grant)
             const { used: usedNow } = _commitCredits_({ granted, sent });
+
+            // Purposely get the remaining quota from MailApp to ensure it's updated
             const gmailLeft = MailApp.getRemainingDailyQuota();
             const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);
             const creditsLeft = Math.min(gmailLeft, planLeft);
@@ -1294,6 +1422,7 @@ export const sendNextBatch = (payload) => {
                 batchCap: serverBatchCap,
                 newQueuedCount: Math.max(0, queuedCount - resultsByRow.size),
                 nextToken,
+                quotaExhausted: quotaExhaustedMidBatch,
             };
         } catch (e) {
             _commitCredits_({ granted, sent });
@@ -1368,7 +1497,7 @@ export const queueUpdateStatus = (payload) => {
 
 
 /** Remove ALL rows from Sender Queue except the header row. */
-export const queueClearAll = (removeSent: boolean = false) => {
+export const queueClearAll = (statuses: string[] = []) => {
     const { sh } = queueEnsureSheet(); // existing helper
     const lastRow = sh.getLastRow();
     if (lastRow <= 1) return { cleared: 0, remaining: 0 };
@@ -1377,6 +1506,7 @@ export const queueClearAll = (removeSent: boolean = false) => {
     if (!lock.tryLock(10_000)) {
         throw new Error('Another operation is in progress. Try again soon.');
     }
+    const removeSent = statuses.length === 1 && statuses.includes('sent');
 
     try {
         if (!removeSent) {
@@ -1567,21 +1697,29 @@ function buildPlainTextFromDoc(docId: string) {
         return out;
     } catch (e) {
         // Fail soft: caller will use fallback body
-        return "";
+        throw e;
     }
 }
 
 
 function generateLOIPDF(docId: string) {
-    // Open the template document
-    const doc = DocumentApp.openById(docId);
-    const docName = doc.getName();
+    try {
+        if (!docId) {
+            throw new Error('Attaching PDF but no docId provided for Google Doc reference.');
+        }
+        // Open the template document
+        const doc = DocumentApp.openById(docId);
+        const docName = doc.getName();
 
-    doc.saveAndClose();
+        doc.saveAndClose();
 
-    // Convert the document to a PDF blob
-    const pdfBlob = doc.getAs('application/pdf').setName(`${docName || docId}.pdf`);
-    return pdfBlob; // Return the PDF blob
+        // Convert the document to a PDF blob
+        const pdfBlob = doc.getAs('application/pdf').setName(`${docName || docId}.pdf`);
+        return pdfBlob; // Return the PDF blob
+    } catch (e) {
+        console.error('Error generating LOI PDF', e);
+        throw e;
+    }
 }
 
 
@@ -1734,8 +1872,7 @@ export const loiEnsureOutputFolder = (): string => {
  */
 export const queueDeleteDocsSimple = (opts?: {
     sheetName?: string;              // default: LOI_QUEUE_NAME
-    removeSent?: boolean;            // if true, restrict to status === "sent"
-    statuses?: string[] | null;      // optional explicit filter (ignored when removeSent=true)
+    statuses: string[] | null;      // optional explicit filter (ignored when removeSent=true)
     permanentDelete?: boolean;       // default: false (Trash instead of permanent)
     throttleEvery?: number;          // default: 50 (sleep every N deletes)
     sleepMs?: number;                // default: 600ms (to be gentle on quotas)
@@ -1746,12 +1883,11 @@ export const queueDeleteDocsSimple = (opts?: {
     timeBudgetMs?: number;           // default: 270_000 (~4.5 min)
     dryRun?: boolean;                // default: false (when true, don't delete; just preview counts)
     sampleNames?: number;            // default: 0 (try to return up to N file names for UI)
+    kind?: 'archive' | 'trash' | 'delete';
 }) => {
     const {
         sheetName = LOI_QUEUE_NAME,
-        removeSent = false,
         statuses = null,
-        permanentDelete = false,
         throttleEvery = 50,
         sleepMs = 600,
 
@@ -1760,7 +1896,9 @@ export const queueDeleteDocsSimple = (opts?: {
         timeBudgetMs = 270_000, // ~4.5 min, leaving buffer for UI/network
         dryRun = false,
         sampleNames = 0,
+        kind = 'trash',
     } = opts || {};
+    const norm = (s: any) => String(s || "").trim().toLowerCase();
 
     const DOC_ID = "docId";
     const STATUS = "status";
@@ -1768,10 +1906,11 @@ export const queueDeleteDocsSimple = (opts?: {
     const t0 = Date.now();
     const withinBudget = () => (Date.now() - t0) < timeBudgetMs;
 
-    const { sh } = queueEnsureSheet();
+    let { sh } = queueEnsureSheet();
     if (sh.getName() !== sheetName) {
         const target = SpreadsheetApp.getActive().getSheetByName(sheetName);
         if (!target) throw new Error(`Sheet "${sheetName}" not found`);
+        sh = target;
     }
 
     const lock = LockService.getDocumentLock();
@@ -1785,6 +1924,7 @@ export const queueDeleteDocsSimple = (opts?: {
                 deleted: 0, trashed: 0, missing: 0, candidates: 0,
                 nextToken: null, timeBudgetHit: false, scannedRows: 0, elapsedMs: Date.now() - t0,
                 previewNames: [] as string[],
+                clearedDocIdCells: 0,
             };
         }
 
@@ -1794,18 +1934,28 @@ export const queueDeleteDocsSimple = (opts?: {
         const docIdIdx = findIdx(DOC_ID);
         const statusIdx = findIdx(STATUS);
         if (docIdIdx < 0) throw new Error(`Header "${DOC_ID}" is required in ${sheetName}`);
-        if ((removeSent || (statuses && statuses.length)) && statusIdx < 0) {
+        if ((statuses && statuses.length) && statusIdx < 0) {
             throw new Error(`Header "${STATUS}" is required to filter by status in ${sheetName}`);
         }
 
-        // Effective status filter
-        const effectiveStatuses: string[] | null = removeSent ? ["sent"] : (statuses ? statuses : null);
-        const statusSet = effectiveStatuses ? new Set(effectiveStatuses.map(s => s.toLowerCase())) : null;
+        // status set
+        // statuses are like ["sent", "failed"] or ["sent"] or ["failed"] or ["sent", "failed", "queued", "paused"]
+        const statusSet = statuses ? new Set(statuses.map(s => s.toLowerCase())) : null;
+        if (statusSet && statusSet.has("all")) {
+            statusSet.clear();
+            statusSet.add("sent");
+            statusSet.add("failed");
+            statusSet.add("queued");
+            statusSet.add("paused");
+        }
 
         // Progressive scan: read the sheet in chunks, collect up to "limit" docIds
         const CHUNK_ROWS = 500;
         const ids: string[] = [];
         const seen = new Set<string>(); // dedupe within this call
+        // Track all sheet row numbers (1-based) that reference each docId we process
+        const idToRows = new Map<string, number[]>();
+
         let nextToken: number | null = null;
         let scannedRows = 0;
         let attachNames: string[] = [];
@@ -1818,13 +1968,19 @@ export const queueDeleteDocsSimple = (opts?: {
             for (let i = 0; i < data.length && ids.length < limit; i++) {
                 scannedRows++;
                 const row = data[i];
+                const rowNum = r + i;
                 const docId = String(row[docIdIdx] || "").trim();
                 if (!docId) continue;
 
                 if (statusSet && statusIdx >= 0) {
-                    const st = String(row[statusIdx] || "").trim().toLowerCase();
+                    const st = norm(row[statusIdx]);
                     if (!statusSet.has(st)) continue;
                 }
+
+                // Always record the row → docId mapping
+                const list = idToRows.get(docId) || [];
+                list.push(rowNum);
+                idToRows.set(docId, list);
 
                 if (!seen.has(docId)) {
                     seen.add(docId);
@@ -1877,30 +2033,75 @@ export const queueDeleteDocsSimple = (opts?: {
                 scannedRows,
                 elapsedMs: Date.now() - t0,
                 previewNames: attachNames,
+                clearedDocIdCells: 0,
             };
         }
 
         // Delete (Trash by default), throttled
         let trashed = 0, deleted = 0, missing = 0;
+        const rowsToClear = new Set<number>();
         ids.forEach((id, i) => {
             if (!withinBudget()) return;
             Utilities.sleep(perIterSleepMs);
+            let success = false;
             try {
-                if (permanentDelete) {
+                if (kind === 'delete') {
                     // Requires Advanced Service: Drive API enabled
                     // @ts-ignore
                     Drive.Files.remove(id);
                     deleted++;
-                } else {
+                    success = true;
+                } else if (kind === 'trash') {
                     Drive.Files.trash(id);
                     trashed++;
+                    success = true;
+                } else if (kind === 'archive') {
+                    Drive.Files.trash(id);
+                    // TODO: archived++;
                 }
             } catch (e) {
-                // File might be gone, already trashed, or permission denied
-                missing++;
+                // Could be already deleted/trashed or permission issues
+                // Treat truly missing as "clearable", permission-denied stays "missing"
+                try {
+                    const file = Drive.Files.get(id);
+                    const alreadyTrashed = !!(file?.labels && file.labels.trashed === true);
+                    if (alreadyTrashed) success = true; // consider clearable
+                } catch (getErr) {
+                    // If not found, also clear
+                    const msg = String(getErr || "");
+                    if (msg.includes("File not found") || msg.includes("404")) success = true;
+                }
+                if (!success) missing++;
             }
+
+            if (success) {
+                const rows = idToRows.get(id) || [];
+                rows.forEach(n => rowsToClear.add(n));
+            }
+
             if ((i + 1) % throttleEvery === 0) Utilities.sleep(sleepMs);
         });
+
+        // Clear docId cells for the affected rows (batched by contiguous ranges)
+        let clearedDocIdCells = 0;
+        if (rowsToClear.size && withinBudget()) {
+            const sorted = Array.from(rowsToClear.values()).sort((a, b) => a - b);
+            let idx = 0;
+            while (idx < sorted.length && withinBudget()) {
+                const start = sorted[idx];
+                let end = start;
+                while (idx + 1 < sorted.length && sorted[idx + 1] === end + 1) {
+                    idx++;
+                    end++;
+                }
+                const num = end - start + 1;
+                const cols = kind === 'trash' ? 1 : 2;
+                const values = Array.from({ length: num }, () => kind === 'trash' ? [""] : ["", ""]); // two blanks per row
+                sh.getRange(start, docIdIdx + 1, num, cols).setValues(values); // <- width 2 (docId + docUrl)                
+                clearedDocIdCells += num;
+                idx++;
+            }
+        }
 
         return {
             deleted,
@@ -1912,6 +2113,7 @@ export const queueDeleteDocsSimple = (opts?: {
             scannedRows,
             elapsedMs: Date.now() - t0,
             previewNames: attachNames,
+            clearedDocIdCells,
         };
     } finally {
         lock.releaseLock();

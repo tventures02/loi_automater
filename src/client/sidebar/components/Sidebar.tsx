@@ -49,6 +49,11 @@ export type SendSummary = {
     userEmail: string;
     total: number;
     missing: string[];
+    queuedWithDoc: number;
+    sentWithDoc: number;
+    failedWithDoc: number;
+    deletableDocsSent: number;
+    deletableDocsSentAndFailed: number;
 };
 
 export type QueueStatus = {
@@ -123,6 +128,7 @@ const SidebarContainer = () => {
     });
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [templatesFolderId, setTemplatesFolderId] = useState(null);
+    const [outputFolderId, setOutputFolderId] = useState(null);
     const [currentStep, setCurrentStep] = useState<string>("template");
     const [isWorking, setIsWorking] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -141,6 +147,7 @@ const SidebarContainer = () => {
     const [config, setConfig] = useState({
         gwsCalcYTURL: 'https://www.youtube.com/watch?v=c0-1-zYiCMU',
         helpLink: 'https://tidisventures.com/support?app=bulk-loi-sender',
+        baseUrl: 'https://tidisventures.com/',
     });
 
     //@ts-ignore
@@ -155,7 +162,9 @@ const SidebarContainer = () => {
                     const {
                         idToken,
                         aud,
+                        outputFolderId,
                     } = data;
+                    setOutputFolderId(outputFolderId || null);
                     sendToAmplitude(CONSTANTS.AMPLITUDE.OPEN_SIDEBAR, null, { email: data.email });
                     localEmail = data.email;
 
@@ -232,7 +241,7 @@ const SidebarContainer = () => {
             const getTemplates = async (user: User) => {
                 try {
                     setIsGettingTemplates(true);
-                    const {results, templatesFolderId} = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
+                    const { results, templatesFolderId } = await serverFunctions.getGoogleDocNamesByIds(user?.items?.loi?.docIds);
                     const docInfos = results;
                     setTemplatesFolderId(templatesFolderId);
                     if (isDev) console.log("docInfos", docInfos);
@@ -389,7 +398,7 @@ const SidebarContainer = () => {
             }
             catch (error) {}
             
-            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
+            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData, config);
             if (isDev) {
                 console.log(url);
                 console.log(user.email)
@@ -501,6 +510,11 @@ const SidebarContainer = () => {
                         userEmail: s.userEmail,
                         total: s.total,
                         missing: s.missing ?? [],
+                        queuedWithDoc: s.queuedWithDoc ?? 0,
+                        sentWithDoc: s.sentWithDoc ?? 0,
+                        failedWithDoc: s.failedWithDoc ?? 0,
+                        deletableDocsSent: s.deletableDocsSent ?? 0,
+                        deletableDocsSentAndFailed: s.deletableDocsSentAndFailed ?? 0,
                     },
                     items: Array.isArray(q?.items) ? q.items : [],
                     lastFetched: Date.now(),
@@ -596,6 +610,7 @@ const SidebarContainer = () => {
     if (isDev) {
         console.log('sidebar render-------------------')
         console.log('user', user)
+        console.log('config', config)
     }
 
     return (
@@ -684,6 +699,9 @@ const SidebarContainer = () => {
                         setCurrentStep={setCurrentStep}
                         user={user}
                         onUpgradeClick={onUpgradeClick}
+                        outputFolderId={outputFolderId}
+                        config={config}
+                        settings={settings}
                     />
                 ) : (
                     <>
@@ -725,6 +743,7 @@ const SidebarContainer = () => {
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
                                 settings={settings}
+                                config={config}
                             />
                         )}
 
@@ -755,6 +774,8 @@ const SidebarContainer = () => {
                                 setEmailBodyTpl={setEmailBodyTpl}
                                 pattern={pattern}
                                 setPattern={setPattern}
+                                outputFolderId={outputFolderId}
+                                config={config}
                             />
                         )}
 
@@ -770,6 +791,9 @@ const SidebarContainer = () => {
                                 setCurrentStep={setCurrentStep}
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
+                                outputFolderId={outputFolderId}
+                                config={config}
+                                settings={settings}
                             />
                         )}
                     </>

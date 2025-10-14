@@ -38,6 +38,7 @@ import {
     setLoiDateKeyToYesterdayDev,
     queueDeleteDocsByIds,
     deleteJobsInQueueGivenRows,
+    getGmailRemaining,
 } from './docs';
 
 // Public functions must be exported as named exports
@@ -75,4 +76,5 @@ export {
     setLoiDateKeyToYesterdayDev,
     queueDeleteDocsByIds,
     deleteJobsInQueueGivenRows,
+    getGmailRemaining,
 };

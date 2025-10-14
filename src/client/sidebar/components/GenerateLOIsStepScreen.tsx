@@ -76,6 +76,8 @@ type Props = {
     setEmailBodyTpl: React.Dispatch<React.SetStateAction<string>>;
     pattern: string;
     setPattern: React.Dispatch<React.SetStateAction<string>>;
+    outputFolderId: string;
+    config: any;
 };
 
 export type PreflightResult = {
@@ -104,7 +106,7 @@ export type GenerateSummary = {
     statuses?: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
 };
 
-const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 50;
+const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 30;
 const DEFAULT_BATCH_SIZE = 100;
 
 /* ---------- helpers ---------- */
@@ -169,6 +171,8 @@ export default function GenerateLOIsStepScreen({
     setEmailBodyTpl,
     pattern,
     setPattern,
+    outputFolderId,
+    config,
 }: Props) {
    
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -193,7 +197,6 @@ export default function GenerateLOIsStepScreen({
 
     const isPremium = user.subscriptionStatusActive;
     const emailColumn = mapping?.__email || "";
-    const outputFolderId = preflight?.outputFolderId || "";
 
     const containerRef = useRef<HTMLDivElement>(null);
     const innerTimerRef = useRef<number | null>(null);
@@ -676,7 +679,15 @@ export default function GenerateLOIsStepScreen({
                 title={alertModalState.title}
             />
 
-            <h2 className="text-sm font-semibold text-gray-900">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}</h2>
+            <h2 className="text-sm font-semibold text-gray-900 flex">Create LOIs{sheetName ? <> from {sheetNameShort}</> : ""}
+            {
+                outputFolderId && (
+                    <Tooltip title="Open LOI Docs folder">
+                        <ArrowTopRightOnSquareIcon className="w-4 h-4 inline-block ml-1 text-indigo-600 cursor-pointer" onClick={() => window.open(`https://drive.google.com/drive/u/0/folders/${outputFolderId}`, '_blank')} />
+                    </Tooltip>
+                )
+            }
+            </h2> 
 
             <div className="mt-0 text-[11px] text-gray-500">
                 Placeholders you can use:{showPlaceholders ?
@@ -1096,9 +1107,9 @@ export default function GenerateLOIsStepScreen({
                 {
                     outputFolderId && attachPdf && (
                         <div className="flex items-center text-[10px] !mb-0 justify-end">
-                            <a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`} target="_blank" rel="noopener noreferrer" className="!text-indigo-500 !hover:text-indigo-600 !hover:underline">
-                                Open Drive folder
-                            </a>
+                            <Tooltip title="Open LOI Docs folder">
+                                <ArrowTopRightOnSquareIcon className="w-4 h-4 inline-block ml-2 text-indigo-600 cursor-pointer" onClick={() => window.open(`https://drive.google.com/drive/u/0/folders/${outputFolderId}`, '_blank')} />
+                            </Tooltip>
                         </div>
                     )
                 }
@@ -1115,7 +1126,7 @@ export default function GenerateLOIsStepScreen({
             )}
 
             {!isPremium && !isPreflighting && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
-                <CtaCard message="Upgrade to create unlimited LOIs!" user={user} />
+                <CtaCard message="Upgrade to create unlimited LOIs!" user={user} config={config}/>
             )}
 
             {/* Snackbar */}

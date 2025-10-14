@@ -7,7 +7,7 @@ import { Settings, User } from "../../utils/types";
 import { INIT_SETTINGS } from "../../utils/initVals";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@mui/material";
-
+const isDev = process.env.REACT_APP_NODE_ENV.includes('dev') || process.env.REACT_APP_TV_BACKEND.includes('localhost');
 type Props = {
     open: boolean;
     onClose: () => void;
@@ -28,26 +28,36 @@ export default function SettingsDialog({
 }: Props) {
     const [lsSettings, setLSSettings] = useLocalStorage<Settings>(CONSTANTS.LS_KEYS.SETTINGS, INIT_SETTINGS);
     const [maxColCharNumber, setMaxColCharNumber] = useState(lsSettings.maxColCharNumber);
+    const [postSendAction, setPostSendAction] = useState(lsSettings.postSendAction);
 
-    console.log('config', config);
-
-    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>, key: string) => {
-        if (e?.target?.value === "") return;
-        const maxColCharNumberSelected = parseInt(e.target.value);
-        if (!isNaN(maxColCharNumberSelected)) {
-            setLSSettings({ ...lsSettings, maxColCharNumber: maxColCharNumberSelected }); // set in local storage
-            setMaxColCharNumber(maxColCharNumberSelected);
-            if (key === 'maxColCharNumber') {
-                setSettings({ ...settings, maxColCharNumber: maxColCharNumberSelected });
-            }
-        }
+    if (isDev) {
+        console.log('config', config);
     }
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>, key: string) => {
+        const val = e.target.value;
+        if (val === "") return;
+        if (key === 'maxColCharNumber') {
+            const n = parseInt(val, 10);
+            if (!Number.isNaN(n)) {
+                const next = { ...lsSettings, maxColCharNumber: n };
+                setLSSettings(next);
+                setMaxColCharNumber(n);
+                setSettings({ ...settings, maxColCharNumber: n });
+            }
+        } else if (key === 'postSendAction') {
+            const next = { ...lsSettings, postSendAction: val as 'keep' | 'trash' | 'delete' };
+            setLSSettings(next);
+            setPostSendAction(next.postSendAction);
+            setSettings({ ...settings, postSendAction: next.postSendAction });
+        }
+    };
 
     const resetSettings = () => {
         localStorage.clear()
         setLSSettings(INIT_SETTINGS);
         setSettings(INIT_SETTINGS);
         setMaxColCharNumber(INIT_SETTINGS.maxColCharNumber);
+        setPostSendAction(INIT_SETTINGS.postSendAction);
     }
 
     if (!open) return null;
@@ -63,10 +73,30 @@ export default function SettingsDialog({
                 <div className="p-4">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">Settings</h3>
 
+                    <div className="grid grid-cols-[2fr_1fr] gap-2 text-xs mb-2">
+                        <div className="text-gray-500 flex items-center gap-1">
+                            After sending LOIs
+                            <Tooltip title="Choose what happens to each generated Google Doc after its email is sent.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-900" />
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <select
+                                value={postSendAction}
+                                onChange={(e) => handleChange(e, 'postSendAction')}
+                                className="w-full rounded-md border border-gray-200 px-2 py-1 bg-white text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                            >
+                                <option value="keep">Keep files</option>
+                                <option value="trash">Move files to trash (recoverable)</option>
+                                <option value="delete">Permanently delete</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-[2fr_1fr] gap-2 text-xs">
                         <div className="text-gray-500 flex items-center gap-1">Last column for mapping
-                            <Tooltip title="The last column letter that can be mapped from your source data sheet tab."> 
-                            <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-900" /></Tooltip></div>
+                            <Tooltip title="The last column letter that can be mapped from your source data sheet tab.">
+                                <QuestionMarkCircleIcon className="w-3 h-3 inline-block cursor-pointer text-gray-900" /></Tooltip></div>
                         <div>
                             <select
                                 value={maxColCharNumber}
@@ -93,7 +123,6 @@ export default function SettingsDialog({
                                 <a href={subManagementLink} className="text-indigo-500 hover:text-indigo-600 hover:underline cursor-pointer" target="_blank" rel="noopener noreferrer">Manage subscription</a>
                             </div>
                         )}
-                        
                     </div>
 
                     <div className="mt-4 flex items-center justify-end gap-2">

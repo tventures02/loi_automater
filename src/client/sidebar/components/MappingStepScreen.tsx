@@ -33,6 +33,8 @@ type Props = {
     onUpgradeClick: () => void;
 
     settings: Settings;
+
+    config: any;
 };
 
 function normalizeNewlines(s: string) {
@@ -90,6 +92,7 @@ export default function MappingStepScreen({
     user,
     onUpgradeClick,
     settings,
+    config,
 }: Props) {
     const placeholders = useMemo(() => extractPlaceholders(templateContent), [templateContent]);
 
@@ -362,7 +365,7 @@ export default function MappingStepScreen({
             )}
 
             {!isPremium && totalColsToMap > CONSTANTS.FREE_MAX_COL_NUMBER && (
-                <CtaCard message="Upgrade to unlock more columns!" user={user} />
+                <CtaCard message="Upgrade to unlock more columns!" user={user} config={config}/>
             )}
 
             {/* Preview */}

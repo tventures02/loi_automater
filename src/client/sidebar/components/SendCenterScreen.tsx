@@ -8,7 +8,7 @@ import { QueueItem } from "./Sidebar";
 import { SendSummary } from "./Sidebar";
 import ConfirmSendDialog from "./ConfirmSendDialog";
 import ConfirmClearQueueModal from "./ConfirmClearQueueModal";
-import { ArrowPathIcon, LinkIcon, PaperClipIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, ClipboardIcon, DocumentIcon, LinkIcon, PaperClipIcon, QueueListIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Alert, Tooltip } from "@mui/material";
 import { Snackbar } from "@mui/material";
 import { User } from "../../utils/types";
@@ -16,6 +16,13 @@ import CtaCard from "./CtaCard";
 import CONSTANTS from "../../utils/constants";
 import JobWarning from "./JobWarning";
 import { sendToAmplitude } from "../../utils/amplitude";
+import {
+    XCircleIcon,
+    ArrowTopRightOnSquareIcon
+} from "@heroicons/react/24/outline";
+import ConfirmDeleteDocsModal from "./ConfirmDeleteDocsModal";
+import { Settings } from "../../utils/types";
+
 
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
 
@@ -49,6 +56,9 @@ type Props = {
     setCurrentStep: React.Dispatch<React.SetStateAction<string>>;
     user: User;
     onUpgradeClick: () => void;
+    outputFolderId: string | null;
+    config: any;
+    settings: Settings;
 };
 
 export default function SendCenterScreen({
@@ -62,14 +72,23 @@ export default function SendCenterScreen({
     setCurrentStep,
     user,
     onUpgradeClick,
+    outputFolderId,
+    config,
+    settings,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
-    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" | "warning" }>({ open: false, message: "", severity: "success" });
+    const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, severity: "success" | "error" | "warning" | "info" }>({ open: false, message: "", severity: "success" });
     const [queueOpen, setQueueOpen] = useState<boolean>(false); // collapsible Queue
     const [dialog, setDialog] = useState<SendDialogState>({ open: false, variant: "real" });
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [openClear, setOpenClear] = useState(false);
+    const [fileCleanupOpen, setFileCleanupOpen] = useState(false);
+    const [cleanUpStates, setCleanUpStates] = useState<{
+        openConfirm: boolean;
+        kind: 'archive' | 'trash' | 'delete';
+        includeFailed: boolean;
+    }>({ openConfirm: false, kind: 'trash', includeFailed: false });
     const [clearing, setClearing] = useState(false);
     const [openMenu, setOpenMenu] = useState<{
         open: boolean;
@@ -160,6 +179,7 @@ export default function SendCenterScreen({
             const noAttachBatchCap = CONSTANTS.NO_ATTACH_BATCH_CAP;
             const MAX_LOOPS = Math.ceil(CONSTANTS.MAX_GWORKSPACE_PREMIUM_SEND_CAP / attachPDFBatchCap); // hard safety
             let queuedRemaining = queuedTotal;
+            let quotaExhausted = false;
 
             while (loops < MAX_LOOPS && !done) {
                 if (pauseRef.current) break;
@@ -173,6 +193,7 @@ export default function SendCenterScreen({
                     isPremium,
                     freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
                     startFromRow: nextToken,
+                    postSendAction: settings?.postSendAction || 'keep',
                 });
 
                 if (isDev) {
@@ -223,26 +244,37 @@ export default function SendCenterScreen({
                 if (stopOnError && failedSoFar > 0) {
                     done = true;
                 }
+                if (res?.quotaExhausted) {
+                    quotaExhausted = true;
+                    done = true;
+                }
             }
 
-            if (failedSoFar > 0) {
-                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.`, severity: "warning" });
+            if (quotaExhausted) {
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far. Gmail daily quota exhausted. Try again tomorrow.`, severity: `${sentSoFar > 0 ? "warning" : "error"}` });
+            }
+            else if (failedSoFar > 0) {
+                const finishedMsg = sentSoFar > 0 ? `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.` : `Failed to send ${failedSoFar} LOIs.`;
+                setSnackbar({ open: true, message: finishedMsg, severity: "warning" });
             }
             else {
                 setSnackbar({ open: true, message: `Successfully sent ${sentSoFar} LOIs.`, severity: "success" });
                 try {
                     sendToAmplitude(CONSTANTS.AMPLITUDE.SENT_LOIS, { requestedCount, sent: sentSoFar, testMode: false }, { email: user.email });
-                } catch (error) {}
+                } catch (error) { }
             }
         } catch (e) {
             setSnackbar({ open: true, message: `Send failed. ${e.message}`, severity: "error" });
             try {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (confirmRealSend)' }, { email: user.email });
-            } catch (error) {}
+            } catch (error) { }
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "real" });
             setSendProg(p => ({ ...p, active: false }));
+            if (isDev) {
+                console.log('gmail hard remaining', await  serverFunctions.getGmailRemaining());
+            }
             refreshSendData(true);
         }
     };
@@ -310,12 +342,12 @@ export default function SendCenterScreen({
             setSnackbar({ open: true, message: `Sent ${sent} test email${sent > 1 ? "s" : ""} to ${sendData?.summary?.userEmail || "you"}`, severity: "success" });
             try {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.SENT_LOIS, { numEmailsToSend, sent, testMode: true }, { email: user.email });
-            } catch (error) {}
+            } catch (error) { }
         } catch (e) {
             setSnackbar({ open: true, message: `Test send failed. ${e.message}`, severity: "error" });
             try {
                 sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (confirmTestSend)' }, { email: user.email });
-            } catch (error) {}
+            } catch (error) { }
         } finally {
             setSending(false);
             setDialog({ open: false, variant: "test" });
@@ -323,30 +355,41 @@ export default function SendCenterScreen({
         }
     };
 
-    const handleClearQueue = async (deleteDocs: boolean = false, removeSent: boolean = false) => {
+    const handleClear = async (
+        deleteDocs: boolean = false,
+        statuses: string[] = [],
+        includeJobs: boolean = true,
+        kind: 'archive' | 'trash' | 'delete' = 'trash',
+    ) => {
         if (clearing) return;
         setClearing(true);
 
         try {
+            let totalDeleted = 0;
+            let totalTrashed = 0;
+            let totalMissing = 0;
+            let totalCandidates = 0;
+            let loops = 0;
             if (deleteDocs) {
                 // Progressive deletion: loop until nextToken is null
                 let nextToken: number | null = 2;      // first data row
-                let totalDeleted = 0;
-                let totalTrashed = 0;
-                let totalMissing = 0;
-                let totalCandidates = 0;
-                let loops = 0;
                 let maxLoops = 10;
+                if (isDev) {
+                    console.log('statuses', statuses);
+                    console.log('kind', kind);
+                    console.log('deleteDocs', deleteDocs);
+                    console.log('includeJobs', includeJobs);
+                }
 
                 while (nextToken !== null && loops < maxLoops) {
                     const res = await serverFunctions.queueDeleteDocsSimple({
-                        removeSent,            // true => only delete Docs for rows with status "sent"
+                        statuses,
                         startFromRow: nextToken,
                         limit: 200,            // tune as needed
                         timeBudgetMs: 270000,  // ~4.5 min; server will return early if needed
                         throttleEvery: 50,
                         sleepMs: 600,
-                        // permanentDelete: false, // keep default "trash"
+                        kind,
                     });
 
                     loops += 1;
@@ -373,8 +416,10 @@ export default function SendCenterScreen({
                 }
             }
 
-            // Now clear the sheet (all rows or only "sent" rows depending on removeSent)
-            await serverFunctions.queueClearAll(removeSent);
+            // Now clear the sheet (all rows or only "sent" rows depending on statuses)
+            if (includeJobs) {
+                await serverFunctions.queueClearAll(statuses);
+            }
 
             // Optimistic local reset; also call onRefresh to re-pull counts
             setSendData(s => ({ ...s, items: [] }));
@@ -384,21 +429,32 @@ export default function SendCenterScreen({
             }));
             onRefresh?.();
 
-            setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
+            if (cleanUpStates.openConfirm) {
+                setSnackbar({ open: true, message: `Successfully ${kind === 'trash' ? `moved ${totalTrashed} to trash` : `deleted ${totalDeleted} files`}.`, severity: "success" });
+            }
+            else {
+                setSnackbar({ open: true, message: "Queue was successfully cleared.", severity: "success" });
+            }
+            
         } catch (e: any) {
             console.error("Failed to clear queue", e);
             setSnackbar({ open: true, message: "Failed to clear queue. Please try again.", severity: "error" });
             try {
-                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClearQueue)' }, { email: user.email });
-            } catch (error) {}
+                sendToAmplitude(CONSTANTS.AMPLITUDE.ERROR, { error: e?.message || JSON.stringify(e), where: 'sendCenterScreen (handleClear)' }, { email: user.email });
+            } catch (error) { }
         } finally {
+            setFileCleanupOpen(false);
+            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
+            setCleanUpStates({ openConfirm: false, kind: 'trash', includeFailed: false });
+            setQueueOpen(false);
             setClearing(false);
             setOpenClear(false);
-            setTimeout(() => setSnackbar({ open: false, message: "", severity: "success" }), 2500);
-            setQueueOpen(false);
         }
     };
 
+    const eligibleSentForCleanUp = summary?.sentWithDoc ?? 0;
+    const eligibleFailedForCleanup = summary?.failedWithDoc ?? 0;
+    const totalCleanupEligible = eligibleSentForCleanUp + (cleanUpStates.includeFailed ? eligibleFailedForCleanup : 0);
 
     const handleGoToGenLOIs = () => {
         if (mode === "send") {
@@ -437,7 +493,7 @@ export default function SendCenterScreen({
             <h2 className="text-sm font-semibold text-gray-900">Send Emails</h2>
             <div className="rounded-xl border border-gray-200 p-3">
                 <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
+                    <div className="text-xs font-medium text-gray-900">Queue Summary</div>
                     <Tooltip title={`Open Sender Queue`}>
                         <LinkIcon className="w-3 h-3 cursor-pointer" onClick={handleOpenQueue} />
                     </Tooltip>
@@ -470,18 +526,18 @@ export default function SendCenterScreen({
                 {loading ? <div className="text-xs text-gray-500 flex items-center gap-2"><InlineSpinner /> Loading...</div> :
                     <>
                         <div className="flex items-center justify-between mb-3">
-                            <div className="text-xs font-medium text-gray-900">Sender Queue Summary</div>
+                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center"><ClipboardIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Queue Summary</div>
                             <Tooltip title={`Open Sender Queue`}>
                                 <LinkIcon className="w-3 h-3 cursor-pointer" onClick={handleOpenQueue} />
                             </Tooltip>
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
-                                <Badge label={`Left to send: ${summary?.queued ?? "—"}`} />
-                                <Badge label={`Sent: ${summary?.sent ?? "—"}`} />
-                                <Badge label={`Failed: ${summary?.failed ?? "—"}`} />
-                                <Badge label={`Total jobs: ${summary?.total ?? "—"}`} />
+                                <Badge label={`Credits left today`} number={summary?.remaining}/>
+                                <Badge label={`Left to send`} number={summary?.queued}/>
+                                <Badge label={`Sent`} number={summary?.sent}/>
+                                <Badge label={`Failed`} number={summary?.failed}/>
+                                <Badge label={`Total jobs`} number={summary?.total}/>
                             </div>
                         </div>
                     </>
@@ -503,164 +559,237 @@ export default function SendCenterScreen({
             </div>
 
             {/* Queue (collapsible) */}
-            <div className="rounded-xl border border-gray-200">
-                {/* Summary row (click to toggle) */}
-                <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setQueueOpen(v => !v)}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setQueueOpen(v => !v)}
-                    className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="text-xs font-medium text-gray-900">Queue Review</div>
-                    </div>
-                    <svg
-                        className={`h-4 w-4 text-gray-500 transition-transform ${queueOpen ? "rotate-180" : ""}`}
-                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                    >
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.093l3.71-3.86a.75.75 0 111.08 1.04l-4.24 4.41a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
-                    </svg>
-                </div>
-
-                {/* Details (collapsible) */}
-                {queueOpen && (
-                    <>
-                        <div className="flex items-center justify-between px-3">
-                            <div className="text-xs text-gray-600 truncate overflow-hidden whitespace-nowrap ellipsis">
-                                {loading ? "" : queueTotal > 0 ? `Showing ${visibleItems.length} of ${queueTotal}` : ""}
+            {
+                items.length > 0 && !loading && (
+                    <div className="rounded-xl border border-gray-200">
+                        {/* Summary row (click to toggle) */}
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setQueueOpen(v => !v)}
+                            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setQueueOpen(v => !v)}
+                            className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="text-xs font-medium text-gray-900 gap-1 flex items-center"><QueueListIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> Queue Management</div>
                             </div>
-                            {/* CLEAR QUEUE (destructive) */}
-                            {items.length > 0 && !loading && <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => setOpenClear(true)}
-                                className={`select-none !w-auto rounded-md px-2 py-1 text-[11px] ring-1 ${items.length === 0
-                                    ? "ring-gray-200 text-gray-400 cursor-not-allowed"
-                                    : "ring-red-300 text-red-700 hover:bg-red-50 cursor-pointer"
-                                    }`}
-                                aria-disabled={items.length === 0}
+                            <svg
+                                className={`h-4 w-4 text-gray-500 transition-transform ${queueOpen ? "rotate-180" : ""}`}
+                                viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
                             >
-                                <div className="flex items-center gap-1"><TrashIcon className="w-3 h-3" /> Clear queue…</div>
-                            </div>
-                            }
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.093l3.71-3.86a.75.75 0 111.08 1.04l-4.24 4.41a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
+                            </svg>
                         </div>
 
-
-                        <div className="flex items-center justify-between px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
-                                <FilterPill active={filter === "queued"} onClick={() => setFilter("queued")} label="Queued" />
-                                <FilterPill active={filter === "failed"} onClick={() => setFilter("failed")} label="Failed" />
-                                <FilterPill active={filter === "sent"} onClick={() => setFilter("sent")} label="Sent" />
-                            </div>
-                        </div>
-
-                        {loading ? (
-                            <div className="px-3 pb-3 text-xs text-gray-500 flex items-center gap-2">
-                                <InlineSpinner /> Loading…
-                            </div>
-                        ) : filtered.length === 0 ? (
-                            <div className="px-3 pb-3 text-xs text-gray-600">No {filter === "all" ? "" : `${filter} `}jobs.</div>
-                        ) : (
-                            <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
-                                <ul className="divide-y divide-gray-100">
-                                    {visibleItems.map((item, index) => {
-                                        return (
-                                            <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <div className="text-[11px] text-gray-600 flex">
-                                                        <b>Recipient: </b>
-                                                    </div>
-                                                    <div className="text-gray-900 truncate mb-1">{item.recipient}</div>
-
-                                                    <div className="text-[11px] text-gray-600 flex">
-                                                        <b>Subject: </b>
-                                                    </div>
-                                                    <div className="text-[11px] text-gray-600 truncate flex mb-1">
-                                                        <span className="w-[100%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
-                                                            {item.subject || "(no subject)"}
-                                                        </span>
-                                                    </div>
-                                                    {
-                                                        item.emailBody && (
-                                                            <>
-                                                                <div className="text-[11px] text-gray-600 flex">
-                                                                    <b>Email Body: </b>
-                                                                </div>
-                                                                <div className="text-[11px] text-gray-600 flex mb-1">
-                                                                    {iQueueEmailBodyPreview === index ? (
-                                                                        <div className="text-gray-600 whitespace-pre-line">
-                                                                            {item.emailBody}
-                                                                        </div>
-                                                                    ) :
-                                                                        <div className="text-gray-600" >
-                                                                            {item.emailBody?.slice(0, 20)}{item.emailBody?.slice(20).length > 0 ? '...' : ''}
-                                                                            <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => setIQueueEmailBodyPreview(index)}>
-                                                                                Show all
-                                                                            </a>
-                                                                        </div>
-                                                                    }
-                                                                </div>
-                                                            </>
-                                                        )
-                                                    }
-
-                                                    {/* Attachment */}
-                                                    <div className="text-[11px] text-gray-600 truncate mb-1">
-                                                        {item.docUrl ? (
-                                                            <>
-                                                                <div className="flex">
-                                                                    <b>Attachment: </b>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
-                                                                        Open doc
-                                                                    </a>
-                                                                    {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
-                                                                </div>
-                                                            </>
-                                                        ) : null}
-                                                    </div>
-
-                                                    {/* Queue tab row */}
-                                                    <div className="text-gray-600 text-[11px]" >Queue tab row:
-                                                        <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a>
-                                                    </div>
-                                                    {item.status === "failed" && item.lastError ? (
-                                                        <div className="text-[11px] text-red-600 truncate mt-0.5">{item?.lastError?.includes('Error:') ? item.lastError : `Error: ${item.lastError}`}</div>
-                                                    ) : null}
-                                                </div>
-                                                <StatusPill
-                                                    status={item.status as any}
-                                                    loading={pendingId === item.id}
-                                                    onClick={(e) => onStatusPillClick(e, item)}
-                                                />
-                                            </li>
-                                        )
+                        {/* Details (collapsible) */}
+                        {queueOpen && (
+                            <>
+                                <div className="flex items-center justify-between px-3">
+                                    <div className="text-xs text-gray-600 truncate overflow-hidden whitespace-nowrap ellipsis">
+                                        {loading ? "" : queueTotal > 0 ? `Showing ${visibleItems.length} of ${queueTotal}` : ""}
+                                    </div>
+                                    {/* CLEAR QUEUE (destructive) */}
+                                    {items.length > 0 && !loading && <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => setOpenClear(true)}
+                                        className={`select-none !w-auto rounded-md px-2 py-1 text-[11px] ring-1 bg-red-50 ${items.length === 0
+                                            ? "ring-gray-200 text-gray-400 cursor-not-allowed"
+                                            : "ring-red-300 text-red-700 hover:bg-red-50 cursor-pointer"
+                                            }`}
+                                        aria-disabled={items.length === 0}
+                                    >
+                                        <div className="flex items-center gap-1"><TrashIcon className="w-3 h-3" /> Clear queue…</div>
+                                    </div>
                                     }
-                                    )}
-                                </ul>
-
-                                {/* Showing X of Y */}
-                                <div className="pt-1 pb-1 flex items-center justify-between text-[11px] text-gray-600">
-                                    {canLoadMore && (
-                                        <div
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
-                                            className="select-none rounded-md ring-1 ring-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer justify-end"
-                                        >
-                                            Show next {Math.min(PAGE_SIZE, filtered.length - visibleCount)}
-                                        </div>
-                                    )}
                                 </div>
 
-                            </div>
+
+                                <div className="flex items-center justify-between px-3 py-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <FilterPill active={filter === "all"} onClick={() => setFilter("all")} label="All" />
+                                        <FilterPill active={filter === "queued"} onClick={() => setFilter("queued")} label="Queued" />
+                                        <FilterPill active={filter === "failed"} onClick={() => setFilter("failed")} label="Failed" />
+                                        <FilterPill active={filter === "sent"} onClick={() => setFilter("sent")} label="Sent" />
+                                    </div>
+                                </div>
+
+                                {loading ? (
+                                    <div className="px-3 pb-3 text-xs text-gray-500 flex items-center gap-2">
+                                        <InlineSpinner /> Loading…
+                                    </div>
+                                ) : filtered.length === 0 ? (
+                                    <div className="px-3 pb-3 text-xs text-gray-600">No {filter === "all" ? "" : `${filter} `}jobs.</div>
+                                ) : (
+                                    <div className="px-3 pb-3 space-y-1 max-h-[300px] overflow-y-scroll scrollbar-hide">
+                                        <ul className="divide-y divide-gray-100">
+                                            {visibleItems.map((item, index) => {
+                                                return (
+                                                    <li key={`${item.id}-item-${index}-${item.status}`} className="py-2 text-xs flex items-center justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-[11px] text-gray-600 flex">
+                                                                <b>Recipient: </b>
+                                                            </div>
+                                                            <div className="text-gray-900 truncate mb-1">{item.recipient}</div>
+
+                                                            <div className="text-[11px] text-gray-600 flex">
+                                                                <b>Subject: </b>
+                                                            </div>
+                                                            <div className="text-[11px] text-gray-600 truncate flex mb-1">
+                                                                <span className="w-[100%] overflow-hidden whitespace-nowrap text-ellipsis truncate">
+                                                                    {item.subject || "(no subject)"}
+                                                                </span>
+                                                            </div>
+                                                            {
+                                                                item.emailBody && (
+                                                                    <>
+                                                                        <div className="text-[11px] text-gray-600 flex">
+                                                                            <b>Email Body: </b>
+                                                                        </div>
+                                                                        <div className="text-[11px] text-gray-600 flex mb-1">
+                                                                            {iQueueEmailBodyPreview === index ? (
+                                                                                <div className="text-gray-600 whitespace-pre-line">
+                                                                                    {item.emailBody}
+                                                                                </div>
+                                                                            ) :
+                                                                                <div className="text-gray-600" >
+                                                                                    {item.emailBody?.slice(0, 20)}{item.emailBody?.slice(20).length > 0 ? '...' : ''}
+                                                                                    <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => setIQueueEmailBodyPreview(index)}>
+                                                                                        Show all
+                                                                                    </a>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    </>
+                                                                )
+                                                            }
+
+                                                            {/* Attachment */}
+                                                            <div className="text-[11px] text-gray-600 truncate mb-1">
+                                                                {item.docUrl ? (
+                                                                    <>
+                                                                        <div className="flex">
+                                                                            <b>Attachment: </b>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <a className="underline underline-offset-2" href={item.docUrl} target="_blank" rel="noopener noreferrer">
+                                                                                Open doc
+                                                                            </a>
+                                                                            {item?.attachPdf && <PaperClipIcon className="w-3 h-3 inline-block" />}
+                                                                        </div>
+                                                                    </>
+                                                                ) : null}
+                                                            </div>
+
+                                                            {/* Queue tab row */}
+                                                            <div className="text-gray-600 text-[11px]" >Queue tab row:
+                                                                <a className="underline underline-offset-2 ml-1 cursor-pointer" onClick={() => serverFunctions.highlightQueueRow(item.queueTabRow)}>{item.queueTabRow}</a>
+                                                            </div>
+                                                            {item.status === "failed" && item.lastError ? (
+                                                                <div className="text-[11px] text-red-600 truncate mt-0.5">{item?.lastError?.includes('Error:') ? item.lastError : `Error: ${item.lastError}`}</div>
+                                                            ) : null}
+                                                        </div>
+                                                        <StatusPill
+                                                            status={item.status as any}
+                                                            loading={pendingId === item.id}
+                                                            onClick={(e) => onStatusPillClick(e, item)}
+                                                        />
+                                                    </li>
+                                                )
+                                            }
+                                            )}
+                                        </ul>
+
+                                        {/* Showing X of Y */}
+                                        <div className="pt-1 pb-1 flex items-center justify-between text-[11px] text-gray-600">
+                                            {canLoadMore && (
+                                                <div
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
+                                                    className="select-none rounded-md ring-1 ring-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 cursor-pointer justify-end"
+                                                >
+                                                    Show next {Math.min(PAGE_SIZE, filtered.length - visibleCount)}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                    </div>
+                                )}
+                            </>
                         )}
+                    </div>
+                )
+            }
+
+            {/* File cleanup (destructive) */}
+            {items.length > 0 && totalCleanupEligible > 0 && !loading &&
+                <div className="rounded-xl border border-gray-200">
+                    {/* Summary row (click to toggle) */}
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setFileCleanupOpen(v => !v)}
+                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setFileCleanupOpen(v => !v)}
+                        className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs font-medium text-gray-900 gap-1 flex items-center">
+                                <DocumentIcon className="w-4 h-4 inline-block mr-0 text-indigo-600" /> File Cleanup <span className="text-gray-500 text-[10px]">{totalCleanupEligible ? `(${totalCleanupEligible})` : ""}</span> </div>
+                        </div>
+                        <svg
+                            className={`h-4 w-4 text-gray-500 transition-transform ${fileCleanupOpen ? "rotate-180" : ""}`}
+                            viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                        >
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.093l3.71-3.86a.75.75 0 111.08 1.04l-4.24 4.41a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    {fileCleanupOpen && (<>
+                        <div className="px-3 pb-3">
+                            <div className="pb-3 flex gap-1 mt-1 ">
+                                <div className="text-[11px] text-gray-600">
+                                    Clean up the <b>SENT</b>{" "}
+                                    <Tooltip title="Open LOI Docs folder">
+                                        <a href={`https://drive.google.com/drive/u/0/folders/${outputFolderId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2">
+                                            LOI Google Docs (PDFs)
+                                            <ArrowTopRightOnSquareIcon className="w-3 h-3 inline-block cursor-pointer ml-1" />
+                                        </a>
+                                    </Tooltip>
+                                    {" "}in your Drive.
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <Tooltip title="Move sent docs to Trash. Recoverable for 30 days." placement="top">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCleanUpStates({ ...cleanUpStates, openConfirm: true, kind: 'trash' })}
+                                        disabled={clearing || totalCleanupEligible === 0}
+                                        className="flex items-center justify-center gap-2 rounded-md ring-1 ring-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                        Move {totalCleanupEligible} to trash
+                                    </button>
+                                </Tooltip>
+
+                                <Tooltip title="Delete sent docs. Cannot be undone." placement="bottom">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCleanUpStates({ ...cleanUpStates, openConfirm: true, kind: 'delete' })}
+                                        disabled={clearing || totalCleanupEligible === 0}
+                                        className="flex items-center justify-center gap-2 rounded-md ring-1 ring-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
+                                    >
+                                        <XCircleIcon className="w-4 h-4" />
+                                        Delete {totalCleanupEligible} forever
+                                    </button>
+                                </Tooltip>
+                            </div>
+                        </div>
                     </>
-                )}
-            </div>
+                    )}
+                </div>
+            }
 
             {sendProg.active && (
                 <div className="rounded-xl border border-gray-200 p-3 bg-white shadow-sm">
@@ -723,7 +852,7 @@ export default function SendCenterScreen({
 
             {
                 !isPremium && ctaMsg && !sendData.loading && (
-                    <CtaCard message={ctaMsg} user={user} />
+                    <CtaCard message={ctaMsg} user={user} config={config}/>
                 )
             }
 
@@ -820,19 +949,32 @@ export default function SendCenterScreen({
                     summary={summary}
                     clearing={clearing}
                     onCancel={() => { setOpenClear(false); }}
-                    onConfirm={(deleteDocs, removeSent) => handleClearQueue(deleteDocs, removeSent)}
+                    onConfirm={(deleteDocs, statuses, includeJobs, kind) => handleClear(deleteDocs, statuses, includeJobs, kind)}
                 />
             )}
 
+            {
+                cleanUpStates.openConfirm && (
+                    <ConfirmDeleteDocsModal
+                        opts={{ ...cleanUpStates, includeJobs: false }}
+                        onCancel={() => setCleanUpStates({ ...cleanUpStates, openConfirm: false })}
+                        onConfirm={handleClear}
+                        deleting={clearing}
+                        totalCleanupEligible={totalCleanupEligible}
+                    />
+                )
+            }
         </div>
     );
 }
 
 /* Small subcomponents */
-function Badge({ label }: { label: string }) {
+function Badge({ label, number }: { label: string, number: number }) {
+    const numberString = number > 0 ? ` ${number}` : number === 0 ? ' 0' : '-';
+    const warningStyle = label.includes('Failed') && number > 0 ? 'text-red-700' : 'text-gray-700';
     return (
-        <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
-            {label}
+        <div className={`rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700`}>
+            {label}:<span className={`${warningStyle}`}>{numberString}</span>
         </div>
     );
 }
