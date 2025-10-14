@@ -10,13 +10,14 @@ function CTA({
     styleOverride,
     email = null,
     token = null,
+    config = null,
 }) {
     const gridStyle = {
         "textAlign": "center", "margin": "auto"
     }
     const handlePricingPageClick = async () => {
         try {
-            const url = await generatePricingPageUrl(email, token, serverFunctions.getUserData);
+            const url = await generatePricingPageUrl(email, token, serverFunctions.getUserData, config);
             if (isDev) {
                 console.log(url);
                 console.log(email)

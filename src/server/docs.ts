@@ -894,8 +894,13 @@ export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number 
         deletableDocsSentAndFailed: sentWithDoc + failedWithDoc,
         userEmail: Session.getActiveUser().getEmail(),
         total: lastRow - 1, 
-        missing: qSheetRes.missing 
+        missing: qSheetRes.missing,
+        gmailHardRemaining: MailApp.getRemainingDailyQuota(),
     };
+};
+
+export const getGmailRemaining = () => {
+    return MailApp.getRemainingDailyQuota();
 };
 
 export const queueList = (payload) => {
@@ -960,6 +965,7 @@ export const sendNextBatch = (payload) => {
     else if (!isFinite(payload.count)) {
         throw new Error('Invalid number of emails to send provided.');
     }
+
     const startFromRow = Number(payload?.startFromRow) || 2; // The cursor
     const isPremium = !!payload?.isPremium;         // from client
     const T_BUDGET_MS = Number(payload?.timeBudgetMs || 240_000); // 4 min
@@ -985,8 +991,26 @@ export const sendNextBatch = (payload) => {
     const testMode = !!payload?.testMode;          // test mode now consumes credits
     const previewTo = String(payload?.previewTo || Session.getActiveUser().getEmail() || "");
     const freeDailyCap = Number(payload?.freeDailyCap ?? 10);
-    const gmailRemaining = MailApp.getRemainingDailyQuota();
-    // console.log('gmailRemaining', gmailRemaining);
+    // Purposely get the remaining quota from MailApp to ensure it's updated
+    const gmailHardRemaining = MailApp.getRemainingDailyQuota();
+    
+    // Check if we're out of quota
+    if (gmailHardRemaining <= 0) {
+        const creditsUi = getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }); // uses smoothed meter for UI
+        return {
+            sent: 0,
+            failed: 0,
+            attempted: 0,
+            testMode: !!payload?.testMode,
+            creditsLeft: creditsUi.creditsLeft,
+            plan: creditsUi.plan,
+            dailyCap: isPremium ? creditsUi.gmailRemaining : freeDailyCap,
+            batchCap: payload?.attachPDFBatchCap || payload?.noAttachBatchCap, // optional
+            nextToken: Number(payload?.startFromRow) || 2,
+            quotaExhausted: true,
+        };
+    }
+    // console.log('gmailHardRemaining', gmailHardRemaining);
     // console.log('isPremium', isPremium);
     // console.log('freeDailyCap', freeDailyCap);
 
@@ -1032,7 +1056,7 @@ export const sendNextBatch = (payload) => {
         const requested = Math.max(1, Math.min(1000, requestedRaw));
         const attachHeavy = queuedAttachCount > 0;
         const serverBatchCap = attachHeavy ? attachPDFBatchCap : noAttachBatchCap;
-        const ask = Math.min(requested, gmailRemaining, queuedCount, serverBatchCap);
+        const ask = Math.min(requested, gmailHardRemaining, queuedCount, serverBatchCap);
         let sent = 0, failed = 0, attempted = 0, timeBudgetHit = false;
         let nextToken = null;
 
@@ -1042,7 +1066,7 @@ export const sendNextBatch = (payload) => {
 
         // Reserve credits (test mode included; we’ll commit after)
         const { plan, used, granted } = _reserveCredits_({ ask, isPremium, freeDailyCap });
-        const dailyCap = isPremium ? gmailRemaining : freeDailyCap; // only used for client display
+        const dailyCap = isPremium ? gmailHardRemaining : freeDailyCap; // only used for client display
 
         // console.log('granted', granted);
         // console.log('dailyCap', dailyCap);
@@ -1160,9 +1184,13 @@ export const sendNextBatch = (payload) => {
             const defaultBodyMaker = (docUrl) => String(payload?.bodyTemplate || `Hello,\n\nPlease review the Letter of Intent attached.\n\nBest regards`);
             const docBodyCache = Object.create(null); // Cache Doc body text to avoid re-open for same docId
             const activeUserEmail = Session.getActiveUser().getEmail();
+            let hardLeft = gmailHardRemaining;
+            let quotaExhaustedMidBatch = false;
 
             const resultsByRow = new Map(); // rowIndex -> { ok:boolean, error?:string, attempts:number, sentAt?:Date }
             for (let k = 0; k < batch.length; k++) {
+                if (hardLeft <= 0) { quotaExhaustedMidBatch = true; break; }
+
                 // Time budget guard (leave time to finalize)
                 if ((Date.now() - t0) > (T_BUDGET_MS - T_GUARD_MS)) { timeBudgetHit = true; break; }
 
@@ -1202,6 +1230,7 @@ export const sendNextBatch = (payload) => {
                     }
 
                     MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    hardLeft--; 
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;
@@ -1290,6 +1319,8 @@ export const sendNextBatch = (payload) => {
 
             // Commit usage (consume sent; release any unused portion of grant)
             const { used: usedNow } = _commitCredits_({ granted, sent });
+
+            // Purposely get the remaining quota from MailApp to ensure it's updated
             const gmailLeft = MailApp.getRemainingDailyQuota();
             const planLeft = Math.max(0, (isPremium ? Number.MAX_SAFE_INTEGER : freeDailyCap) - usedNow);
             const creditsLeft = Math.min(gmailLeft, planLeft);
@@ -1313,6 +1344,7 @@ export const sendNextBatch = (payload) => {
                 batchCap: serverBatchCap,
                 newQueuedCount: Math.max(0, queuedCount - resultsByRow.size),
                 nextToken,
+                quotaExhausted: quotaExhaustedMidBatch,
             };
         } catch (e) {
             _commitCredits_({ granted, sent });

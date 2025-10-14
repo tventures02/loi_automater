@@ -91,8 +91,8 @@ export function parseHTMLData() {
 }
 
 
-export const generatePricingPageUrl = async (emailIn = '', token = '', getUserData) => {
-    const baseUrl = isDev ? 'http://localhost:3000/' : 'https://tidsiventures.com/';
+export const generatePricingPageUrl = async (emailIn = '', token = '', getUserData, config = {}) => {
+    const baseUrl = isDev ? 'http://localhost:3000/' : config?.baseUrl || 'https://tidisventures.com/';
     const appSlug = CONSTANTS.APP_SLUG;
     let purchaseResp = null;
 

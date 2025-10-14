@@ -10,6 +10,8 @@ const LOI_PROP = {
     reservedTs: 'loi.reservedTs', // timestamp of last reservation change
 };
 
+const GMAIL_REMAINING_CACHE_KEY = 'loi.GmailRemaining:v1';
+
 function _tz_() {
     return SpreadsheetApp.getActive()?.getSpreadsheetTimeZone()
         || Session.getScriptTimeZone()
@@ -43,6 +45,7 @@ function _readAndNormalizeCounters_(tz: string) {
             [LOI_PROP.reserved]: '0',
             [LOI_PROP.reservedTs]: String(Date.now()),
         });
+        invalidateGmailRemainingCache();
     } else if (reserved > 0 && Date.now() - reservedTs > RESERVATION_TTL_MS) {
         // Reclaim stale holds
         reserved = 0;
@@ -150,3 +153,8 @@ export const getSendCreditsLeft = (payload) => {
         lock.releaseLock();
     }
 };
+
+/** Clears the cache so the next UI read refreshes from MailApp. */
+export function invalidateGmailRemainingCache() {
+    CacheService.getUserCache().remove(GMAIL_REMAINING_CACHE_KEY);
+}

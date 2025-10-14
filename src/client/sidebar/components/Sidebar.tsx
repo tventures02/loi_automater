@@ -147,6 +147,7 @@ const SidebarContainer = () => {
     const [config, setConfig] = useState({
         gwsCalcYTURL: 'https://www.youtube.com/watch?v=c0-1-zYiCMU',
         helpLink: 'https://tidisventures.com/support?app=bulk-loi-sender',
+        baseUrl: 'https://tidisventures.com/',
     });
 
     //@ts-ignore
@@ -397,7 +398,7 @@ const SidebarContainer = () => {
             }
             catch (error) {}
             
-            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
+            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData, config);
             if (isDev) {
                 console.log(url);
                 console.log(user.email)
@@ -609,6 +610,7 @@ const SidebarContainer = () => {
     if (isDev) {
         console.log('sidebar render-------------------')
         console.log('user', user)
+        console.log('config', config)
     }
 
     return (
@@ -698,6 +700,7 @@ const SidebarContainer = () => {
                         user={user}
                         onUpgradeClick={onUpgradeClick}
                         outputFolderId={outputFolderId}
+                        config={config}
                     />
                 ) : (
                     <>
@@ -739,6 +742,7 @@ const SidebarContainer = () => {
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
                                 settings={settings}
+                                config={config}
                             />
                         )}
 
@@ -770,6 +774,7 @@ const SidebarContainer = () => {
                                 pattern={pattern}
                                 setPattern={setPattern}
                                 outputFolderId={outputFolderId}
+                                config={config}
                             />
                         )}
 
@@ -786,6 +791,7 @@ const SidebarContainer = () => {
                                 user={user}
                                 onUpgradeClick={onUpgradeClick}
                                 outputFolderId={outputFolderId}
+                                config={config}
                             />
                         )}
                     </>

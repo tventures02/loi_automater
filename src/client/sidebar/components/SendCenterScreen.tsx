@@ -56,6 +56,7 @@ type Props = {
     user: User;
     onUpgradeClick: () => void;
     outputFolderId: string | null;
+    config: any;
 };
 
 export default function SendCenterScreen({
@@ -70,6 +71,7 @@ export default function SendCenterScreen({
     user,
     onUpgradeClick,
     outputFolderId,
+    config,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
@@ -174,6 +176,7 @@ export default function SendCenterScreen({
             const noAttachBatchCap = CONSTANTS.NO_ATTACH_BATCH_CAP;
             const MAX_LOOPS = Math.ceil(CONSTANTS.MAX_GWORKSPACE_PREMIUM_SEND_CAP / attachPDFBatchCap); // hard safety
             let queuedRemaining = queuedTotal;
+            let quotaExhausted = false;
 
             while (loops < MAX_LOOPS && !done) {
                 if (pauseRef.current) break;
@@ -237,9 +240,16 @@ export default function SendCenterScreen({
                 if (stopOnError && failedSoFar > 0) {
                     done = true;
                 }
+                if (res?.quotaExhausted) {
+                    quotaExhausted = true;
+                    done = true;
+                }
             }
 
-            if (failedSoFar > 0) {
+            if (quotaExhausted) {
+                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far. Gmail daily quota exhausted. Try again tomorrow.`, severity: `${sentSoFar > 0 ? "warning" : "error"}` });
+            }
+            else if (failedSoFar > 0) {
                 setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.`, severity: "warning" });
             }
             else {
@@ -257,6 +267,9 @@ export default function SendCenterScreen({
             setSending(false);
             setDialog({ open: false, variant: "real" });
             setSendProg(p => ({ ...p, active: false }));
+            if (isDev) {
+                console.log('gmail hard remaining', await  serverFunctions.getGmailRemaining());
+            }
             refreshSendData(true);
         }
     };
@@ -834,7 +847,7 @@ export default function SendCenterScreen({
 
             {
                 !isPremium && ctaMsg && !sendData.loading && (
-                    <CtaCard message={ctaMsg} user={user} />
+                    <CtaCard message={ctaMsg} user={user} config={config}/>
                 )
             }
 

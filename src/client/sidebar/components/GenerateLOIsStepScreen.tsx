@@ -77,6 +77,7 @@ type Props = {
     pattern: string;
     setPattern: React.Dispatch<React.SetStateAction<string>>;
     outputFolderId: string;
+    config: any;
 };
 
 export type PreflightResult = {
@@ -171,6 +172,7 @@ export default function GenerateLOIsStepScreen({
     pattern,
     setPattern,
     outputFolderId,
+    config,
 }: Props) {
    
     const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -1124,7 +1126,7 @@ export default function GenerateLOIsStepScreen({
             )}
 
             {!isPremium && !isPreflighting && preflight?.eligibleRows > CONSTANTS.FREE_LOI_GEN_CAP_PER_SHEET && (
-                <CtaCard message="Upgrade to create unlimited LOIs!" user={user} />
+                <CtaCard message="Upgrade to create unlimited LOIs!" user={user} config={config}/>
             )}
 
             {/* Snackbar */}

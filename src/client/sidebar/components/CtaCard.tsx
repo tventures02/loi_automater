@@ -11,9 +11,11 @@ const isDev = process.env.REACT_APP_NODE_ENV.includes('dev');
 export default function CtaCard ({ 
     message,    
     user,
+    config,
 }: {
     message: string;
     user: User;
+    config: any;
 }) {
     const [isNavigating, setIsNavigating] = useState(false);
     const onUpgradeClick = async () => {
@@ -25,7 +27,7 @@ export default function CtaCard ({
             }
             catch (error) { }
 
-            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData);
+            const url = await generatePricingPageUrl(user.email, user.idToken, serverFunctions.getUserData, config);
             if (isDev) {
                 console.log(url);
                 console.log(user.email)
