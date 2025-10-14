@@ -106,7 +106,7 @@ export type GenerateSummary = {
     statuses?: Array<{ row: number; status: "ok" | "skipped" | "failed"; message?: string; docUrl?: string }>;
 };
 
-const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 50;
+const DEFAULT_BATCH_SIZE_WITH_DOC_CREATION = 30;
 const DEFAULT_BATCH_SIZE = 100;
 
 /* ---------- helpers ---------- */
