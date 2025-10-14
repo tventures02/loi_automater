@@ -1225,7 +1225,7 @@ export const sendNextBatch = (payload) => {
                     const to = testMode ? previewTo || activeUserEmail : item.email;
 
                     // ATTACHMENTS
-                    const wantAttach = item.attachPdf && !!item.docId;
+                    const wantAttach = item.attachPdf;
 
                     let attachments = null;
                     if (wantAttach) {
@@ -1704,6 +1704,10 @@ function buildPlainTextFromDoc(docId: string) {
 
 function generateLOIPDF(docId: string) {
     try {
+        console.log('docId', docId);
+        if (!docId) {
+            throw new Error('Attaching PDF but no docId provided for Google Doc reference.');
+        }
         // Open the template document
         const doc = DocumentApp.openById(docId);
         const docName = doc.getName();

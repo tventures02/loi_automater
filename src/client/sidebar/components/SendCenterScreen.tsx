@@ -254,7 +254,8 @@ export default function SendCenterScreen({
                 setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far. Gmail daily quota exhausted. Try again tomorrow.`, severity: `${sentSoFar > 0 ? "warning" : "error"}` });
             }
             else if (failedSoFar > 0) {
-                setSnackbar({ open: true, message: `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.`, severity: "warning" });
+                const finishedMsg = sentSoFar > 0 ? `Sent ${sentSoFar} LOIs so far but failed to send ${failedSoFar} LOIs.` : `Failed to send ${failedSoFar} LOIs.`;
+                setSnackbar({ open: true, message: finishedMsg, severity: "warning" });
             }
             else {
                 setSnackbar({ open: true, message: `Successfully sent ${sentSoFar} LOIs.`, severity: "success" });
