@@ -701,6 +701,7 @@ const SidebarContainer = () => {
                         onUpgradeClick={onUpgradeClick}
                         outputFolderId={outputFolderId}
                         config={config}
+                        settings={settings}
                     />
                 ) : (
                     <>
@@ -792,6 +793,7 @@ const SidebarContainer = () => {
                                 onUpgradeClick={onUpgradeClick}
                                 outputFolderId={outputFolderId}
                                 config={config}
+                                settings={settings}
                             />
                         )}
                     </>

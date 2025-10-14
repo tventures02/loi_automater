@@ -15,4 +15,5 @@ export interface User {
 }
 export interface Settings {
     maxColCharNumber: number;
+    postSendAction: 'keep' | 'trash' | 'delete';
 }

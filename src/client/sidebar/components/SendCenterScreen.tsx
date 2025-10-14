@@ -21,6 +21,7 @@ import {
     ArrowTopRightOnSquareIcon
 } from "@heroicons/react/24/outline";
 import ConfirmDeleteDocsModal from "./ConfirmDeleteDocsModal";
+import { Settings } from "../../utils/types";
 
 
 const isDev = process.env.REACT_APP_NODE_ENV === 'development' || process.env.REACT_APP_NODE_ENV === 'dev';
@@ -57,6 +58,7 @@ type Props = {
     onUpgradeClick: () => void;
     outputFolderId: string | null;
     config: any;
+    settings: Settings;
 };
 
 export default function SendCenterScreen({
@@ -72,6 +74,7 @@ export default function SendCenterScreen({
     onUpgradeClick,
     outputFolderId,
     config,
+    settings,
 }: Props) {
     const [filter, setFilter] = useState<"all" | "queued" | "failed" | "paused" | "sent">("all");
     const [sending, setSending] = useState(false);
@@ -190,6 +193,7 @@ export default function SendCenterScreen({
                     isPremium,
                     freeDailyCap: CONSTANTS.DEFAULT_FREE_DAILY_SEND_CAP,
                     startFromRow: nextToken,
+                    postSendAction: settings?.postSendAction || 'keep',
                 });
 
                 if (isDev) {
@@ -528,11 +532,11 @@ export default function SendCenterScreen({
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge label={`Credits left today`} number={summary?.remaining ?? 0}/>
-                                <Badge label={`Left to send`} number={summary?.queued ?? 0}/>
-                                <Badge label={`Sent`} number={summary?.sent ?? 0}/>
-                                <Badge label={`Failed`} number={summary?.failed ?? 0}/>
-                                <Badge label={`Total jobs`} number={summary?.total ?? 0}/>
+                                <Badge label={`Credits left today`} number={summary?.remaining}/>
+                                <Badge label={`Left to send`} number={summary?.queued}/>
+                                <Badge label={`Sent`} number={summary?.sent}/>
+                                <Badge label={`Failed`} number={summary?.failed}/>
+                                <Badge label={`Total jobs`} number={summary?.total}/>
                             </div>
                         </div>
                     </>

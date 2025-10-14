@@ -886,14 +886,14 @@ export const getSendSummary = (isPremium: boolean = false, freeDailyCap: number 
     }
     const creditsObj = getSendCreditsLeft({ isPremium, freeDailyCap });
     const remaining = creditsObj.creditsLeft;
-    return { 
-        remaining, 
+    return {
+        remaining,
         queued, sent, failed,
         queuedWithDoc, sentWithDoc, failedWithDoc,
         deletableDocsSent: sentWithDoc,
         deletableDocsSentAndFailed: sentWithDoc + failedWithDoc,
         userEmail: Session.getActiveUser().getEmail(),
-        total: lastRow - 1, 
+        total: lastRow - 1,
         missing: qSheetRes.missing,
         gmailHardRemaining: MailApp.getRemainingDailyQuota(),
     };
@@ -993,7 +993,7 @@ export const sendNextBatch = (payload) => {
     const freeDailyCap = Number(payload?.freeDailyCap ?? 10);
     // Purposely get the remaining quota from MailApp to ensure it's updated
     const gmailHardRemaining = MailApp.getRemainingDailyQuota();
-    
+
     // Check if we're out of quota
     if (gmailHardRemaining <= 0) {
         const creditsUi = getSendCreditsLeft({ isPremium, freeDailyCap: payload?.freeDailyCap }); // uses smoothed meter for UI
@@ -1027,6 +1027,10 @@ export const sendNextBatch = (payload) => {
         const iBody = head[normHeader('body')];        // optional (plain text)
         const iAttachPdf = head[normHeader('attachPdf')];  // optional (TRUE/FALSE)
         const iUseDocBody = coalesce(head[normHeader('useLOIAsBody')], head[normHeader('useDocBody')]); // legacy fallback if needed
+        const postSendAction = ((): 'keep' | 'trash' | 'delete' => {
+            const v = String(payload?.postSendAction || 'keep').toLowerCase();
+            return (v === 'trash' || v === 'delete') ? v : 'keep';
+        })();
 
         // Read all data rows
         const numRows = lastRow - startFromRow + 1;
@@ -1230,7 +1234,7 @@ export const sendNextBatch = (payload) => {
                     }
 
                     MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
-                    hardLeft--; 
+                    hardLeft--;
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
                     sent++;
@@ -1316,6 +1320,80 @@ export const sendNextBatch = (payload) => {
                     dlock.releaseLock();
                 }
             })();
+
+            // ─────────────────────────────────────────────────────────────
+            // POST-SEND FILE DISPOSITION: 'keep' | 'trash' | 'delete'
+            // Runs only for successfully sent items, after statuses are finalized
+            // Requires Advanced Drive Service (Drive API) enabled.
+            // ─────────────────────────────────────────────────────────────
+            (function postSendFileDisposition() {
+                if (testMode) return;                      // never mutate files in test mode
+                if (postSendAction === 'keep') return;    // no-op
+                if (iDocId == null) return;                // can't clear cells without docId column
+
+                // Collect docIds/rows for items that actually sent OK
+                const idsToDispose: string[] = [];
+                const rowsToClear: number[] = [];
+
+                for (const b of batch) {
+                    const res = resultsByRow.get(b.rowIndex);
+                    if (res?.ok && b.docId) {
+                        idsToDispose.push(b.docId);
+                        rowsToClear.push(b.rowIndex);
+                    }
+                }
+                if (!idsToDispose.length) return;
+
+                // 1) Drive operations (best effort, throttled)
+                idsToDispose.forEach((id, idx) => {
+                    try {
+                        if (postSendAction === 'delete') {
+                            // permanent delete
+                            // @ts-ignore Advanced Drive Service
+                            Drive.Files.remove(id);
+                        } else {
+                            // move to Trash
+                            // @ts-ignore Advanced Drive Service
+                            Drive.Files.trash(id);
+                        }
+                    } catch (e) {
+                        // ignore (already deleted/trashed/permission issues)
+                    }
+                    // Gentle throttling
+                    if ((idx + 1) % 50 === 0) Utilities.sleep(600); else Utilities.sleep(20);
+                });
+
+                // 2) Clear docId + docUrl cells for those rows (batched)
+                if (!rowsToClear.length) return;
+
+                // Sort & coalesce contiguous row ranges to minimize writes
+                const sorted = Array.from(new Set(rowsToClear)).sort((a, b) => a - b);
+
+                const clearBlock = (start: number, end: number) => {
+                    const num = end - start + 1;
+                    const isTrash = postSendAction === 'trash';
+
+                    if (iDocUrl != null && iDocUrl === iDocId + 1) {
+                        const vals = Array.from({ length: num }, () => isTrash ? [""] : ["", ""]);
+                        sh.getRange(start, iDocId + 1, num, isTrash ? 1 : 2).setValues(vals);
+                    }
+                };
+
+                let i = 0;
+                while (i < sorted.length) {
+                    let start = sorted[i];
+                    let end = start;
+                    while (i + 1 < sorted.length && sorted[i + 1] === end + 1) {
+                        end = sorted[i + 1];
+                        i++;
+                    }
+                    clearBlock(start, end);
+                    i++;
+                }
+
+                SpreadsheetApp.flush();
+            })();
+
 
             // Commit usage (consume sent; release any unused portion of grant)
             const { used: usedNow } = _commitCredits_({ granted, sent });
