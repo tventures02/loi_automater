@@ -528,11 +528,11 @@ export default function SendCenterScreen({
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge label={`Credits left today: ${summary?.remaining ?? "—"}`} />
-                                <Badge label={`Left to send: ${summary?.queued ?? "—"}`} />
-                                <Badge label={`Sent: ${summary?.sent ?? "—"}`} />
-                                <Badge label={`Failed: ${summary?.failed ?? "—"}`} />
-                                <Badge label={`Total jobs: ${summary?.total ?? "—"}`} />
+                                <Badge label={`Credits left today`} number={summary?.remaining ?? 0}/>
+                                <Badge label={`Left to send`} number={summary?.queued ?? 0}/>
+                                <Badge label={`Sent`} number={summary?.sent ?? 0}/>
+                                <Badge label={`Failed`} number={summary?.failed ?? 0}/>
+                                <Badge label={`Total jobs`} number={summary?.total ?? 0}/>
                             </div>
                         </div>
                     </>
@@ -964,10 +964,12 @@ export default function SendCenterScreen({
 }
 
 /* Small subcomponents */
-function Badge({ label }: { label: string }) {
+function Badge({ label, number }: { label: string, number: number }) {
+    const numberString = number > 0 ? ` ${number}` : number === 0 ? ' 0' : '-';
+    const warningStyle = label.includes('Failed') && number > 0 ? 'text-red-700' : 'text-gray-700';
     return (
-        <div className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
-            {label}
+        <div className={`rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700`}>
+            {label}:<span className={`${warningStyle}`}>{numberString}</span>
         </div>
     );
 }
