@@ -56,6 +56,7 @@ export default function SettingsDialog({
         setLSSettings(INIT_SETTINGS);
         setSettings(INIT_SETTINGS);
         setMaxColCharNumber(INIT_SETTINGS.maxColCharNumber);
+        setPostSendAction(INIT_SETTINGS.postSendAction);
     }
 
     if (!open) return null;
