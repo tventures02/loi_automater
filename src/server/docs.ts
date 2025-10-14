@@ -1619,21 +1619,26 @@ function buildPlainTextFromDoc(docId: string) {
         return out;
     } catch (e) {
         // Fail soft: caller will use fallback body
-        return "";
+        throw e;
     }
 }
 
 
 function generateLOIPDF(docId: string) {
-    // Open the template document
-    const doc = DocumentApp.openById(docId);
-    const docName = doc.getName();
+    try {
+        // Open the template document
+        const doc = DocumentApp.openById(docId);
+        const docName = doc.getName();
 
-    doc.saveAndClose();
+        doc.saveAndClose();
 
-    // Convert the document to a PDF blob
-    const pdfBlob = doc.getAs('application/pdf').setName(`${docName || docId}.pdf`);
-    return pdfBlob; // Return the PDF blob
+        // Convert the document to a PDF blob
+        const pdfBlob = doc.getAs('application/pdf').setName(`${docName || docId}.pdf`);
+        return pdfBlob; // Return the PDF blob
+    } catch (e) {
+        console.error('Error generating LOI PDF', e);
+        throw e;
+    }
 }
 
 
