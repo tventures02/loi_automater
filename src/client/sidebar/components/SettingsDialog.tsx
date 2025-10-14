@@ -35,6 +35,7 @@ export default function SettingsDialog({
     }
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>, key: string) => {
         const val = e.target.value;
+        if (val === "") return;
         if (key === 'maxColCharNumber') {
             const n = parseInt(val, 10);
             if (!Number.isNaN(n)) {
