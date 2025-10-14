@@ -1704,7 +1704,6 @@ function buildPlainTextFromDoc(docId: string) {
 
 function generateLOIPDF(docId: string) {
     try {
-        console.log('docId', docId);
         if (!docId) {
             throw new Error('Attaching PDF but no docId provided for Google Doc reference.');
         }
