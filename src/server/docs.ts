@@ -5,6 +5,7 @@ import {
     _reserveCredits_,
     getSendCreditsLeft
 } from "./send_credits_management";
+import { convertPlainTextToHtml } from "./util-functions";
 
 var LOI_QUEUE_NAME = 'Sender Queue';
 var LOI_QUEUE_HEADERS = [
@@ -1233,7 +1234,16 @@ export const sendNextBatch = (payload) => {
                         if (pdf) attachments = [pdf];
                     }
 
-                    MailApp.sendEmail({ to, subject: finalSubject, body: rowBody, attachments });
+                    // Convert plain text to HTML
+                    const htmlBody = convertPlainTextToHtml(rowBody);
+                    
+                    MailApp.sendEmail({ 
+                        to, 
+                        subject: finalSubject, 
+                        body: rowBody, // Keep plain text for fallback/compatibility
+                        htmlBody: htmlBody, 
+                        attachments,
+                    });
                     hardLeft--;
 
                     resultsByRow.set(item.rowIndex, { ok: true, attempts: newAttempts, sentAt: now });
